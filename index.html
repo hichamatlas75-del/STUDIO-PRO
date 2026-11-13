@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InMenu Studio Pro — Grey Corner Café (PAO Menu 34×30 cm)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for Editorial Menu Design -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Montserrat:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- jsPDF for Vector/High-Res Print PDF Export with Crop Marks -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Mammoth.js for Native Browser Word (.docx) Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        idBg: '#18181b',
+                        idPanel: '#252528',
+                        idHeader: '#2e2e32',
+                        idBorder: '#3a3a3f',
+                        idInput: '#1c1c1f',
+                        idAccent: '#3b82f6',
+                        idBleed: '#ef4444',
+                        idMargin: '#ec4899',
+                        idFold: '#06b6d4',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        serif: ['Playfair Display', 'serif'],
+                        cinzel: ['Cinzel', 'serif'],
+                        montserrat: ['Montserrat', 'sans-serif'],
+                        cormorant: ['Cormorant Garamond', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-idBg text-gray-200 font-sans h-screen w-screen overflow-hidden flex flex-col text-xs">
+
+    <!-- ==================== TOP APPLICATION MENU & CONTROL BAR ==================== -->
+    <header class="bg-idHeader border-b border-idBorder h-10 flex items-center justify-between px-3 shrink-0 z-40">
+        <!-- Left: Brand & File Menu -->
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 bg-pink-600/20 border border-pink-500/40 px-2 py-1 rounded">
+                <span class="font-bold text-pink-400 tracking-tighter text-sm font-mono">Id</span>
+                <span class="font-semibold text-gray-100 tracking-tight">InMenu Studio Pro</span>
+                <span class="text-[10px] bg-pink-500/30 text-pink-200 px-1.5 py-0.2 rounded font-mono">34×30cm</span>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center space-x-1 border-l border-idBorder pl-3">
+                <button onclick="app.undo()" id="btn-undo" title="Annuler (Ctrl+Z)" class="px-2 py-1 rounded hover:bg-white/10 text-gray-300 disabled:opacity-30">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onclick="app.redo()" id="btn-redo" title="Rétablir (Ctrl+Y)" class="px-2 py-1 rounded hover:bg-white/10 text-gray-300 disabled:opacity-30">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <span class="h-4 w-[1px] bg-idBorder mx-1"></span>
+                <button onclick="app.openWordImportModal()" class="flex items-center space-x-1.5 bg-gradient-to-r from-indigo-600 to-amber-600 hover:from-indigo-500 hover:to-amber-500 text-white border border-amber-400/50 px-3 py-1 rounded font-semibold shadow-md transition">
+                    <i class="fa-solid fa-file-word"></i>
+                    <span>📄 Importer Word (.docx) & Auto-Mise en Page</span>
+                </button>
+                <button onclick="app.openDatabaseModal()" class="flex items-center space-x-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded font-medium transition">
+                    <i class="fa-solid fa-database"></i>
+                    <span>Base Plats & Prix (<span id="db-count-badge">0</span>)</span>
+                </button>
+                <button onclick="app.openEngineInspector()" class="flex items-center space-x-1.5 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 px-2.5 py-1 rounded font-medium transition" title="Inspecter l'architecture Engine.js & JSON">
+                    <i class="fa-solid fa-code"></i>
+                    <span>Moteur (engine.js)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center: InDesign Live Coordinate Bar (X, Y, L, H in mm) -->
+        <div id="top-transform-bar" class="hidden xl:flex items-center space-x-2 bg-idInput px-3 py-1 rounded border border-idBorder font-mono text-[11px]">
+            <span class="text-gray-400">X:</span>
+            <input type="number" step="0.5" id="bar-x" onchange="app.updateSelectedFromTopBar()" class="w-12 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
+            <span class="text-gray-500">mm</span>
+
+            <span class="text-gray-400 pl-1">Y:</span>
+            <input type="number" step="0.5" id="bar-y" onchange="app.updateSelectedFromTopBar()" class="w-12 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
+            <span class="text-gray-500">mm</span>
+
+            <span class="text-gray-600">|</span>
+
+            <span class="text-gray-400">L:</span>
+            <input type="number" step="0.5" id="bar-w" onchange="app.updateSelectedFromTopBar()" class="w-12 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
+            <span class="text-gray-500">mm</span>
+
+            <span class="text-gray-400 pl-1">H:</span>
+            <input type="number" step="0.5" id="bar-h" onchange="app.updateSelectedFromTopBar()" class="w-12 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
+            <span class="text-gray-500">mm</span>
+        </div>
+
+        <!-- Right: View Modes, 3D Fold, Save JSON, Export PDF/PNG -->
+        <div class="flex items-center space-x-2">
+            <!-- Toggle Guides / Preview Mode [W] -->
+            <button onclick="app.togglePreviewMode()" id="btn-preview-mode" class="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-idInput border border-idBorder hover:border-gray-500 text-gray-200 transition" title="Basculer Mode Normal / Aperçu sans repères (Touche W)">
+                <i class="fa-solid fa-eye text-cyan-400"></i>
+                <span id="preview-mode-label">Repères [W]</span>
+            </button>
+
+            <!-- 3D Fold Simulator -->
+            <button onclick="app.open3DFoldModal()" class="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/25 text-cyan-300 transition" title="Simuler le pliage 17×30 cm en 3D">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Pliage 3D</span>
+            </button>
+
+            <!-- Save / Load JSON -->
+            <div class="flex items-center bg-idInput rounded border border-idBorder">
+                <button onclick="app.exportProjectJSON()" class="px-2 py-1 hover:bg-white/10 text-gray-300" title="Sauvegarder le projet (.inmenu.json)">
+                    <i class="fa-solid fa-download"></i> JSON
+                </button>
+                <label class="px-2 py-1 hover:bg-white/10 text-gray-300 cursor-pointer border-l border-idBorder" title="Importer un projet JSON">
+                    <i class="fa-solid fa-upload"></i>
+                    <input type="file" accept=".json" onchange="app.importProjectJSON(event)" class="hidden">
+                </label>
+            </div>
+
+            <!-- Export Print Modal Button -->
+            <button onclick="app.openExportModal()" class="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded font-semibold shadow transition">
+                <i class="fa-solid fa-file-pdf"></i>
+                <span>Exporter PDF / PNG</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ==================== MAIN WORKSPACE AREA ==================== -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- 1. LEFT DOCK: INDESIGN TOOLBOX & PAGES NAVIGATOR -->
+        <aside class="w-72 bg-idPanel border-r border-idBorder flex flex-col shrink-0 z-30">
+            <!-- Left Dock Tabs -->
+            <div class="flex border-b border-idBorder bg-idHeader text-[11px] font-semibold">
+                <button onclick="app.switchLeftTab('blocks')" id="tab-btn-blocks" class="flex-1 py-2 text-center border-b-2 border-blue-500 text-white bg-idPanel">
+                    <i class="fa-solid fa-shapes mr-1"></i> Blocs Menu
+                </button>
+                <button onclick="app.switchLeftTab('pages')" id="tab-btn-pages" class="flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                    <i class="fa-solid fa-copy mr-1"></i> 5 Planches (10 Faces)
+                </button>
+            </div>
+
+            <!-- TAB 1: MENU BUILDING BLOCKS (Blocs de base du cahier des charges) -->
+            <div id="left-tab-blocks" class="flex-1 overflow-y-auto p-3 space-y-4">
+                <!-- Specs Banner -->
+                <div class="bg-idInput border border-idBorder rounded p-2.5 text-[11px] space-y-1">
+                    <div class="flex items-center justify-between font-semibold text-gray-200">
+                        <span><i class="fa-solid fa-ruler-combined text-cyan-400 mr-1"></i> Format Ouvert</span>
+                        <span class="font-mono text-cyan-300">340 × 300 mm</span>
+                    </div>
+                    <div class="flex justify-between text-gray-400">
+                        <span>2 Panneaux pliés :</span>
+                        <span class="font-mono">170 × 300 mm</span>
+                    </div>
+                    <div class="flex justify-between text-gray-400">
+                        <span>Fond perdu / Sécurité pli :</span>
+                        <span class="font-mono text-red-400">3 mm <span class="text-gray-500">/</span> <span class="text-cyan-400">±10 mm</span></span>
+                    </div>
+                </div>
+
+                <!-- Section: Blocs Métier Menu -->
+                <div>
+                    <h3 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2 flex items-center justify-between">
+                        <span>Blocs de Base (Clic pour ajouter)</span>
+                        <span class="text-blue-400">PAO</span>
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <!-- 1. Bandeau de catégorie vertical -->
+                        <button onclick="app.addMenuBlock('vertical_banner')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-blue-600/20 border border-idBorder hover:border-blue-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-amber-500/20 text-amber-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-grip-lines-vertical text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Bandeau Vertical</span>
+                            <span class="text-[9px] text-gray-400">Catégorie 90°</span>
+                        </button>
+
+                        <!-- 2. Ligne Plat + Description + Prix (Lié BDD) -->
+                        <button onclick="app.addMenuBlock('dish_item')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-blue-600/20 border border-idBorder hover:border-blue-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-utensils text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Ligne Plat + Prix</span>
+                            <span class="text-[9px] text-emerald-400">Lié Base de Données</span>
+                        </button>
+
+                        <!-- 3. Liste Catégorie Complète (Auto-table lié BDD) -->
+                        <button onclick="app.addMenuBlock('category_list')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-blue-600/20 border border-idBorder hover:border-blue-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-blue-500/20 text-blue-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-table-list text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Bloc Catégorie</span>
+                            <span class="text-[9px] text-blue-400">Auto-liste Plats BDD</span>
+                        </button>
+
+                        <!-- 4. Badge NOUVEAU -->
+                        <button onclick="app.addMenuBlock('badge_new')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-blue-600/20 border border-idBorder hover:border-blue-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-rose-500/20 text-rose-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-certificate text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Badge « NOUVEAU »</span>
+                            <span class="text-[9px] text-gray-400">Étiquette promo</span>
+                        </button>
+
+                        <!-- 5. Photo Gastronomique -->
+                        <button onclick="app.addMenuBlock('photo')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-blue-600/20 border border-idBorder hover:border-blue-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-camera-retro text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Cadre Photo</span>
+                            <span class="text-[9px] text-gray-400">Upload ou Galerie</span>
+                        </button>
+
+                        <!-- 6. Logo / En-tête -->
+                        <button onclick="app.addMenuBlock('logo')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-blue-600/20 border border-idBorder hover:border-blue-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-yellow-500/20 text-yellow-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-crown text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Bloc Logo</span>
+                            <span class="text-[9px] text-gray-400">Emblème & Titre</span>
+                        </button>
+
+                        <!-- 7. Texte Libre / Titre -->
+                        <button onclick="app.addMenuBlock('text')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-blue-600/20 border border-idBorder hover:border-blue-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-gray-500/20 text-gray-300 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-font text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Texte / Titre</span>
+                            <span class="text-[9px] text-gray-400">Typographie libre</span>
+                        </button>
+
+                        <!-- 8. Forme / Cadre Décoratif -->
+                        <button onclick="app.addMenuBlock('shape')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-blue-600/20 border border-idBorder hover:border-blue-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-regular fa-square text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Cadre / Fond</span>
+                            <span class="text-[9px] text-gray-400">Fond ou filet doré</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Insert Dish from Central Database -->
+                <div class="border-t border-idBorder pt-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                            <i class="fa-solid fa-bolt mr-1"></i> Insertion Rapide Plat (BDD)
+                        </h3>
+                        <button onclick="app.openDatabaseModal()" class="text-[10px] text-blue-400 hover:underline">Éditer BDD</button>
+                    </div>
+                    <div class="flex space-x-1 mb-2">
+                        <select id="quick-dish-select" class="flex-1 bg-idInput border border-idBorder rounded px-2 py-1.5 text-gray-200 text-[11px] focus:outline-none focus:border-blue-500">
+                        </select>
+                        <button onclick="app.insertSelectedQuickDish()" class="bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded font-semibold shrink-0" title="Insérer ce plat sur la planche active">
+                            + Plat
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Preset Page Templates Generator -->
+                <div class="border-t border-idBorder pt-3">
+                    <h3 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                        Gabarits de Planche Prêts à l'Emploi
+                    </h3>
+                    <div class="space-y-1.5">
+                        <button onclick="app.applySpreadTemplate('cover_back')" class="w-full text-left px-2.5 py-1.5 rounded bg-idInput hover:bg-white/5 border border-idBorder flex items-center justify-between">
+                            <span><i class="fa-solid fa-book-bookmark text-amber-400 mr-1.5"></i> Couverture + Dos (Panneau D/G)</span>
+                            <span class="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">Recto 1</span>
+                        </button>
+                        <button onclick="app.applySpreadTemplate('brunch_spread')" class="w-full text-left px-2.5 py-1.5 rounded bg-idInput hover:bg-white/5 border border-idBorder flex items-center justify-between">
+                            <span><i class="fa-solid fa-mug-hot text-emerald-400 mr-1.5"></i> Double Page Petits-Déj & Brunch</span>
+                            <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">Intérieur</span>
+                        </button>
+                        <button onclick="app.applySpreadTemplate('bistro_spread')" class="w-full text-left px-2.5 py-1.5 rounded bg-idInput hover:bg-white/5 border border-idBorder flex items-center justify-between">
+                            <span><i class="fa-solid fa-plate-wheat text-blue-400 mr-1.5"></i> Double Page Plats, Pâtes & Crêpes</span>
+                            <span class="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">Intérieur</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: 5 SHEETS / 10 FACES NAVIGATOR (Panneau Pages InDesign) -->
+            <div id="left-tab-pages" class="hidden flex-1 overflow-y-auto p-3 space-y-3">
+                <div class="text-[11px] text-gray-400 bg-idInput p-2 rounded border border-idBorder">
+                    Le menu comporte <strong>5 feuilles 34×30 cm</strong> (pli central à 17 cm), soit <strong>10 faces</strong> au total (Recto & Verso).
+                </div>
+                <div id="spreads-navigator-list" class="space-y-2.5">
+                    <!-- Populated dynamically by DocumentEngine -->
+                </div>
+            </div>
+
+            <!-- Left Footer: Current Face Quick Switcher -->
+            <div class="p-2.5 bg-idHeader border-t border-idBorder flex items-center justify-between">
+                <button onclick="app.prevFace()" class="px-2 py-1 bg-idInput hover:bg-white/10 rounded border border-idBorder text-gray-300">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <div class="text-center">
+                    <div id="footer-face-title" class="font-bold text-white text-[11px]">Feuille 1 — Recto</div>
+                    <div id="footer-face-sub" class="text-[9px] text-cyan-400 font-mono">Faces 1 & 2 / 10 (34×30 cm)</div>
+                </div>
+                <button onclick="app.nextFace()" class="px-2 py-1 bg-idInput hover:bg-white/10 rounded border border-idBorder text-gray-300">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- 2. CENTER WORKSPACE: RULERS + PASTEBOARD + 34x30cm SPREAD CANVAS -->
+        <main class="flex-1 flex flex-col bg-[#141416] relative overflow-hidden">
+
+            <!-- Top Horizontal Ruler (Graduated in cm / mm) -->
+            <div class="h-6 bg-idHeader border-b border-idBorder flex shrink-0 relative z-20">
+                <div class="w-6 h-6 border-r border-idBorder flex items-center justify-center text-[9px] font-mono text-gray-400 shrink-0 bg-idPanel">
+                    cm
+                </div>
+                <div id="ruler-top" class="flex-1 relative overflow-hidden font-mono text-[9px] text-gray-400"></div>
+            </div>
+
+            <div class="flex-1 flex relative overflow-hidden">
+                <!-- Left Vertical Ruler -->
+                <div id="ruler-left" class="w-6 bg-idHeader border-r border-idBorder relative overflow-hidden shrink-0 z-20 font-mono text-[9px] text-gray-400"></div>
+
+                <!-- Scrollable / Pannable Pasteboard Viewport -->
+                <div id="viewport" class="flex-1 pasteboard-bg overflow-auto relative p-12" onmousedown="app.onViewportMouseDown(event)">
+                    <div id="viewport-center" class="min-w-full min-h-full flex items-center justify-center">
+                        <div id="spread-stage" class="relative shrink-0">
+
+                            <!-- THE SPREAD CONTAINER (Includes 3mm Bleed Box outside the 340x300mm Trim Box) -->
+                            <div id="spread-wrapper" class="relative shadow-[0_25px_70px_rgba(0,0,0,0.85)] origin-top-left">
+
+                                <!-- 1. RED BLEED OUTLINE (Fond perdu +3mm tout autour : 346 x 306 mm) -->
+                                <div id="guide-bleed" class="absolute pointer-events-none border border-dashed border-red-500/90 z-30" title="Fond perdu de 3 mm (346 × 306 mm)">
+                                    <span class="absolute -top-4 left-0 text-[9px] font-mono text-red-400 bg-black/80 px-1 rounded whitespace-nowrap">Fond perdu +3 mm (346×306 mm)</span>
+                                </div>
+
+                                <!-- 1B. BLEED CLIP CONTAINER (Renders visible 3mm bleed in Normal mode, trims to 340x300mm in Preview mode) -->
+                                <div id="bleed-clip" class="relative overflow-hidden">
+                                    <!-- 2. ACTUAL TRIM PAGE (340 x 300 mm) -->
+                                    <div id="spread-page" class="relative" style="background-color: #fdfbf7;">
+
+                                        <!-- Panel Indicators (Left 17cm / Right 17cm) -->
+                                        <div id="guide-overlays" class="absolute inset-0 pointer-events-none z-30">
+                                            <!-- Trim Line Indicator (0..340 x 0..300mm) -->
+                                            <div id="guide-trim-box" class="absolute inset-0 border border-blue-400/35"></div>
+
+                                            <!-- Outer Safe Margin (10mm from trim edges) -->
+                                            <div id="guide-outer-margin" class="absolute border border-pink-500/60" style="left: 10mm; top: 10mm; right: 10mm; bottom: 10mm;">
+                                                <span class="absolute -top-3.5 right-1 text-[8px] font-mono text-pink-500 bg-black/70 px-1 rounded">Marge sécurité 10 mm</span>
+                                            </div>
+
+                                            <!-- Fold Safety Zone (160mm to 180mm -> 10mm each side of 170mm fold) -->
+                                            <div id="guide-fold-zone" class="absolute top-0 bottom-0 bg-cyan-500/10 border-l border-r border-dashed border-cyan-400/80 flex flex-col justify-between items-center py-1">
+                                                <span class="text-[8px] font-mono text-cyan-300 bg-slate-900/90 px-1.5 py-0.5 rounded border border-cyan-500/40 whitespace-nowrap">
+                                                    Zone sécurité pli (±10 mm : 16–18 cm)
+                                                </span>
+                                                <span class="text-[8px] font-mono text-cyan-300 bg-slate-900/90 px-1.5 py-0.5 rounded border border-cyan-500/40 whitespace-nowrap">
+                                                    Pli central X = 170 mm
+                                                </span>
+                                            </div>
+
+                                            <!-- Exact Central Fold Line at 170 mm -->
+                                            <div id="guide-fold-line" class="absolute top-0 bottom-0 w-[1.5px] bg-cyan-400 shadow-[0_0_6px_#06b6d4]"></div>
+
+                                            <!-- Dynamic Smart Alignment Guides (Magnetic Snapping) -->
+                                            <div id="smart-guide-v" class="hidden absolute top-0 bottom-0 w-[1px] bg-emerald-400 z-50"></div>
+                                            <div id="smart-guide-h" class="hidden absolute left-0 right-0 h-[1px] bg-emerald-400 z-50"></div>
+                                        </div>
+
+                                        <!-- 3. INTERACTIVE OBJECTS LAYER -->
+                                        <div id="objects-layer" class="absolute inset-0 z-20">
+                                            <!-- Rendered dynamically by VisualCanvasEditor -->
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Floating Status & Zoom Bar -->
+                <div class="absolute bottom-3 left-4 right-4 flex items-center justify-between pointer-events-none z-30">
+                    <!-- Left: Active Face & Panel Info -->
+                    <div class="pointer-events-auto flex items-center space-x-3 bg-idHeader/95 backdrop-blur border border-idBorder px-3 py-1.5 rounded-md shadow-lg text-[11px]">
+                        <span id="autosave-status" class="flex items-center text-emerald-400 font-mono">
+                            <span id="autosave-dot" class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+                            <span id="autosave-text">Auto-Save OK</span>
+                        </span>
+                        <span class="text-gray-600">|</span>
+                        <span class="text-gray-300">Panneau Gauche: <strong class="text-white font-mono">0–170 mm</strong></span>
+                        <span class="text-gray-600">•</span>
+                        <span class="text-gray-300">Panneau Droit: <strong class="text-white font-mono">170–340 mm</strong></span>
+                    </div>
+
+                    <!-- Right: Zoom & Snap Controls -->
+                    <div class="pointer-events-auto flex items-center space-x-2 bg-idHeader/95 backdrop-blur border border-idBorder px-2.5 py-1 rounded-md shadow-lg">
+                        <label class="flex items-center space-x-1 text-[11px] text-gray-300 cursor-pointer pr-2 border-r border-idBorder">
+                            <input type="checkbox" id="chk-snap" checked onchange="app.toggleSnap(this.checked)" class="accent-blue-500">
+                            <span>Magnétisme</span>
+                        </label>
+                        <button onclick="app.setZoom(app.zoom - 0.1)" class="px-1.5 py-0.5 hover:bg-white/10 rounded text-gray-300">
+                            <i class="fa-solid fa-minus"></i>
+                        </button>
+                        <select id="zoom-select" onchange="app.setZoom(parseFloat(this.value))" class="bg-idInput border border-idBorder rounded px-1.5 py-0.5 font-mono text-[11px] text-white focus:outline-none">
+                            <option value="0.5">50%</option>
+                            <option value="0.65">65%</option>
+                            <option value="0.8" selected>80%</option>
+                            <option value="1">100%</option>
+                            <option value="1.25">125%</option>
+                            <option value="1.5">150%</option>
+                            <option id="zoom-custom-opt" value="" hidden></option>
+                        </select>
+                        <button onclick="app.setZoom(app.zoom + 0.1)" class="px-1.5 py-0.5 hover:bg-white/10 rounded text-gray-300">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                        <button onclick="app.fitToScreen()" class="px-2 py-0.5 bg-idInput hover:bg-white/10 border border-idBorder rounded text-[10px] text-gray-300" title="Ajuster la planche 34×30 cm à l'écran">
+                            Ajuster
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 3. RIGHT DOCK: PROPERTIES INSPECTOR & LAYERS -->
+        <aside class="w-80 bg-idPanel border-l border-idBorder flex flex-col shrink-0 z-30">
+            <!-- Header -->
+            <div class="bg-idHeader px-3 py-2 border-b border-idBorder font-semibold flex items-center justify-between">
+                <span><i class="fa-solid fa-sliders text-blue-400 mr-1.5"></i> Propriétés de l'Objet</span>
+                <span id="prop-obj-type" class="text-[10px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">Planche</span>
+            </div>
+
+            <!-- Dynamic Inspector Body -->
+            <div id="inspector-content" class="flex-1 overflow-y-auto p-3 space-y-4">
+                <!-- Populated dynamically when an object or spread is selected -->
+            </div>
+
+            <!-- Layers / Objects Stack on Current Face -->
+            <div class="h-56 border-t border-idBorder flex flex-col bg-idBg/50">
+                <div class="bg-idHeader px-3 py-1.5 border-b border-idBorder flex items-center justify-between text-[11px] font-semibold text-gray-300">
+                    <span><i class="fa-solid fa-layer-group text-purple-400 mr-1.5"></i> Calques de la Face (<span id="layer-count">0</span>)</span>
+                    <div class="flex space-x-1">
+                        <button onclick="app.bringForward()" title="Avancer d'un plan" class="px-1.5 py-0.5 bg-idInput hover:bg-white/10 rounded border border-idBorder"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>
+                        <button onclick="app.sendBackward()" title="Reculer d'un plan" class="px-1.5 py-0.5 bg-idInput hover:bg-white/10 rounded border border-idBorder"><i class="fa-solid fa-arrow-down text-[10px]"></i></button>
+                    </div>
+                </div>
+                <div id="layers-list" class="flex-1 overflow-y-auto p-1.5 space-y-1">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- ==================== MODAL 1: CENTRALIZED MENU DATABASE (Plats & Prix à un seul endroit) ==================== -->
+    <div id="modal-database" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div class="bg-idPanel border border-idBorder rounded-lg shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-idHeader px-5 py-3.5 border-b border-idBorder flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-base">
+                        <i class="fa-solid fa-database"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white">Base de Données Centrale — Plats, Descriptions & Prix</h2>
+                        <p class="text-[11px] text-gray-400">Toute modification d'un plat ou d'un prix ici met automatiquement à jour toutes les planches du menu qui l'utilisent.</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="app.closeDatabaseModal(); app.openWordImportModal();" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded font-semibold flex items-center space-x-1.5">
+                        <i class="fa-solid fa-file-word"></i>
+                        <span>Importer depuis Word (.docx)</span>
+                    </button>
+                    <button onclick="app.addNewDishToDB()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded font-semibold flex items-center space-x-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Nouveau Plat</span>
+                    </button>
+                    <button onclick="app.closeDatabaseModal()" class="bg-idInput hover:bg-white/10 text-gray-300 px-3 py-1.5 rounded border border-idBorder">
+                        Fermer & Appliquer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="bg-idBg px-5 py-2.5 border-b border-idBorder flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-400">Filtrer par catégorie :</span>
+                    <select id="db-filter-cat" onchange="app.renderDatabaseTable()" class="bg-idPanel border border-idBorder rounded px-2.5 py-1 text-white">
+                        <option value="ALL">Toutes les catégories</option>
+                    </select>
+                </div>
+                <div class="text-amber-400 text-[11px] font-mono">
+                    <i class="fa-solid fa-circle-info mr-1"></i> Astuce : Cliquez sur « Insérer sur la planche » pour poser directement une ligne de plat sur la page active.
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="flex-1 overflow-y-auto p-5">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-idBorder text-[10px] uppercase text-gray-400 font-mono">
+                            <th class="py-2 px-2 w-20">ID</th>
+                            <th class="py-2 px-2 w-40">Catégorie</th>
+                            <th class="py-2 px-2 w-56">Nom du Plat / Formule</th>
+                            <th class="py-2 px-2">Description / Ingrédients</th>
+                            <th class="py-2 px-2 w-24 text-right">Prix</th>
+                            <th class="py-2 px-2 w-28">Badge</th>
+                            <th class="py-2 px-2 w-32 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="db-table-body" class="divide-y divide-idBorder/60 text-xs">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL 2: PRINT EXPORT (PDF AVEC TRAITS DE COUPE & PNG) ==================== -->
+    <div id="modal-export" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div class="bg-idPanel border border-idBorder rounded-lg shadow-2xl w-full max-w-xl overflow-hidden">
+            <div class="bg-idHeader px-5 py-3.5 border-b border-idBorder flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <i class="fa-solid fa-print text-blue-400 text-lg"></i>
+                    <div>
+                        <h2 class="text-sm font-bold text-white">Export Pré-Presse PDF & PNG Haute Définition</h2>
+                        <p class="text-[11px] text-gray-400">Module 3 : PrintExporter — Format ouvert 340 × 300 mm + Fond perdu 3 mm</p>
+                    </div>
+                </div>
+                <button onclick="app.closeExportModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <!-- Specs Summary -->
+                <div class="bg-idInput border border-idBorder rounded p-3 grid grid-cols-2 gap-2 text-[11px]">
+                    <div><span class="text-gray-400">Format fini (Trim) :</span> <strong class="text-white font-mono">340 × 300 mm</strong></div>
+                    <div><span class="text-gray-400">Panneau plié :</span> <strong class="text-white font-mono">170 × 300 mm</strong></div>
+                    <div><span class="text-gray-400">Fond perdu (Bleed) :</span> <strong class="text-red-400 font-mono">+3 mm (346 × 306 mm)</strong></div>
+                    <div><span class="text-gray-400">Pli central :</span> <strong class="text-cyan-400 font-mono">X = 170 mm</strong></div>
+                </div>
+
+                <!-- Printer Marks Checkboxes -->
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-gray-200 block">Repères d'impression (Traits de coupe & pli) :</label>
+                    <label class="flex items-center space-x-2.5 bg-idInput p-2.5 rounded border border-idBorder cursor-pointer">
+                        <input type="checkbox" id="exp-cropmarks" checked class="accent-blue-500 w-4 h-4">
+                        <div>
+                            <div class="font-semibold text-white">Inclure les traits de coupe (Crop Marks) et traits de pli</div>
+                            <div class="text-[10px] text-gray-400">Ajoute une marge technique autour du fond perdu de 3 mm avec traits de coupe aux 4 coins et repères de rainage à 170 mm.</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center space-x-2.5 bg-idInput p-2.5 rounded border border-idBorder cursor-pointer">
+                        <input type="checkbox" id="exp-bleed" checked class="accent-blue-500 w-4 h-4">
+                        <div>
+                            <div class="font-semibold text-white">Utiliser les paramètres de fond perdu du document (3 mm)</div>
+                            <div class="text-[10px] text-gray-400">Étend les éléments de fond de 3 mm au-delà du bord de coupe de 34 × 30 cm.</div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Export Scope & Resolution -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1.5">
+                        <label class="text-xs font-semibold text-gray-200 block">Étendue de l'export PDF :</label>
+                        <select id="exp-scope" class="w-full bg-idInput border border-idBorder rounded px-3 py-2 text-white">
+                            <option value="current">Face active (1 planche 34×30 cm)</option>
+                            <option value="all" selected>Toutes les 10 faces (5 Feuilles R/V)</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-xs font-semibold text-gray-200 block">Résolution Pré-Presse :</label>
+                        <select id="exp-dpi" class="w-full bg-idInput border border-idBorder rounded px-3 py-2 text-white">
+                            <option value="11.81" selected>300 DPI — Imprimerie HD (Recommandé)</option>
+                            <option value="7.87">200 DPI — Équilibré</option>
+                            <option value="5.91">150 DPI — Rapide / Web</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Progress Status -->
+                <div id="export-progress" class="hidden bg-blue-500/10 border border-blue-500/30 text-blue-300 px-3 py-2 rounded font-mono text-[11px] flex items-center space-x-2">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span id="export-progress-text">Génération haute définition en cours...</span>
+                </div>
+            </div>
+
+            <div class="bg-idHeader px-5 py-3 border-t border-idBorder flex items-center justify-between">
+                <button onclick="app.exportCurrentFacePNG()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded font-semibold flex items-center space-x-2">
+                    <i class="fa-solid fa-image"></i>
+                    <span>Exporter Face Active en PNG</span>
+                </button>
+                <button onclick="app.exportPDF()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded font-semibold flex items-center space-x-2 shadow-lg">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span>Générer le PDF Imprimeur</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL 3: 3D FOLD SIMULATOR (17×30 cm Folded Panels) ==================== -->
+    <div id="modal-3d" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6">
+        <div class="w-full max-w-4xl flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-base font-bold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-book-open text-cyan-400"></i>
+                    <span>Simulateur de Pliage 3D — Format Fermé 17 × 30 cm / Ouvert 34 × 30 cm</span>
+                </h2>
+                <p class="text-xs text-gray-400">Vérifiez que vos textes respectent bien la zone de sécurité autour du pli central à 17 cm.</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="text-xs text-gray-300">Angle de pliage :</span>
+                <input type="range" id="fold-angle-slider" min="0" max="75" value="35" oninput="app.update3DFoldAngle(this.value)" class="w-36 accent-cyan-400">
+                <button onclick="app.close3DFoldModal()" class="bg-idPanel hover:bg-white/10 text-white px-3 py-1.5 rounded border border-idBorder">
+                    Fermer
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 w-full flex items-center justify-center scene-3d overflow-hidden">
+            <div id="book-3d-container" class="book-3d flex items-center justify-center shadow-2xl" style="transform: rotateX(12deg);">
+                <!-- Left 17x30cm Panel -->
+                <div id="fold-panel-left" class="panel-left-3d overflow-hidden relative shadow-2xl border-r border-black/20" style="transform: rotateY(35deg);"></div>
+                <!-- Right 17x30cm Panel -->
+                <div id="fold-panel-right" class="panel-right-3d overflow-hidden relative shadow-2xl border-l border-white/10" style="transform: rotateY(-35deg);"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL 4: ENGINE.JS ARCHITECTURE INSPECTOR ==================== -->
+    <div id="modal-engine" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div class="bg-idPanel border border-idBorder rounded-lg shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
+            <div class="bg-idHeader px-5 py-3 border-b border-idBorder flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-microchip text-purple-400"></i>
+                    <span class="font-bold text-white text-sm">Architecture Interne en 3 Modules (`engine.js`, `VisualCanvasEditor`, `PrintExporter`)</span>
+                </div>
+                <button onclick="app.closeEngineInspector()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 flex-1 flex flex-col space-y-3 overflow-hidden">
+                <div class="grid grid-cols-3 gap-3 text-[11px]">
+                    <div class="bg-idInput p-3 rounded border border-purple-500/30">
+                        <div class="font-bold text-purple-300 mb-1">1. DocumentEngine (engine.js)</div>
+                        <p class="text-gray-400">Gère sans interface les 5 feuilles (10 faces Recto/Verso), la géométrie 340×300 mm (pli 170 mm, fond perdu 3 mm, sécurité 10 mm), la pile Annuler/Rétablir et la Base Plats/Prix.</p>
+                    </div>
+                    <div class="bg-idInput p-3 rounded border border-blue-500/30">
+                        <div class="font-bold text-blue-300 mb-1">2. VisualCanvasEditor</div>
+                        <p class="text-gray-400">Éditeur WYSIWYG millimétrique : déplacement, redimensionnement 8 poignées, guides magnétiques sur le pli et les marges, et blocs métier.</p>
+                    </div>
+                    <div class="bg-idInput p-3 rounded border border-emerald-500/30">
+                        <div class="font-bold text-emerald-300 mb-1">3. PrintExporter</div>
+                        <p class="text-gray-400">Rendu Canvas Haute-Définition & jsPDF en millimètres réels avec traits de coupe aux coins, traits de pliage en pointillés à 170 mm et hirondelles.</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-400 pt-1">
+                    <span>État JSON en temps réel du `DocumentEngine` :</span>
+                    <button onclick="app.copyEngineJSON()" class="text-blue-400 hover:underline"><i class="fa-regular fa-copy mr-1"></i>Copier le JSON</button>
+                </div>
+                <textarea id="engine-json-viewer" readonly class="flex-1 w-full bg-[#111113] text-emerald-400 font-mono text-[11px] p-3 rounded border border-idBorder focus:outline-none"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL 5: SMART WORD (.DOCX) IMPORTER & AUTO-LAYOUT ENGINE ==================== -->
+    <div id="modal-word-import" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-idPanel border border-idBorder rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+            <!-- Header -->
+            <div class="bg-idHeader px-5 py-3.5 border-b border-idBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-amber-500 text-white flex items-center justify-center text-base shadow">
+                        <i class="fa-solid fa-file-word"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white flex items-center space-x-2">
+                            <span>Assistant d'Importation Word (.docx / .txt) & Auto-Mise en Page PAO</span>
+                            <span class="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded font-mono">IA Parser + Auto-Flow 34×30cm</span>
+                        </h2>
+                        <p class="text-[11px] text-gray-400">Importez un fichier Word simple : le logiciel détecte les catégories, plats, descriptions et prix, puis compose automatiquement vos planches 34 × 30 cm.</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="app.downloadWordTemplateSample()" class="bg-idInput hover:bg-white/10 text-gray-200 border border-idBorder px-2.5 py-1.5 rounded text-[11px] flex items-center space-x-1.5" title="Télécharger un exemple de menu structuré au format .txt (compatible copier-coller Word)">
+                        <i class="fa-solid fa-download text-cyan-400"></i>
+                        <span>Modèle .txt</span>
+                    </button>
+                    <button onclick="app.closeWordImportModal()" class="text-gray-400 hover:text-white px-2 py-1 text-base">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3-Column Body -->
+            <div class="flex-1 grid grid-cols-12 overflow-hidden divide-x divide-idBorder">
+
+                <!-- STEP 1: FILE DROPZONE & RAW WORD TEXT EDITOR (4 cols) -->
+                <div class="col-span-4 flex flex-col p-4 bg-idBg/60 overflow-y-auto space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">
+                            1. Source Word (.docx) ou Texte
+                        </span>
+                        <button onclick="app.loadFull10FacesSampleWordText()" class="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2 py-1 rounded font-semibold transition">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Charger Exemple 10 Faces
+                        </button>
+                    </div>
+
+                    <!-- Drag & Drop Zone -->
+                    <label id="word-dropzone" class="border-2 border-dashed border-indigo-500/50 hover:border-indigo-400 bg-indigo-500/5 hover:bg-indigo-500/10 rounded-lg p-4 text-center cursor-pointer transition flex flex-col items-center justify-center space-y-1.5">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-indigo-400"></i>
+                        <div class="font-semibold text-gray-200 text-xs">Glissez votre fichier <span class="text-indigo-300 font-mono">.docx</span> ou <span class="text-cyan-300 font-mono">.txt</span> ici</div>
+                        <div class="text-[10px] text-gray-400">ou cliquez pour parcourir votre ordinateur</div>
+                        <input type="file" id="word-file-input" accept=".docx,.txt" onchange="app.handleWordFileUpload(event)" class="hidden">
+                    </label>
+
+                    <!-- Status Pill -->
+                    <div id="word-file-status" class="bg-idInput border border-idBorder rounded px-2.5 py-1.5 text-[11px] text-gray-300 flex items-center justify-between">
+                        <span><i class="fa-solid fa-keyboard text-emerald-400 mr-1.5"></i>Éditeur direct ou Copier-Coller Word</span>
+                        <button onclick="app.parseWordRawText()" class="text-blue-400 hover:underline font-semibold">Actualiser l'analyse</button>
+                    </div>
+
+                    <!-- Raw Textarea -->
+                    <div class="flex-1 flex flex-col">
+                        <label class="text-[10px] text-gray-400 mb-1 flex justify-between">
+                            <span>Contenu brut extrait (modifiable en direct) :</span>
+                            <span class="font-mono text-gray-500">Format: CATÉGORIE / Plat - Desc ... 65 DH</span>
+                        </label>
+                        <textarea id="word-raw-textarea" oninput="app.parseWordRawTextDebounced()" class="flex-1 w-full bg-[#111114] border border-idBorder rounded-lg p-3 text-gray-200 font-mono text-[11px] leading-relaxed focus:outline-none focus:border-indigo-500 resize-none" placeholder="Collez ici le texte de votre menu Word ou chargez un fichier .docx..."></textarea>
+                    </div>
+                </div>
+
+                <!-- STEP 2: SMART PARSER LIVE PREVIEW TABLE (5 cols) -->
+                <div class="col-span-5 flex flex-col p-4 bg-idPanel overflow-hidden">
+                    <div class="flex items-center justify-between mb-2 shrink-0">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                                2. Analyseur Intelligent (Plats & Catégories détectés)
+                            </span>
+                            <p class="text-[10px] text-gray-400">Vérifiez ou ajustez les données extraites avant la génération PAO.</p>
+                        </div>
+                        <div id="word-parsed-summary" class="bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 px-2.5 py-1 rounded font-mono text-[11px] font-bold">
+                            0 Cat. • 0 Plats
+                        </div>
+                    </div>
+
+                    <!-- Interactive Parsed Dishes List -->
+                    <div id="word-parsed-preview-container" class="flex-1 overflow-y-auto space-y-3 pr-1">
+                        <!-- Populated dynamically by WordImporter -->
+                    </div>
+                </div>
+
+                <!-- STEP 3: AUTO-LAYOUT & INTEGRATION OPTIONS (3 cols) -->
+                <div class="col-span-3 flex flex-col p-4 bg-idBg/90 justify-between overflow-y-auto">
+                    <div class="space-y-4">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-400">
+                                3. Mode d'Intégration & Mise en Page
+                            </span>
+                            <p class="text-[10px] text-gray-400 mt-0.5">Choisissez comment convertir ce menu dans vos planches 34 × 30 cm.</p>
+                        </div>
+
+                        <!-- Integration Target Radio Cards -->
+                        <div class="space-y-2" id="word-import-mode-group">
+                            <label class="word-mode-card flex items-start space-x-2.5 p-2.5 rounded-lg border border-blue-500 bg-blue-500/10 cursor-pointer transition">
+                                <input type="radio" name="word-import-mode" value="full_auto_spreads" checked onchange="app.updateWordModeCardsUI()" class="mt-1 accent-blue-500">
+                                <div>
+                                    <div class="font-bold text-white text-xs">Option A — Auto-Mise en Page Complète (5 Feuilles / 10 Faces)</div>
+                                    <div class="text-[10px] text-gray-300 leading-snug mt-0.5">Met à jour la Base Centrale et compose automatiquement la Couverture + les panneaux intérieurs 17×30 cm (bandeaux verticaux, plats alignés, respect du pli à 170 mm).</div>
+                                </div>
+                            </label>
+
+                            <label class="word-mode-card flex items-start space-x-2.5 p-2.5 rounded-lg border border-idBorder bg-idInput hover:border-gray-500 cursor-pointer transition">
+                                <input type="radio" name="word-import-mode" value="active_spread_only" onchange="app.updateWordModeCardsUI()" class="mt-1 accent-blue-500">
+                                <div>
+                                    <div class="font-bold text-gray-200 text-xs">Option B — Remplir la Planche Active Uniquement</div>
+                                    <div class="text-[10px] text-gray-400 leading-snug mt-0.5">Dispose les catégories détectées sur le panneau Gauche (10–160 mm) et Droit (180–330 mm) de la face ouverte actuelle.</div>
+                                </div>
+                            </label>
+
+                            <label class="word-mode-card flex items-start space-x-2.5 p-2.5 rounded-lg border border-idBorder bg-idInput hover:border-gray-500 cursor-pointer transition">
+                                <input type="radio" name="word-import-mode" value="db_only" onchange="app.updateWordModeCardsUI()" class="mt-1 accent-blue-500">
+                                <div>
+                                    <div class="font-bold text-gray-200 text-xs">Option C — Importer uniquement dans la Base Centrale</div>
+                                    <div class="text-[10px] text-gray-400 leading-snug mt-0.5">Ajoute ou remplace les plats dans la base de données sans modifier l'agencement visuel actuel de vos pages.</div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Theme Style Selector for Auto-Layout -->
+                        <div class="border-t border-idBorder pt-3 space-y-2">
+                            <label class="text-[11px] font-semibold text-gray-200 block">Style Graphique de l'Auto-Mise en Page :</label>
+                            <select id="word-layout-theme" class="w-full bg-idInput border border-idBorder rounded px-2.5 py-2 text-white text-xs font-medium">
+                                <option value="bistro_warm" selected>✨ Crème Minéral, Terracotta & Or (Chic & Lisible)</option>
+                                <option value="luxury_dark">🌙 Noir Prestige & Or Champagne (Lounge / Soir)</option>
+                                <option value="minimal_slate">📐 Blanc Pur & Ardoise Contemporaine</option>
+                            </select>
+                        </div>
+
+                        <!-- Restaurant Brand Header Settings -->
+                        <div class="border-t border-idBorder pt-3 space-y-2">
+                            <label class="text-[11px] font-semibold text-gray-200 block">En-tête & Couverture du Menu :</label>
+                            <input type="text" id="word-brand-title" value="GREY CORNER" placeholder="Nom du Restaurant" class="w-full bg-idInput border border-idBorder rounded px-2.5 py-1.5 text-white text-xs font-bold">
+                            <input type="text" id="word-brand-sub" value="café • SINCE 2024 • @GREYCORNERFES" placeholder="Slogan / Sous-titre" class="w-full bg-idInput border border-idBorder rounded px-2.5 py-1.5 text-gray-300 text-[11px]">
+                        </div>
+
+                        <!-- Geometry Safety Reminder -->
+                        <div class="bg-cyan-500/10 border border-cyan-500/30 rounded p-2.5 text-[10px] text-cyan-200 space-y-1">
+                            <div class="font-bold flex items-center"><i class="fa-solid fa-shield-halved mr-1.5 text-cyan-400"></i>Protection Automatique du Pli</div>
+                            <p class="text-cyan-300/80 leading-relaxed">L'algorithme répartit les colonnes entre <strong>12–158 mm</strong> (Gauche) et <strong>182–328 mm</strong> (Droite) afin qu'aucun texte ne touche la zone de pli (160–180 mm).</p>
+                        </div>
+                    </div>
+
+                    <!-- Execute Button -->
+                    <div class="pt-4 border-t border-idBorder mt-4">
+                        <button onclick="app.executeWordImportAndLayout()" class="w-full bg-gradient-to-r from-indigo-600 via-blue-600 to-amber-600 hover:from-indigo-500 hover:to-amber-500 text-white font-bold py-3 px-4 rounded-lg shadow-xl flex items-center justify-center space-x-2 text-xs transition transform active:scale-95">
+                            <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+                            <span>Générer & Intégrer le Menu Maintenant</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-14 right-6 bg-gray-900 border border-blue-500/50 text-white px-4 py-2.5 rounded-lg shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center space-x-2 pointer-events-none">
+        <i class="fa-solid fa-circle-check text-blue-400"></i>
+        <span id="toast-msg">Action effectuée</span>
+    </div>
+
+    <!-- ==================== APPLICATION JAVASCRIPT: 3 MODULAR ENGINES ==================== -->
+    <!-- Architecture Modulaire InMenu Studio Pro (Grey Corner Edition) -->
+    <script src="js/utils.js"></script>
+    <script src="js/grey-corner-data.js"></script>
+    <script src="js/word-importer.js"></script>
+    <script src="js/engine.js"></script>
+    <script src="js/print-exporter.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
