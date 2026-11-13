@@ -1,0 +1,80 @@
+* {
+    user-select: none;
+    box-sizing: border-box;
+}
+input, textarea, select {
+    user-select: text;
+}
+/* Custom Scrollbars InDesign Style */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #1c1c1f;
+}
+::-webkit-scrollbar-thumb {
+    background: #45454b;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #5a5a62;
+}
+
+/* Pasteboard Pattern */
+.pasteboard-bg {
+    background-color: #141416;
+    background-image: radial-gradient(#27272c 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Resize Handles */
+.resize-handle {
+    width: 8px;
+    height: 8px;
+    background-color: #ffffff;
+    border: 1.5px solid #3b82f6;
+    position: absolute;
+    z-index: 60;
+}
+.handle-nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.handle-n  { top: -5px; left: calc(50% - 4px); cursor: ns-resize; }
+.handle-ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.handle-e  { top: calc(50% - 4px); right: -5px; cursor: ew-resize; }
+.handle-se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+.handle-s  { bottom: -5px; left: calc(50% - 4px); cursor: ns-resize; }
+.handle-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.handle-w  { top: calc(50% - 4px); left: -5px; cursor: ew-resize; }
+
+/* Dotted Leaders for Menu Items */
+.menu-dots {
+    flex-grow: 1;
+    border-bottom: 1.5px dotted currentColor;
+    opacity: 0.45;
+    margin: 0 6px;
+    position: relative;
+    top: -4px;
+}
+
+/* 3D Fold Preview Perspective */
+.scene-3d {
+    perspective: 1600px;
+}
+.book-3d {
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.panel-left-3d {
+    transform-origin: right center;
+    transition: transform 0.7s ease;
+}
+.panel-right-3d {
+    transform-origin: left center;
+    transition: transform 0.7s ease;
+}
+
+/* Vertical Text utility */
+.vertical-banner-text {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+}
