@@ -188,31 +188,11 @@
     <!-- ==================== MAIN WORKSPACE AREA ==================== -->
     <div class="flex-1 flex overflow-hidden relative">
 
-        <!-- 1. LEFT DOCK: INDESIGN TOOLBOX & PAGES NAVIGATOR -->
-        <aside id="left-dock" class="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-idPanel border-r border-idBorder flex flex-col shrink-0 z-50 transform -translate-x-full transition-transform duration-300 lg:static lg:translate-x-0 lg:w-72 lg:z-30">
-            <!-- Mobile Drawer Header with Close Button -->
-            <div class="lg:hidden flex items-center justify-between px-3 py-2.5 bg-idHeader border-b border-idBorder">
-                <span class="font-bold text-xs text-white flex items-center space-x-1.5">
-                    <i class="fa-solid fa-layer-group text-blue-400"></i>
-                    <span>Outils & Pages</span>
-                </span>
-                <button onclick="app.closeMobileDrawers()" class="text-gray-400 hover:text-white p-1 rounded hover:bg-white/10">
-                    <i class="fa-solid fa-xmark text-base"></i>
-                </button>
-            </div>
-
+        <!-- 1. LEFT DOCK: INDESIGN TOOLBOX & PAGES NAVIGATOR (Desktop Only: hidden on mobile) -->
+        <aside id="left-dock" class="hidden lg:flex flex-col w-72 bg-idPanel border-r border-idBorder shrink-0 z-30">
             <!-- Left Dock Tabs -->
             <div class="flex border-b border-idBorder bg-idHeader text-[11px] font-semibold">
                 <button onclick="app.switchLeftTab('blocks')" id="tab-btn-blocks" class="flex-1 py-2 text-center border-b-2 border-blue-500 text-white bg-idPanel">
-                    <i class="fa-solid fa-shapes mr-1"></i> Blocs
-                </button>
-                <button onclick="app.switchLeftTab('illustrations')" id="tab-btn-illustrations" class="flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200">
-                    <i class="fa-solid fa-wand-magic-sparkles mr-1 text-amber-400"></i> Pack Canva
-                </button>
-                <button onclick="app.switchLeftTab('pages')" id="tab-btn-pages" class="flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200">
-                    <i class="fa-solid fa-copy mr-1"></i> Pages (<span id="tab-pages-count">10</span>)
-                </button>
-            </div>
                     <i class="fa-solid fa-shapes mr-1"></i> Blocs
                 </button>
                 <button onclick="app.switchLeftTab('illustrations')" id="tab-btn-illustrations" class="flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200">
@@ -536,20 +516,12 @@
             </div>
         </main>
 
-        <!-- 3. RIGHT DOCK: PROPERTIES INSPECTOR & LAYERS -->
-        <aside id="right-dock" class="fixed inset-y-0 right-0 w-80 max-w-[85vw] bg-idPanel border-l border-idBorder flex flex-col shrink-0 z-50 transform translate-x-full transition-transform duration-300 lg:static lg:translate-x-0 lg:w-80 lg:z-30">
+        <!-- 3. RIGHT DOCK: PROPERTIES INSPECTOR & LAYERS (Desktop Only: hidden on mobile) -->
+        <aside id="right-dock" class="hidden lg:flex flex-col w-80 bg-idPanel border-l border-idBorder shrink-0 z-30">
             <!-- Header -->
             <div class="bg-idHeader px-3 py-2 border-b border-idBorder font-semibold flex items-center justify-between">
-                <div class="flex items-center space-x-1.5 min-w-0">
-                    <i class="fa-solid fa-sliders text-blue-400"></i>
-                    <span class="truncate">Propriétés de l'Objet</span>
-                </div>
-                <div class="flex items-center space-x-1.5">
-                    <span id="prop-obj-type" class="text-[10px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">Planche</span>
-                    <button onclick="app.closeMobileDrawers()" class="lg:hidden text-gray-400 hover:text-white p-1 rounded hover:bg-white/10 ml-1">
-                        <i class="fa-solid fa-xmark text-sm"></i>
-                    </button>
-                </div>
+                <span><i class="fa-solid fa-sliders text-blue-400 mr-1.5"></i> Propriétés de l'Objet</span>
+                <span id="prop-obj-type" class="text-[10px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">Planche</span>
             </div>
 
             <!-- Dynamic Inspector Body -->
@@ -1100,18 +1072,139 @@
         </div>
     </div>
 
-    <!-- ==================== MOBILE DRAWER BACKDROP ==================== -->
-    <div id="mobile-drawer-backdrop" onclick="app.closeMobileDrawers()" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xs z-40 lg:hidden transition-opacity"></div>
+    <!-- ==================== MOBILE BACKDROP & BOTTOM SHEETS ==================== -->
+    <div id="mobile-sheet-backdrop" onclick="app.closeMobileSheets()" class="hidden fixed inset-0 bg-black/75 backdrop-blur-xs z-50 transition-opacity"></div>
 
-    <!-- ==================== MOBILE TOOLS ACTION SHEET ==================== -->
+    <!-- SHEET 1: PAGES NAVIGATOR (MOBILE) -->
+    <div id="sheet-mobile-pages" class="hidden fixed inset-x-0 bottom-0 z-50 flex flex-col justify-end">
+        <div class="bg-idPanel border-t border-idBorder rounded-t-2xl shadow-2xl w-full max-h-[82vh] flex flex-col overflow-hidden animate-slide-up">
+            <div class="bg-idHeader px-4 py-3 border-b border-idBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-copy text-blue-400 text-sm"></i>
+                    <span class="font-bold text-white text-sm">Planches & Pages (<span id="mobile-pages-count">10</span>)</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="app.addNewPage(); app.renderMobilePagesList();" class="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow flex items-center space-x-1">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>+ Page</span>
+                    </button>
+                    <button onclick="app.closeMobileSheets()" class="text-gray-400 hover:text-white p-1 ml-1">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="mobile-pages-list" class="p-4 space-y-2.5 overflow-y-auto max-h-[68vh]">
+                <!-- Populated dynamically by app.renderMobilePagesList() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SHEET 2: AJOUTER UN BLOC AU MENU (MOBILE) -->
+    <div id="sheet-mobile-add" class="hidden fixed inset-x-0 bottom-0 z-50 flex flex-col justify-end">
+        <div class="bg-idPanel border-t border-idBorder rounded-t-2xl shadow-2xl w-full max-h-[82vh] flex flex-col overflow-hidden animate-slide-up">
+            <div class="bg-idHeader px-4 py-3 border-b border-idBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-shapes text-amber-400 text-sm"></i>
+                    <span class="font-bold text-white text-sm">Ajouter un Bloc au Menu</span>
+                </div>
+                <button onclick="app.closeMobileSheets()" class="text-gray-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3.5 overflow-y-auto max-h-[68vh]">
+                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Blocs Prédéfinis</div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <button onclick="app.addMenuBlock('title_heading'); app.closeMobileSheets();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center space-x-2.5 text-left transition">
+                        <i class="fa-solid fa-heading text-blue-400 text-base"></i>
+                        <div><div class="font-bold text-white">Grand Titre</div><div class="text-[10px] text-gray-400">Cinzel / Serif</div></div>
+                    </button>
+                    <button onclick="app.addMenuBlock('dish_item'); app.closeMobileSheets();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center space-x-2.5 text-left transition">
+                        <i class="fa-solid fa-utensils text-emerald-400 text-base"></i>
+                        <div><div class="font-bold text-white">Plat + Prix</div><div class="text-[10px] text-gray-400">Points & tarif</div></div>
+                    </button>
+                    <button onclick="app.addMenuBlock('category_header'); app.closeMobileSheets();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center space-x-2.5 text-left transition">
+                        <i class="fa-solid fa-table-list text-purple-400 text-base"></i>
+                        <div><div class="font-bold text-white">Catégorie</div><div class="text-[10px] text-gray-400">Section de carte</div></div>
+                    </button>
+                    <button onclick="app.addMenuBlock('vertical_banner'); app.closeMobileSheets();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center space-x-2.5 text-left transition">
+                        <i class="fa-solid fa-grip-lines-vertical text-amber-400 text-base"></i>
+                        <div><div class="font-bold text-white">Bandeau Latéral</div><div class="text-[10px] text-gray-400">Bordure verticale</div></div>
+                    </button>
+                    <button onclick="app.addMenuBlock('badge_seal'); app.closeMobileSheets();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center space-x-2.5 text-left transition">
+                        <i class="fa-solid fa-certificate text-pink-400 text-base"></i>
+                        <div><div class="font-bold text-white">Badge & Sceau</div><div class="text-[10px] text-gray-400">Fait Maison, Bio</div></div>
+                    </button>
+                    <button onclick="app.addMenuBlock('food_image'); app.closeMobileSheets();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center space-x-2.5 text-left transition">
+                        <i class="fa-solid fa-image text-cyan-400 text-base"></i>
+                        <div><div class="font-bold text-white">Photo / Cadre</div><div class="text-[10px] text-gray-400">Image de plat</div></div>
+                    </button>
+                </div>
+
+                <div class="border-t border-idBorder pt-3 text-[11px] text-gray-400 font-bold uppercase tracking-wider">Gabarits Complets de Planche</div>
+                <div class="space-y-2">
+                    <button onclick="app.applySpreadTemplate('cover_spread'); app.closeMobileSheets();" class="w-full p-2.5 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center justify-between text-left text-xs transition">
+                        <span class="font-bold text-white flex items-center space-x-2"><i class="fa-solid fa-book-bookmark text-amber-400"></i><span>Couverture + Dos (Feuille 1)</span></span>
+                        <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono font-bold">Appliquer</span>
+                    </button>
+                    <button onclick="app.applySpreadTemplate('bistro_spread'); app.closeMobileSheets();" class="w-full p-2.5 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center justify-between text-left text-xs transition">
+                        <span class="font-bold text-white flex items-center space-x-2"><i class="fa-solid fa-mug-hot text-emerald-400"></i><span>Double Page Brunch & Plats</span></span>
+                        <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold">Appliquer</span>
+                    </button>
+                    <button onclick="app.applySpreadTemplate('flyer_promo_a4'); app.closeMobileSheets();" class="w-full p-2.5 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center justify-between text-left text-xs transition">
+                        <span class="font-bold text-white flex items-center space-x-2"><i class="fa-solid fa-file-lines text-cyan-400"></i><span>Gabarit Flyer Promotionnel A4</span></span>
+                        <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded font-mono font-bold">Appliquer</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHEET 3: PACK ILLUSTRATIONS CANVA (MOBILE) -->
+    <div id="sheet-mobile-canva" class="hidden fixed inset-x-0 bottom-0 z-50 flex flex-col justify-end">
+        <div class="bg-idPanel border-t border-idBorder rounded-t-2xl shadow-2xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
+            <div class="bg-idHeader px-4 py-3 border-b border-idBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-pink-400 text-sm"></i>
+                    <span class="font-bold text-white text-sm">Pack Illustrations Canva</span>
+                </div>
+                <button onclick="app.closeMobileSheets()" class="text-gray-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            <div id="mobile-canva-content" class="p-3.5 space-y-3 overflow-y-auto max-h-[72vh]">
+                <!-- Rendered dynamically by app.renderMobileCanvaSheet() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SHEET 4: INSPECTEUR D'OBJET (MOBILE) -->
+    <div id="sheet-mobile-inspector" class="hidden fixed inset-x-0 bottom-0 z-50 flex flex-col justify-end">
+        <div class="bg-idPanel border-t border-idBorder rounded-t-2xl shadow-2xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
+            <div class="bg-idHeader px-4 py-3 border-b border-idBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-purple-400 text-sm"></i>
+                    <span class="font-bold text-white text-sm">Propriétés de l'Élément</span>
+                    <span id="mobile-prop-badge" class="text-[9px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">Planche</span>
+                </div>
+                <button onclick="app.closeMobileSheets()" class="text-gray-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            <div id="mobile-inspector-body" class="p-4 space-y-3 overflow-y-auto max-h-[72vh]">
+                <!-- Rendered dynamically by app.renderMobileInspector() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MENU BURGER MOBILE (ACTIONS & OUTILS) ==================== -->
     <div id="modal-mobile-tools" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <div class="bg-idPanel border-t sm:border border-idBorder rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
             <div class="bg-idHeader px-4 py-3 border-b border-idBorder flex items-center justify-between">
                 <div class="flex items-center space-x-2">
                     <div class="w-7 h-7 rounded bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <i class="fa-solid fa-bars"></i>
                     </div>
-                    <span class="font-bold text-white text-sm">Actions & Outils Rapides</span>
+                    <span class="font-bold text-white text-sm">Menu Outils & Projet</span>
                 </div>
                 <button onclick="app.closeMobileToolsMenu()" class="text-gray-400 hover:text-white p-1">
                     <i class="fa-solid fa-xmark text-base"></i>
@@ -1123,28 +1216,28 @@
                         <i class="fa-solid fa-file-word text-indigo-400 text-lg mt-0.5"></i>
                         <div>
                             <div class="font-bold text-white">Importer Word</div>
-                            <div class="text-[10px] text-gray-400">Extraction auto</div>
+                            <div class="text-[10px] text-gray-400">Extraction automatique</div>
                         </div>
                     </button>
                     <button onclick="app.closeMobileToolsMenu(); app.openDatabaseModal();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg text-left flex items-start space-x-2.5 transition">
                         <i class="fa-solid fa-database text-amber-400 text-lg mt-0.5"></i>
                         <div>
                             <div class="font-bold text-white">Base Plats & Prix</div>
-                            <div class="text-[10px] text-gray-400">Carte & tarifs</div>
+                            <div class="text-[10px] text-gray-400">Modifier la carte</div>
                         </div>
                     </button>
                     <button onclick="app.closeMobileToolsMenu(); app.openFormatModal();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg text-left flex items-start space-x-2.5 transition">
                         <i class="fa-solid fa-expand text-cyan-400 text-lg mt-0.5"></i>
                         <div>
-                            <div class="font-bold text-white">Formats (A4/A5)</div>
-                            <div class="text-[10px] text-gray-400">Gabarits & plis</div>
+                            <div class="font-bold text-white">Formats (A4, A5...)</div>
+                            <div class="text-[10px] text-gray-400">Menu, Flyer, Dépliant</div>
                         </div>
                     </button>
                     <button onclick="app.closeMobileToolsMenu(); app.openPageNumberingModal();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg text-left flex items-start space-x-2.5 transition">
                         <i class="fa-solid fa-hashtag text-purple-400 text-lg mt-0.5"></i>
                         <div>
                             <div class="font-bold text-white">Numérotation</div>
-                            <div class="text-[10px] text-gray-400">Folios de page</div>
+                            <div class="text-[10px] text-gray-400">Folios automatiques</div>
                         </div>
                     </button>
                     <button onclick="app.closeMobileToolsMenu(); app.open3DFoldModal();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg text-left flex items-start space-x-2.5 transition">
@@ -1158,7 +1251,7 @@
                         <i class="fa-solid fa-maximize text-emerald-400 text-lg mt-0.5"></i>
                         <div>
                             <div class="font-bold text-white">Ajuster l'écran</div>
-                            <div class="text-[10px] text-gray-400">Plein écran</div>
+                            <div class="text-[10px] text-gray-400">Zoom 100% visible</div>
                         </div>
                     </button>
                 </div>
@@ -1178,29 +1271,29 @@
 
     <!-- ==================== MOBILE BOTTOM BAR ==================== -->
     <nav id="mobile-bottom-nav" class="lg:hidden fixed bottom-0 inset-x-0 h-14 bg-idHeader/95 backdrop-blur-md border-t border-idBorder flex items-center justify-around z-40 px-1 py-1 select-none text-[10px] shadow-2xl">
-        <button onclick="app.openMobileDrawer('pages')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-white transition">
+        <button onclick="app.openMobileSheet('pages')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-300 hover:text-white transition">
             <i class="fa-solid fa-copy text-sm mb-0.5 text-blue-400"></i>
             <span>Pages</span>
         </button>
-        <button onclick="app.openMobileDrawer('blocks')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-white transition">
-            <i class="fa-solid fa-shapes text-sm mb-0.5 text-amber-400"></i>
-            <span>Blocs</span>
+        <button onclick="app.openMobileSheet('add')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-300 hover:text-white transition">
+            <i class="fa-solid fa-plus text-sm mb-0.5 text-amber-400"></i>
+            <span>Ajouter</span>
         </button>
-        <button onclick="app.openMobileDrawer('illustrations')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-white transition">
+        <button onclick="app.openMobileSheet('canva')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-300 hover:text-white transition">
             <i class="fa-solid fa-wand-magic-sparkles text-sm mb-0.5 text-pink-400"></i>
             <span>Canva</span>
         </button>
-        <button onclick="app.openMobileDrawer('inspector')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-white transition">
+        <button onclick="app.openMobileSheet('inspector')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-300 hover:text-white transition">
             <i class="fa-solid fa-sliders text-sm mb-0.5 text-purple-400"></i>
             <span>Inspecteur</span>
         </button>
-        <button onclick="app.togglePreviewMode()" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-white transition">
+        <button onclick="app.togglePreviewMode()" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-300 hover:text-white transition">
             <i class="fa-solid fa-eye text-sm mb-0.5 text-cyan-400"></i>
             <span>Aperçu</span>
         </button>
-        <button onclick="app.toggleMobileToolsMenu()" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-white transition">
-            <i class="fa-solid fa-ellipsis text-sm mb-0.5 text-emerald-400"></i>
-            <span>Outils</span>
+        <button onclick="app.toggleMobileToolsMenu()" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-300 hover:text-white transition">
+            <i class="fa-solid fa-bars text-sm mb-0.5 text-emerald-400"></i>
+            <span>Menu</span>
         </button>
     </nav>
 

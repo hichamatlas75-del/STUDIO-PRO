@@ -90,12 +90,9 @@ input, textarea, select {
         touch-action: pan-x pan-y pinch-zoom;
     }
 
-    /* Mobile drawer slide-in */
-    #left-dock.mobile-drawer-open {
-        transform: translateX(0) !important;
-    }
-    #right-dock.mobile-drawer-open {
-        transform: translateX(0) !important;
+    /* Left and Right desktop docks are strictly hidden on mobile: canvas is the centerpiece */
+    #left-dock, #right-dock {
+        display: none !important;
     }
 }
 

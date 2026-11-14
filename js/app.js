@@ -359,10 +359,18 @@ class InMenuStudioApp {
 
                 // Update Footer & Badges
                 const specs = this.engine.specs;
-                document.getElementById('footer-face-title').textContent = face.name;
+                const footerFaceTitle = document.getElementById('footer-face-title');
+                if (footerFaceTitle) footerFaceTitle.textContent = face.name;
+                const footerFaceSub = document.getElementById('footer-face-sub');
                 const foldTxt = specs.hasFold ? ` (Pli ${specs.foldXMm} mm)` : '';
-                document.getElementById('footer-face-sub').textContent = `Face ${this.currentFaceIndex + 1} / ${this.engine.faces.length} • ${specs.widthMm}×${specs.heightMm} mm${foldTxt}`;
-                document.getElementById('db-count-badge').textContent = this.engine.dishesDB.length;
+                if (footerFaceSub) footerFaceSub.textContent = `Face ${this.currentFaceIndex + 1} / ${this.engine.faces.length} • ${specs.widthMm}×${specs.heightMm} mm${foldTxt}`;
+                const dbCountBadge = document.getElementById('db-count-badge');
+                if (dbCountBadge) dbCountBadge.textContent = this.engine.dishesDB.length;
+
+                const mobHeaderPill = document.getElementById('mobile-header-face-pill');
+                if (mobHeaderPill) mobHeaderPill.textContent = `${face.name} (${this.currentFaceIndex + 1}/${this.engine.faces.length})`;
+                const mobCanvasPill = document.getElementById('mobile-canvas-face-pill');
+                if (mobCanvasPill) mobCanvasPill.textContent = `${face.name} (${this.currentFaceIndex + 1}/${this.engine.faces.length})`;
 
                 this.renderCanvasPageNumberOverlay();
 
@@ -2968,19 +2976,7 @@ class InMenuStudioApp {
             }
 
             closeTopModal() {
-                const modalMobileTools = document.getElementById('modal-mobile-tools');
-                if (modalMobileTools && !modalMobileTools.classList.contains('hidden')) {
-                    this.closeMobileToolsMenu();
-                    return true;
-                }
-                const leftDock = document.getElementById('left-dock');
-                if (leftDock && leftDock.classList.contains('mobile-drawer-open')) {
-                    this.closeMobileDrawers();
-                    return true;
-                }
-                const rightDock = document.getElementById('right-dock');
-                if (rightDock && rightDock.classList.contains('mobile-drawer-open')) {
-                    this.closeMobileDrawers();
+                if (this.closeMobileSheets()) {
                     return true;
                 }
                 const modalFormat = document.getElementById('modal-format');
@@ -3558,53 +3554,263 @@ class InMenuStudioApp {
             }
 
             // ==========================================
-            // MOBILE RESPONSIVE DRAWERS & TOOLS
+            // MOBILE BOTTOM SHEETS ARCHITECTURE
+            // (Page principale / canevas est la pièce maîtresse)
             // ==========================================
-            openMobileDrawer(type) {
-                const leftDock = document.getElementById('left-dock');
-                const rightDock = document.getElementById('right-dock');
-                const backdrop = document.getElementById('mobile-drawer-backdrop');
+            openMobileSheet(sheetName) {
+                this.closeMobileSheets();
+                const backdrop = document.getElementById('mobile-sheet-backdrop');
+                if (backdrop) backdrop.classList.remove('hidden');
 
-                this.closeMobileToolsMenu();
-
-                if (type === 'pages' || type === 'blocks' || type === 'illustrations') {
-                    this.switchLeftTab(type);
-                    if (rightDock) rightDock.classList.remove('mobile-drawer-open');
-                    if (leftDock) leftDock.classList.add('mobile-drawer-open');
-                    if (backdrop) backdrop.classList.remove('hidden');
-                } else if (type === 'inspector') {
-                    if (leftDock) leftDock.classList.remove('mobile-drawer-open');
-                    if (rightDock) rightDock.classList.add('mobile-drawer-open');
-                    if (backdrop) backdrop.classList.remove('hidden');
-                    this.renderInspector();
+                if (sheetName === 'pages') {
+                    this.renderMobilePagesList();
+                    const el = document.getElementById('sheet-mobile-pages');
+                    if (el) el.classList.remove('hidden');
+                } else if (sheetName === 'add') {
+                    const el = document.getElementById('sheet-mobile-add');
+                    if (el) el.classList.remove('hidden');
+                } else if (sheetName === 'canva') {
+                    this.renderMobileCanvaSheet();
+                    const el = document.getElementById('sheet-mobile-canva');
+                    if (el) el.classList.remove('hidden');
+                } else if (sheetName === 'inspector') {
+                    this.renderMobileInspector();
+                    const el = document.getElementById('sheet-mobile-inspector');
+                    if (el) el.classList.remove('hidden');
                 }
             }
 
-            closeMobileDrawers() {
-                const leftDock = document.getElementById('left-dock');
-                const rightDock = document.getElementById('right-dock');
-                const backdrop = document.getElementById('mobile-drawer-backdrop');
-
-                if (leftDock) leftDock.classList.remove('mobile-drawer-open');
-                if (rightDock) rightDock.classList.remove('mobile-drawer-open');
+            closeMobileSheets() {
+                let closedAny = false;
+                const sheetIds = ['sheet-mobile-pages', 'sheet-mobile-add', 'sheet-mobile-canva', 'sheet-mobile-inspector', 'modal-mobile-tools'];
+                sheetIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && !el.classList.contains('hidden')) {
+                        el.classList.add('hidden');
+                        closedAny = true;
+                    }
+                });
+                const backdrop = document.getElementById('mobile-sheet-backdrop');
                 if (backdrop) backdrop.classList.add('hidden');
-                this.closeMobileToolsMenu();
+                return closedAny;
             }
 
             toggleMobileToolsMenu() {
                 const modal = document.getElementById('modal-mobile-tools');
                 if (!modal) return;
-                this.closeMobileDrawers();
-                if (modal.classList.contains('hidden')) {
+                const isHidden = modal.classList.contains('hidden');
+                this.closeMobileSheets();
+                if (isHidden) {
                     modal.classList.remove('hidden');
-                } else {
-                    modal.classList.add('hidden');
+                    const backdrop = document.getElementById('mobile-sheet-backdrop');
+                    if (backdrop) backdrop.classList.remove('hidden');
                 }
             }
 
             closeMobileToolsMenu() {
-                const modal = document.getElementById('modal-mobile-tools');
-                if (modal) modal.classList.add('hidden');
+                this.closeMobileSheets();
+            }
+
+            renderMobilePagesList() {
+                const container = document.getElementById('mobile-pages-list');
+                const countBadge = document.getElementById('mobile-pages-count');
+                if (countBadge) countBadge.textContent = this.engine.faces.length;
+                if (!container) return;
+
+                const specs = this.engine.specs;
+                let html = '';
+
+                this.engine.faces.forEach((face, idx) => {
+                    const isCurrent = this.currentFaceIndex === idx;
+                    html += `
+                        <div onclick="app.goToFace(${idx}); app.closeMobileSheets();" class="p-3 rounded-xl border cursor-pointer transition flex items-center justify-between ${
+                            isCurrent ? 'border-cyan-400 bg-cyan-500/15 ring-2 ring-cyan-400/40 shadow-lg' : 'border-idBorder bg-idInput hover:border-gray-500'
+                        }">
+                            <div class="flex items-center space-x-3 min-w-0">
+                                <div class="w-9 h-11 rounded border border-black/50 shrink-0 shadow flex items-center justify-center text-xs font-bold font-mono ${
+                                    isCurrent ? 'bg-cyan-400 text-black' : 'bg-gray-800 text-gray-300'
+                                }" style="background:${isCurrent ? '#22d3ee' : escapeHTML(face.bgColor || '#1c1c1f')}">
+                                    ${idx + 1}
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-white text-xs truncate">${escapeHTML(face.name)}</div>
+                                    <div class="text-[10px] text-gray-400 font-mono">${face.objects.length} éléments • ${specs.widthMm}×${specs.heightMm}mm</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1 shrink-0" onclick="event.stopPropagation()">
+                                <button onclick="app.duplicatePage(${idx}); app.renderMobilePagesList();" class="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white text-xs" title="Dupliquer">
+                                    <i class="fa-regular fa-clone"></i>
+                                </button>
+                                ${this.engine.faces.length > 1 ? `
+                                <button onclick="app.removePage(${idx}); app.renderMobilePagesList();" class="p-2 hover:bg-rose-500/20 rounded-lg text-gray-400 hover:text-rose-400 text-xs" title="Supprimer">
+                                    <i class="fa-regular fa-trash-can"></i>
+                                </button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            }
+
+            renderMobileCanvaSheet() {
+                const container = document.getElementById('mobile-canva-content');
+                if (!container) return;
+
+                const pack = window.CanvaIllustrationsPack || (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null);
+                if (!pack || !pack.items) {
+                    container.innerHTML = '<div class="p-4 text-center text-gray-400">Pack en cours de chargement...</div>';
+                    return;
+                }
+
+                const categories = pack.categories || [];
+                const activeCat = this.activeIllustrationCategory || 'all';
+                const query = (this.illustrationsSearchQuery || '').toLowerCase().trim();
+
+                let filtered = pack.items;
+                if (activeCat !== 'all') {
+                    filtered = filtered.filter(i => i.category === activeCat);
+                }
+                if (query) {
+                    filtered = filtered.filter(i => 
+                        i.name.toLowerCase().includes(query) || 
+                        (i.tags && i.tags.some(t => t.toLowerCase().includes(query)))
+                    );
+                }
+
+                container.innerHTML = `
+                    <div class="relative">
+                        <input type="text" 
+                               value="${escapeHTML(this.illustrationsSearchQuery || '')}" 
+                               oninput="app.searchIllustrations(this.value); app.renderMobileCanvaSheet();"
+                               placeholder="Rechercher (café, burger, ornement...)" 
+                               class="w-full bg-idInput border border-idBorder rounded-xl px-3 py-2.5 pl-8 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-pink-400">
+                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-3 text-gray-400 text-xs"></i>
+                        ${query ? `
+                            <button onclick="app.searchIllustrations(''); app.renderMobileCanvaSheet();" class="absolute right-2.5 top-2.5 text-gray-400 hover:text-white">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    <div class="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                        ${categories.map(c => `
+                            <button onclick="app.filterIllustrations('${c.id}'); app.renderMobileCanvaSheet();" class="px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap font-medium transition flex items-center space-x-1 ${
+                                activeCat === c.id 
+                                    ? 'bg-pink-500 text-white font-bold shadow' 
+                                    : 'bg-idInput text-gray-300 hover:bg-white/10'
+                            }">
+                                <i class="fa-solid ${c.icon} text-[9px]"></i>
+                                <span>${escapeHTML(c.name.split(' ')[0])}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+
+                    <div class="text-[10px] text-gray-400 flex items-center justify-between px-1">
+                        <span>${filtered.length} illustrations disponibles</span>
+                        <span class="text-pink-400 font-semibold">1 tap pour insérer</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2.5 max-h-[50vh] overflow-y-auto pr-1">
+                        ${filtered.map(item => `
+                            <div onclick="app.addIllustrationObject('${item.id}'); app.closeMobileSheets();" 
+                                 class="p-2.5 rounded-xl bg-idInput border border-idBorder hover:border-pink-400 active:scale-95 cursor-pointer flex flex-col items-center justify-between transition shadow-sm aspect-square">
+                                <div class="w-full h-12 flex items-center justify-center p-1">
+                                    ${pack.buildSVGString(item, { color: item.defaultColor || '#c8a96a' })}
+                                </div>
+                                <span class="text-[9px] text-gray-300 font-medium text-center truncate w-full mt-1">
+                                    ${escapeHTML(item.name)}
+                                </span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            renderMobileInspector() {
+                const container = document.getElementById('mobile-inspector-body');
+                const badge = document.getElementById('mobile-prop-badge');
+                if (!container) return;
+
+                const obj = this.selectedObject;
+                if (!obj) {
+                    if (badge) badge.textContent = 'Planche';
+                    container.innerHTML = `
+                        <div class="text-center py-6 text-gray-400 text-xs space-y-2">
+                            <i class="fa-solid fa-arrow-pointer text-2xl text-blue-400 animate-bounce"></i>
+                            <div class="font-bold text-white">Aucun élément sélectionné</div>
+                            <p class="text-[11px] text-gray-400">Touchez un bloc, texte ou illustration sur le menu pour modifier sa taille, couleur ou police.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (badge) badge.textContent = obj.type.toUpperCase();
+
+                let html = `
+                    <div class="space-y-3 text-xs">
+                        <div class="flex items-center justify-between pb-2 border-b border-idBorder">
+                            <span class="font-bold text-white">${escapeHTML(obj.title || obj.type)}</span>
+                            <button onclick="app.deleteSelected(); app.closeMobileSheets();" class="text-rose-400 hover:text-rose-300 font-semibold text-xs flex items-center space-x-1 px-2 py-1 bg-rose-500/15 rounded">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>Supprimer</span>
+                            </button>
+                        </div>
+                `;
+
+                if (obj.type === 'text') {
+                    html += `
+                        <div>
+                            <label class="text-gray-400 text-[11px] block mb-1">Contenu texte :</label>
+                            <textarea oninput="app.updateSelectedProp('content', this.value)" class="w-full bg-idInput border border-idBorder rounded p-2 text-white text-xs">${escapeHTML(obj.content || '')}</textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-gray-400 text-[11px] block mb-1">Taille (pt) :</label>
+                                <input type="number" step="0.5" value="${obj.fontSizePt || 12}" onchange="app.updateSelectedProp('fontSizePt', parseFloat(this.value))" class="w-full bg-idInput border border-idBorder rounded p-1.5 text-white">
+                            </div>
+                            <div>
+                                <label class="text-gray-400 text-[11px] block mb-1">Couleur :</label>
+                                <input type="color" value="${obj.color || '#ffffff'}" onchange="app.updateSelectedProp('color', this.value)" class="w-full h-8 bg-idInput border border-idBorder rounded cursor-pointer">
+                            </div>
+                        </div>
+                    `;
+                } else if (obj.type === 'dish_row') {
+                    html += `
+                        <div class="space-y-2">
+                            <div>
+                                <label class="text-gray-400 text-[11px] block mb-1">Nom du plat :</label>
+                                <input type="text" value="${escapeHTML(obj.dishName || '')}" oninput="app.updateSelectedProp('dishName', this.value)" class="w-full bg-idInput border border-idBorder rounded p-2 text-white font-bold">
+                            </div>
+                            <div>
+                                <label class="text-gray-400 text-[11px] block mb-1">Prix affiché :</label>
+                                <input type="text" value="${escapeHTML(obj.priceText || '')}" oninput="app.updateSelectedProp('priceText', this.value)" class="w-full bg-idInput border border-idBorder rounded p-2 text-emerald-400 font-mono font-bold">
+                            </div>
+                            <div>
+                                <label class="text-gray-400 text-[11px] block mb-1">Description / Ingrédients :</label>
+                                <input type="text" value="${escapeHTML(obj.descText || '')}" oninput="app.updateSelectedProp('descText', this.value)" class="w-full bg-idInput border border-idBorder rounded p-2 text-gray-300">
+                            </div>
+                        </div>
+                    `;
+                } else if (obj.type === 'illustration') {
+                    html += `
+                        <div>
+                            <label class="text-gray-400 text-[11px] block mb-1">Teinte de l'illustration :</label>
+                            <input type="color" value="${obj.color || '#c8a96a'}" onchange="app.updateSelectedProp('color', this.value)" class="w-full h-9 bg-idInput border border-idBorder rounded cursor-pointer">
+                        </div>
+                    `;
+                }
+
+                html += `
+                        <div class="pt-2 border-t border-idBorder flex justify-end">
+                            <button onclick="app.closeMobileSheets()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-xs">
+                                Terminer
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                container.innerHTML = html;
             }
         }
 
