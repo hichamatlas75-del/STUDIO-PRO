@@ -1,0 +1,740 @@
+/**
+ * MODULE 2A: Core Controller, State Management, Shortcuts & Event Delegation (app-core.js)
+ */
+class InMenuStudioApp {
+    constructor() {
+        if (typeof window !== 'undefined') {
+            window.app = this;
+        }
+        this.engine = new DocumentEngine();
+        this.engine.loadFromLocalStorage();
+        this.engine.saveState();
+
+        this.exporter = new PrintExporter(this.engine);
+
+        // Base scale: 1 mm = 3 px at 100% zoom (340mm = 1020px, 300mm = 900px)
+        this.basePxPerMm = 3;
+        this.zoom = 0.8;
+
+        this.currentFaceIndex = 0;
+        this.selectedObjectId = null;
+        this.previewMode = false; // 'W' shortcut InDesign mode
+        this.snapEnabled = true;
+
+        // Drag / Resize Interaction State & Timers
+        this.interaction = null;
+        this.debounceSaveTimer = null;
+        this.activeIllustrationCategory = 'all';
+        this.illustrationsSearchQuery = '';
+
+        // Google Drive / Local Disk Synchronization State (Option A)
+        this.activeFileHandle = null;
+        this.activeFileName = (typeof localStorage !== 'undefined' && localStorage.getItem('inmenu_last_synced_filename')) || null;
+        this.isSavingDisk = false;
+
+        this.init();
+    }
+
+    init() {
+        this.setupGeometryDOM();
+        this.bindViewportEvents();
+        this.bindActionDelegation();
+        this.initWordDropzone();
+        this.renderSpreadsNavigator();
+        this.populateQuickDishSelect();
+        this.renderCurrentFace();
+        this.renderInspector();
+        this.updateUndoRedoButtons();
+        this.updateAutoSaveUI(this.engine.lastSaveSuccess);
+        this.bindGlobalShortcuts();
+        this.initModalBackdrops();
+        this.renderIllustrationsTab();
+        this.updateFormatHeaderUI();
+        this.updateDiskSyncUI(true);
+
+        // Asynchronously verify if larger project exists in IndexedDB
+        if (this.engine.loadFromAsyncStorage) {
+            this.engine.loadFromAsyncStorage().then(loaded => {
+                if (loaded) {
+                    this.renderSpreadsNavigator();
+                    this.populateQuickDishSelect();
+                    this.renderCurrentFace();
+                    this.renderInspector();
+                    this.updateUndoRedoButtons();
+                    this.updateAutoSaveUI(true);
+                }
+            }).catch(() => { this.engine.persistReady = true; });
+        } else {
+            this.engine.persistReady = true;
+        }
+
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+            this.fitToScreen();
+        }
+        requestAnimationFrame(() => this.renderRulers());
+    }
+
+    initModalBackdrops() {
+        const modalIds = [
+            'modal-database', 'modal-export', 'modal-3d', 'modal-engine',
+            'modal-word-import', 'modal-format', 'modal-page-numbering',
+            'modal-templates', 'modal-mobile-tools'
+        ];
+        modalIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('click', (e) => {
+                    if (e.target === el) {
+                        this.closeTopModal();
+                    }
+                });
+            }
+        });
+    }
+
+    bindViewportEvents() {
+        const viewport = document.getElementById('viewport');
+        if (viewport) {
+            viewport.addEventListener('scroll', () => {
+                requestAnimationFrame(() => this.renderRulers());
+            }, { passive: true });
+            viewport.addEventListener('mousedown', (e) => {
+                this.onViewportMouseDown(e);
+            });
+        }
+        window.addEventListener('resize', () => {
+            requestAnimationFrame(() => this.renderRulers());
+        });
+        // Ne pas perdre une saisie en attente de debounce lors de la fermeture / mise en arrière-plan
+        window.addEventListener('beforeunload', () => this.flushPendingSave());
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') this.flushPendingSave();
+        });
+    }
+
+    /**
+     * Délégation centralisée des événements (click, input, change)
+     * Remplace tous les attributs inline onclick / oninput / onchange.
+     */
+    bindActionDelegation() {
+        if (typeof document === 'undefined' || this._delegationBound) return;
+        this._delegationBound = true;
+
+        document.addEventListener('click', (e) => {
+            const el = e.target.closest('[data-action]');
+            if (!el) return;
+            const action = el.dataset.action;
+            if (el.dataset.closeTools === 'true') {
+                this.closeMobileToolsMenu();
+            }
+            this.handleDelegatedClick(action, el, e);
+            if (el.dataset.closeMobile === 'true') {
+                this.closeMobileSheets();
+            }
+        });
+
+        document.addEventListener('input', (e) => {
+            const el = e.target.closest('[data-input]');
+            if (!el) return;
+            this.handleDelegatedInput(el.dataset.input, el, e);
+        });
+
+        document.addEventListener('change', (e) => {
+            const el = e.target.closest('[data-change]');
+            if (!el) return;
+            this.handleDelegatedChange(el.dataset.change, el, e);
+        });
+    }
+
+    handleDelegatedClick(action, el, e) {
+        switch (action) {
+            case 'noop':
+                e.stopPropagation();
+                break;
+            case 'undo':
+                this.undo();
+                break;
+            case 'redo':
+                this.redo();
+                break;
+            case 'open-word-import':
+                if (el.dataset.closeDb === 'true') this.closeDatabaseModal();
+                this.openWordImportModal();
+                break;
+            case 'close-word-import':
+                this.closeWordImportModal();
+                break;
+            case 'open-database':
+                this.openDatabaseModal();
+                break;
+            case 'close-database':
+                this.closeDatabaseModal();
+                break;
+            case 'open-engine-inspector':
+                this.openEngineInspector();
+                break;
+            case 'close-engine-inspector':
+                this.closeEngineInspector();
+                break;
+            case 'copy-engine-json':
+                this.copyEngineJSON();
+                break;
+            case 'open-templates-modal':
+                this.openTemplatesModal();
+                break;
+            case 'close-templates-modal':
+                this.closeTemplatesModal();
+                break;
+            case 'open-format-modal':
+                this.openFormatModal();
+                break;
+            case 'close-format-modal':
+                this.closeFormatModal();
+                break;
+            case 'open-page-numbering':
+                this.openPageNumberingModal();
+                break;
+            case 'close-page-numbering':
+                this.closePageNumberingModal();
+                break;
+            case 'save-page-numbering':
+                this.savePageNumberingFromModal();
+                break;
+            case 'toggle-preview-mode':
+                this.togglePreviewMode();
+                break;
+            case 'open-3d-fold':
+                this.open3DFoldModal();
+                break;
+            case 'close-3d-fold':
+                this.close3DFoldModal();
+                break;
+            case 'save-disk':
+                this.saveProjectToDisk(el.dataset.saveAs === 'true');
+                break;
+            case 'open-disk':
+                this.openProjectFromDisk();
+                break;
+            case 'export-json':
+                this.exportProjectJSON();
+                break;
+            case 'open-export-modal':
+                this.openExportModal();
+                break;
+            case 'close-export-modal':
+                this.closeExportModal();
+                break;
+            case 'export-separate-png':
+                this.exportSeparatePanelsPNG();
+                break;
+            case 'export-face-png':
+                this.exportCurrentFacePNG();
+                break;
+            case 'export-pdf':
+                this.exportPDF();
+                break;
+            case 'toggle-mobile-tools':
+                this.toggleMobileToolsMenu();
+                break;
+            case 'close-mobile-tools':
+                this.closeMobileToolsMenu();
+                break;
+            case 'open-mobile-sheet':
+                this.openMobileSheet(el.dataset.sheet);
+                break;
+            case 'close-mobile-sheets':
+                this.closeMobileSheets();
+                break;
+            case 'switch-left-tab':
+                this.switchLeftTab(el.dataset.tab);
+                break;
+            case 'add-menu-block':
+                this.addMenuBlock(el.dataset.type);
+                break;
+            case 'insert-quick-dish':
+                this.insertSelectedQuickDish();
+                break;
+            case 'apply-spread-template':
+                this.applySpreadTemplate(el.dataset.template);
+                break;
+            case 'prev-face':
+                this.prevFace();
+                break;
+            case 'next-face':
+                this.nextFace();
+                break;
+            case 'go-to-face':
+                this.goToFace(parseInt(el.dataset.index, 10));
+                break;
+            case 'add-new-page':
+                this.addNewPage();
+                if (el.dataset.refreshMobile === 'true') this.renderMobilePagesList();
+                break;
+            case 'duplicate-page':
+                e.stopPropagation();
+                this.duplicatePage(parseInt(el.dataset.index, 10));
+                if (el.dataset.refreshMobile === 'true') this.renderMobilePagesList();
+                break;
+            case 'remove-page':
+                e.stopPropagation();
+                this.removePage(parseInt(el.dataset.index, 10));
+                if (el.dataset.refreshMobile === 'true') this.renderMobilePagesList();
+                break;
+            case 'zoom-step':
+                this.setZoom(this.zoom + parseFloat(el.dataset.delta));
+                break;
+            case 'fit-to-screen':
+                this.fitToScreen();
+                break;
+            case 'bring-to-front':
+                this.bringToFront();
+                break;
+            case 'bring-forward':
+                this.bringForward();
+                break;
+            case 'send-backward':
+                this.sendBackward();
+                break;
+            case 'send-to-back':
+                this.sendToBack();
+                break;
+            case 'add-dish-db':
+                this.addNewDishToDB();
+                break;
+            case 'insert-dish-from-modal': {
+                const tr = el.closest('tr');
+                this.insertDishFromModal((tr && tr.dataset.dishId) || el.dataset.dishId);
+                break;
+            }
+            case 'delete-dish-db': {
+                const tr = el.closest('tr');
+                this.deleteDishFromDB((tr && tr.dataset.dishId) || el.dataset.dishId);
+                break;
+            }
+            case 'download-word-sample':
+                this.downloadWordTemplateSample();
+                break;
+            case 'load-word-sample':
+                this.loadFull10FacesSampleWordText();
+                break;
+            case 'parse-word-raw':
+                this.parseWordRawText();
+                break;
+            case 'toggle-word-badge': {
+                const row = el.closest('[data-item-id]');
+                this.toggleWordPreviewBadge((row && row.dataset.itemId) || el.dataset.itemId);
+                break;
+            }
+            case 'execute-word-import':
+                this.executeWordImportAndLayout();
+                break;
+            case 'change-active-format':
+                this.changeActiveFormat(el.dataset.format);
+                break;
+            case 'filter-templates':
+                this.filterTemplates(el.dataset.cat);
+                break;
+            case 'reset-templates-filter':
+                this.searchTemplates('');
+                this.filterTemplates('all');
+                break;
+            case 'start-project-template':
+                this.startProjectFromTemplate(el.dataset.tplId);
+                break;
+            case 'apply-template-page':
+                this.applyTemplateToActivePage(el.dataset.tplId);
+                break;
+            case 'filter-illustrations':
+                this.filterIllustrations(el.dataset.cat);
+                if (el.dataset.refreshMobile === 'true') this.renderMobileCanvaSheet();
+                break;
+            case 'clear-illustrations-search':
+                this.searchIllustrations('');
+                if (el.dataset.refreshMobile === 'true') this.renderMobileCanvaSheet();
+                break;
+            case 'add-illustration':
+                this.addIllustrationObject(el.dataset.id);
+                break;
+            case 'select-object':
+                this.selectObject(el.dataset.objId);
+                break;
+            case 'toggle-lock':
+                e.stopPropagation();
+                this.toggleLockSelected(el.dataset.objId || null);
+                break;
+            case 'align-selected':
+                this.alignSelected(el.dataset.mode);
+                break;
+            case 'duplicate-selected':
+                this.duplicateSelected();
+                break;
+            case 'delete-selected':
+                this.deleteSelected();
+                break;
+            case 'fit-block-height':
+                this.updateObjProp('h', parseFloat(el.dataset.height));
+                this.renderInspector();
+                break;
+            case 'set-obj-color':
+                this.updateObjProp('color', el.dataset.color, false);
+                this.renderInspector();
+                break;
+            case 'toggle-obj-flip':
+                if (this.selectedObject) {
+                    const prop = el.dataset.flip;
+                    this.updateObjProp(prop, !this.selectedObject[prop], false);
+                    this.renderInspector();
+                }
+                break;
+        }
+    }
+
+    handleDelegatedInput(type, el) {
+        switch (type) {
+            case 'face-bg-color':
+                this.updateFaceBgColor(el.value, true);
+                break;
+            case 'obj-prop':
+                this.handleInspectorPropEvent(el, true);
+                break;
+            case 'db-search':
+                this.renderDatabaseTable();
+                break;
+            case 'fold-angle':
+                this.update3DFoldAngle(el.value);
+                break;
+            case 'word-raw':
+                this.parseWordRawTextDebounced();
+                break;
+            case 'search-templates':
+                this.searchTemplates(el.value);
+                break;
+            case 'search-illustrations':
+                this.searchIllustrations(el.value);
+                if (el.dataset.refreshMobile === 'true') this.renderMobileCanvaSheet();
+                break;
+            case 'mobile-selected-prop':
+                this.updateSelectedProp(el.dataset.prop, el.value, true);
+                break;
+        }
+    }
+
+    handleDelegatedChange(type, el, e) {
+        switch (type) {
+            case 'top-bar-transform':
+                this.updateSelectedFromTopBar();
+                break;
+            case 'import-json':
+                this.importProjectJSON(e);
+                break;
+            case 'toggle-snap':
+                this.toggleSnap(el.checked);
+                break;
+            case 'zoom-select':
+                this.setZoom(parseFloat(el.value));
+                break;
+            case 'db-filter-cat':
+                this.renderDatabaseTable();
+                break;
+            case 'word-file-upload':
+                this.handleWordFileUpload(e);
+                break;
+            case 'word-import-mode':
+                this.updateWordModeCardsUI();
+                break;
+            case 'pgnum-format':
+                this.updatePageNumberingPreview();
+                break;
+            case 'face-bg-color':
+                this.updateFaceBgColor(el.value, false);
+                break;
+            case 'obj-prop':
+                this.handleInspectorPropEvent(el, false);
+                break;
+            case 'upload-photo':
+                this.uploadPhotoFile(e);
+                break;
+            case 'db-dish-field': {
+                const tr = el.closest('tr');
+                if (tr) this.updateDishDB(tr.dataset.dishId, el.dataset.field, el.value);
+                break;
+            }
+            case 'word-preview-field': {
+                const row = el.closest('[data-item-id]');
+                if (row) this.updateWordPreviewItem(row.dataset.itemId, el.dataset.field, el.value);
+                break;
+            }
+            case 'mobile-selected-prop': {
+                const val = el.dataset.valType === 'number' ? parseFloat(el.value) : el.value;
+                this.updateSelectedProp(el.dataset.prop, val, false);
+                break;
+            }
+        }
+    }
+
+    handleInspectorPropEvent(el, isLiveInput) {
+        const prop = el.dataset.prop;
+        if (!prop) return;
+        let val;
+        const valType = el.dataset.valType;
+        if (valType === 'number') {
+            val = parseFloat(el.value);
+        } else if (valType === 'opacity-pct') {
+            val = Math.max(0.05, Math.min(1, parseFloat(el.value) / 100));
+        } else if (valType === 'transparent-toggle') {
+            val = el.checked ? 'transparent' : (el.dataset.fallbackColor || '#ffffff');
+        } else {
+            val = el.value;
+        }
+        this.updateObjProp(prop, val, isLiveInput);
+        if (!isLiveInput && el.dataset.refreshInspector === 'true') {
+            this.renderInspector();
+        }
+    }
+
+    commitState(skipRender = false) {
+        clearTimeout(this.debounceSaveTimer);
+        this.debounceSaveTimer = null;
+        const saved = this.engine.saveState(this.currentFaceIndex);
+        this.updateAutoSaveUI(saved);
+        this.updateUndoRedoButtons();
+        if (this.activeFileName) {
+            this.updateDiskSyncUI(false);
+        }
+        if (!skipRender) {
+            this.renderCurrentFace();
+        }
+    }
+
+    commitStateDebounced() {
+        clearTimeout(this.debounceSaveTimer);
+        this.debounceSaveTimer = setTimeout(() => {
+            this.debounceSaveTimer = null;
+            const saved = this.engine.saveState(this.currentFaceIndex);
+            this.updateAutoSaveUI(saved);
+            this.updateUndoRedoButtons();
+            if (this.activeFileName) {
+                this.updateDiskSyncUI(false);
+            }
+        }, 400);
+    }
+
+    /**
+     * Enregistre immédiatement une modification encore en attente de debounce.
+     * Indispensable avant Undo/Redo (sinon l'annulation saute une étape et perd la saisie)
+     * et avant fermeture de l'onglet (sinon les 400 dernières ms sont perdues).
+     */
+    flushPendingSave() {
+        if (!this.debounceSaveTimer) return;
+        clearTimeout(this.debounceSaveTimer);
+        this.debounceSaveTimer = null;
+        const saved = this.engine.saveState(this.currentFaceIndex);
+        this.updateAutoSaveUI(saved);
+        this.updateUndoRedoButtons();
+    }
+
+    updateAutoSaveUI(ok) {
+        const statusEl = document.getElementById('autosave-status');
+        const dotEl = document.getElementById('autosave-dot');
+        const textEl = document.getElementById('autosave-text');
+        if (!statusEl || !dotEl || !textEl) return;
+        if (ok) {
+            statusEl.className = 'flex items-center text-emerald-400 font-mono';
+            dotEl.className = 'w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse';
+            textEl.textContent = 'Auto-Save OK';
+        } else {
+            statusEl.className = 'flex items-center text-amber-400 font-mono';
+            dotEl.className = 'w-2 h-2 rounded-full bg-amber-400 mr-1.5';
+            textEl.textContent = 'Stockage local saturé (Export JSON conseillé)';
+        }
+    }
+
+    // Convert mm to screen canvas pixels (at 100% unscaled DOM layer)
+    mmToPx(mm) {
+        return mm * this.basePxPerMm;
+    }
+
+    pxToMm(px) {
+        return +(px / this.basePxPerMm).toFixed(1);
+    }
+
+    get currentFace() {
+        return this.engine.faces[this.currentFaceIndex];
+    }
+
+    get selectedObject() {
+        if (!this.selectedObjectId) return null;
+        return this.currentFace.objects.find(o => o.id === this.selectedObjectId) || null;
+    }
+
+    undo() {
+        this.flushPendingSave();
+        if (this.engine.undo()) {
+            if (typeof this.engine.activeFaceIndex === 'number' && this.engine.activeFaceIndex >= 0 && this.engine.activeFaceIndex < this.engine.faces.length) {
+                this.currentFaceIndex = this.engine.activeFaceIndex;
+            }
+            this.selectedObjectId = null;
+            this.populateQuickDishSelect();
+            this.renderCurrentFace();
+            this.renderInspector();
+            this.updateUndoRedoButtons();
+            this.updateAutoSaveUI(this.engine.lastSaveSuccess);
+            this.showToast('Action annulée (Ctrl+Z)');
+        }
+    }
+
+    redo() {
+        this.flushPendingSave();
+        if (this.engine.redo()) {
+            if (typeof this.engine.activeFaceIndex === 'number' && this.engine.activeFaceIndex >= 0 && this.engine.activeFaceIndex < this.engine.faces.length) {
+                this.currentFaceIndex = this.engine.activeFaceIndex;
+            }
+            this.selectedObjectId = null;
+            this.populateQuickDishSelect();
+            this.renderCurrentFace();
+            this.renderInspector();
+            this.updateUndoRedoButtons();
+            this.updateAutoSaveUI(this.engine.lastSaveSuccess);
+            this.showToast('Action rétablie (Ctrl+Y)');
+        }
+    }
+
+    updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('btn-undo');
+        const redoBtn = document.getElementById('btn-redo');
+        if (undoBtn) undoBtn.disabled = this.engine.history.length <= 1;
+        if (redoBtn) redoBtn.disabled = this.engine.redoStack.length === 0;
+    }
+
+    isAnyModalOpen() {
+        const modalIds = [
+            'modal-database', 'modal-export', 'modal-3d', 'modal-engine',
+            'modal-word-import', 'modal-format', 'modal-page-numbering', 'modal-templates'
+        ];
+        return modalIds.some(id => {
+            const el = document.getElementById(id);
+            return el && !el.classList.contains('hidden');
+        });
+    }
+
+    closeTopModal() {
+        if (this.closeMobileSheets()) {
+            return true;
+        }
+        const modalTemplates = document.getElementById('modal-templates');
+        if (modalTemplates && !modalTemplates.classList.contains('hidden')) {
+            this.closeTemplatesModal();
+            return true;
+        }
+        const modalFormat = document.getElementById('modal-format');
+        if (modalFormat && !modalFormat.classList.contains('hidden')) {
+            this.closeFormatModal();
+            return true;
+        }
+        const modalPageNum = document.getElementById('modal-page-numbering');
+        if (modalPageNum && !modalPageNum.classList.contains('hidden')) {
+            this.closePageNumberingModal();
+            return true;
+        }
+        const modalWord = document.getElementById('modal-word-import');
+        if (modalWord && !modalWord.classList.contains('hidden')) {
+            this.closeWordImportModal();
+            return true;
+        }
+        const modalEngine = document.getElementById('modal-engine');
+        if (modalEngine && !modalEngine.classList.contains('hidden')) {
+            this.closeEngineInspector();
+            return true;
+        }
+        const modal3d = document.getElementById('modal-3d');
+        if (modal3d && !modal3d.classList.contains('hidden')) {
+            this.close3DFoldModal();
+            return true;
+        }
+        const modalExport = document.getElementById('modal-export');
+        if (modalExport && !modalExport.classList.contains('hidden')) {
+            this.closeExportModal();
+            return true;
+        }
+        const modalDb = document.getElementById('modal-database');
+        if (modalDb && !modalDb.classList.contains('hidden')) {
+            this.closeDatabaseModal();
+            return true;
+        }
+        return false;
+    }
+
+    bindGlobalShortcuts() {
+        window.addEventListener('keydown', (e) => {
+            const keyLower = e.key.toLowerCase();
+
+            // Ctrl + S or Cmd + S: Save directly to Google Drive / Disk file
+            if ((e.ctrlKey || e.metaKey) && keyLower === 's') {
+                e.preventDefault();
+                this.saveProjectToDisk(false);
+                return;
+            }
+
+            if (e.key === 'Escape') {
+                if (this.closeTopModal()) {
+                    e.preventDefault();
+                    return;
+                }
+                if (this.selectedObjectId) {
+                    e.preventDefault();
+                    this.selectObject(null);
+                    return;
+                }
+            }
+
+            if (this.isAnyModalOpen()) return;
+            const tag = document.activeElement ? document.activeElement.tagName : '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+            if ((e.ctrlKey || e.metaKey) && keyLower === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    this.redo();
+                } else {
+                    this.undo();
+                }
+            } else if ((e.ctrlKey || e.metaKey) && keyLower === 'y') {
+                e.preventDefault();
+                this.redo();
+            } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (this.selectedObjectId && !this.previewMode) {
+                    e.preventDefault();
+                    this.deleteSelected();
+                }
+            } else if (keyLower === 'w' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                e.preventDefault();
+                this.togglePreviewMode();
+            } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                const obj = this.selectedObject;
+                if (obj && !obj.locked && !this.previewMode) {
+                    e.preventDefault();
+                    const step = e.shiftKey ? 2.0 : 0.5;
+                    if (e.key === 'ArrowLeft') obj.x = +(obj.x - step).toFixed(1);
+                    else if (e.key === 'ArrowRight') obj.x = +(obj.x + step).toFixed(1);
+                    else if (e.key === 'ArrowUp') obj.y = +(obj.y - step).toFixed(1);
+                    else if (e.key === 'ArrowDown') obj.y = +(obj.y + step).toFixed(1);
+                    this.commitState(false);
+                    this.renderInspector();
+                }
+            }
+        });
+    }
+
+    showToast(msg) {
+        const toast = document.getElementById('toast');
+        const toastMsg = document.getElementById('toast-msg');
+        if (toastMsg) toastMsg.textContent = msg;
+        if (toast) {
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            clearTimeout(this.toastTimer);
+            this.toastTimer = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2600);
+        }
+    }
+}

@@ -89,7 +89,9 @@ const InMenuStorage = {
             localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
             lsSuccess = true;
         } catch (_) {
-            // normal si le projet dépasse 5 Mo avec photos
+            // normal si le projet dépasse 5 Mo avec photos.
+            // On supprime l'ancienne copie pour ne jamais relire une version périmée.
+            try { localStorage.removeItem(key); } catch (__) {}
         }
 
         return idbSuccess || lsSuccess;
@@ -117,3 +119,7 @@ const InMenuStorage = {
         }
     }
 };
+
+function sanitizeFileName(str) {
+    return String(str ?? '').replace(/[^\w.\-]+/g, '_').replace(/^_+|_+$/g, '') || 'export';
+}

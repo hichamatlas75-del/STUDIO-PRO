@@ -132,6 +132,10 @@ class DocumentEngine {
         this.maxHistory = 30;
         this.lastSaveSuccess = true;
         this.lastRestoredFaceIndex = null;
+
+        // Empêche d'écraser un projet sauvegardé (IndexedDB) par l'état par défaut
+        // tant que le chargement asynchrone n'est pas terminé.
+        this.persistReady = false;
     }
 
     getDefaultDishesDatabase() {
@@ -241,8 +245,12 @@ class DocumentEngine {
             case 'simple':
                 return `${pageNumber}`;
             case 'roman': {
-                const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
-                return romans[pageNumber - 1] || `${pageNumber}`;
+                let n = Math.floor(pageNumber);
+                if (n < 1 || n > 3999) return `${pageNumber}`;
+                const map = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+                let out = '';
+                for (const [v, s] of map) { while (n >= v) { out += s; n -= v; } }
+                return out;
             }
             default:
                 return `Page ${pageNumber}`;
@@ -323,7 +331,7 @@ class DocumentEngine {
         const defaultName = isFlyer ? `Flyer — Page ${nextIdx}` : `Planche ${nextIdx}`;
 
         const newFace = {
-            id: `face_${Date.now().toString(36)}_${nextIdx}`,
+            id: generateUniqueId('face'),
             sheetNumber: Math.ceil(nextIdx / 2),
             side: nextIdx % 2 === 1 ? 'Recto' : 'Verso',
             name: name || defaultName,
@@ -342,7 +350,7 @@ class DocumentEngine {
         if (faceIndex < 0 || faceIndex >= this.faces.length) return null;
         const src = this.faces[faceIndex];
         const copy = JSON.parse(JSON.stringify(src));
-        copy.id = `face_${Date.now().toString(36)}_copy`;
+        copy.id = generateUniqueId('face_copy');
         copy.name = `${src.name} (Copie)`;
         copy.objects.forEach((o, idx) => {
             o.id = generateUniqueId(`obj_dup_${idx}`);
@@ -471,6 +479,7 @@ class DocumentEngine {
     }
 
     persistToLocalStorage() {
+        if (!this.persistReady) return true;
         if (typeof InMenuStorage !== 'undefined' && InMenuStorage.setItem) {
             InMenuStorage.setItem('inmenu_studio_v3_greycorner_split', this.toJSON(false))
                 .then(ok => {
@@ -574,6 +583,7 @@ class DocumentEngine {
 
         const targetCount = Math.max(1, data.faces.length);
         const faces = [];
+        const seenFaceIds = new Set();
         for (let i = 0; i < targetCount; i++) {
             const sheet = Math.floor(i / 2) + 1;
             const side = i % 2 === 0 ? 'Recto' : 'Verso';
@@ -597,8 +607,11 @@ class DocumentEngine {
                     })
                 : [];
 
+            let faceId = (src && src.id) ? String(src.id) : `page_${i + 1}`;
+            if (seenFaceIds.has(faceId)) faceId = generateUniqueId('page');
+            seenFaceIds.add(faceId);
             faces.push({
-                id: (src && src.id) ? String(src.id) : `page_${i + 1}`,
+                id: faceId,
                 sheetNumber: sheet,
                 side,
                 name: (src && src.name) ? String(src.name) : `Page ${i + 1}`,
@@ -630,24 +643,36 @@ class DocumentEngine {
     }
 
     async loadFromAsyncStorage() {
-        if (typeof InMenuStorage !== 'undefined' && InMenuStorage.getItem) {
-            try {
-                const saved = await InMenuStorage.getItem('inmenu_studio_v3_greycorner_split');
-                if (saved) {
-                    const data = typeof saved === 'string' ? JSON.parse(saved) : saved;
-                    const normalized = this.normalizeImportedData(data);
-                    this.dishesDB = normalized.dishesDB;
-                    this.faces = normalized.faces;
-                    if (normalized.currentFormat) this.currentFormat = normalized.currentFormat;
-                    if (normalized.specs) this.specs = normalized.specs;
-                    if (normalized.pageNumbering) this.pageNumbering = normalized.pageNumbering;
-                    return true;
+        let loaded = false;
+        try {
+            if (typeof InMenuStorage !== 'undefined' && InMenuStorage.getItem) {
+                try {
+                    const saved = await InMenuStorage.getItem('inmenu_studio_v3_greycorner_split');
+                    if (saved) {
+                        const data = typeof saved === 'string' ? JSON.parse(saved) : saved;
+                        const normalized = this.normalizeImportedData(data);
+                        this.dishesDB = normalized.dishesDB;
+                        this.faces = normalized.faces;
+                        if (normalized.currentFormat) this.currentFormat = normalized.currentFormat;
+                        if (normalized.specs) this.specs = normalized.specs;
+                        if (normalized.pageNumbering) this.pageNumbering = normalized.pageNumbering;
+                        loaded = true;
+                    }
+                } catch (err) {
+                    console.warn('Could not load saved state from IndexedDB:', err);
                 }
-            } catch (err) {
-                console.warn('Could not load saved state from IndexedDB:', err);
+            }
+            if (!loaded) loaded = this.loadFromLocalStorage();
+        } finally {
+            this.persistReady = true;
+            if (loaded) {
+                // Historique cohérent avec l'état réellement chargé
+                this.history = [];
+                this.redoStack = [];
+                this.saveState(0);
             }
         }
-        return this.loadFromLocalStorage();
+        return loaded;
     }
 
     toJSON(pretty = true) {

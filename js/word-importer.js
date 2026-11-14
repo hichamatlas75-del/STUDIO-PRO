@@ -2,6 +2,21 @@
  * MODULE 1B: WordMenuImporter & AutoLayoutEngine (word-importer.js)
  */
 class WordMenuImporter {
+    static buildOfflinePhotoDataUrl(title, subtitle, bg1 = '#1f2937', bg2 = '#0f172a', accent = '#d4af37') {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400">` +
+            `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${bg1}"/><stop offset="100%" stop-color="${bg2}"/></linearGradient></defs>` +
+            `<rect width="600" height="400" fill="url(#g)"/>` +
+            `<rect x="24" y="24" width="552" height="352" fill="none" stroke="${accent}" stroke-width="2" stroke-opacity="0.55" rx="8"/>` +
+            `<rect x="34" y="34" width="532" height="332" fill="none" stroke="${accent}" stroke-width="0.8" stroke-opacity="0.3" rx="6"/>` +
+            `<circle cx="300" cy="155" r="46" fill="none" stroke="${accent}" stroke-width="1.8" stroke-opacity="0.7"/>` +
+            `<circle cx="300" cy="155" r="34" fill="none" stroke="${accent}" stroke-width="1" stroke-dasharray="4 3" stroke-opacity="0.5"/>` +
+            `<path d="M286 135 v22 M280 135 v12 a6 6 0 0 0 12 0 v-12 M286 157 v20 M314 135 c6 0 8 10 8 18 s-4 10-8 10 v14" stroke="${accent}" stroke-width="2.2" fill="none" stroke-linecap="round"/>` +
+            `<text x="300" y="245" text-anchor="middle" fill="${accent}" font-family="Georgia, serif" font-size="22" font-weight="bold" letter-spacing="3">${title}</text>` +
+            `<text x="300" y="278" text-anchor="middle" fill="#e5e7eb" font-family="sans-serif" font-size="13" opacity="0.85" letter-spacing="1">${subtitle}</text>` +
+            `</svg>`;
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
     static getSampleFullMenuText() {
         if (typeof getGreyCornerSampleText === 'function') {
             return getGreyCornerSampleText();
@@ -269,7 +284,7 @@ class WordMenuImporter {
             {
                 id: 'cov_photo', type: 'photo', name: 'Photo Couverture',
                 x: 200, y: 104, w: 110, h: 115,
-                imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80',
+                imageUrl: this.buildOfflinePhotoDataUrl('GREY CORNER CAFÉ', 'Créations Gourmandes & Produits Frais', '#292018', '#14110f', '#c5a059'),
                 caption: 'Créations Gourmandes & Produits Frais',
                 radius: 6, borderColor: palette.frameBorder, borderWidth: 1.5
             },
@@ -572,11 +587,11 @@ class WordMenuImporter {
         }
 
         const gourmetPhotos = [
-            { url: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?auto=format&fit=crop&w=900&q=80', cap: 'Nos Brunchs & Petits-Déjeuners préparés minute' },
-            { url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=80', cap: 'Sélection de viandes grillées au feu de bois' },
-            { url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=900&q=80', cap: 'Pizzas artisanales et pâtes fraîches maison' },
-            { url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=900&q=80', cap: 'Douceurs pâtissières, Cheesecakes & Glaces artisanales' },
-            { url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80', cap: 'Cuisine d\'auteur & produits frais de saison' }
+            { url: this.buildOfflinePhotoDataUrl('BRUNCH & MATIN', 'Préparés minute • Produits du terroir', '#2c1e16', '#17110d', '#d97706'), cap: 'Nos Brunchs & Petits-Déjeuners préparés minute' },
+            { url: this.buildOfflinePhotoDataUrl('GRILLADES & VIANDES', 'Sélection de viandes grillées au feu de bois', '#2d1616', '#160b0b', '#e11d48'), cap: 'Sélection de viandes grillées au feu de bois' },
+            { url: this.buildOfflinePhotoDataUrl('PASTA & PIZZAS', 'Pizzas artisanales et pâtes fraîches maison', '#1e291b', '#0f160e', '#10b981'), cap: 'Pizzas artisanales et pâtes fraîches maison' },
+            { url: this.buildOfflinePhotoDataUrl('DOUCEURS & GLACES', 'Pâtisseries, Cheesecakes & Glaces artisanales', '#281829', '#140c15', '#ec4899'), cap: 'Douceurs pâtissières, Cheesecakes & Glaces artisanales' },
+            { url: this.buildOfflinePhotoDataUrl('CUISINE D\'AUTEUR', 'Recettes signatures & produits frais de saison', '#1e2433', '#0f131c', '#c5a059'), cap: 'Cuisine d\'auteur & produits frais de saison' }
         ];
 
         let bucketCursor = 0;
