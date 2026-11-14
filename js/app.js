@@ -65,11 +65,14 @@ class InMenuStudioApp {
                     }).catch(() => {});
                 }
 
+                if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                    this.fitToScreen();
+                }
                 requestAnimationFrame(() => this.renderRulers());
             }
 
             initModalBackdrops() {
-                const modalIds = ['modal-database', 'modal-export', 'modal-3d', 'modal-engine', 'modal-word-import', 'modal-format', 'modal-page-numbering'];
+                const modalIds = ['modal-database', 'modal-export', 'modal-3d', 'modal-engine', 'modal-word-import', 'modal-format', 'modal-page-numbering', 'modal-mobile-tools'];
                 modalIds.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) {
@@ -280,11 +283,15 @@ class InMenuStudioApp {
 
             fitToScreen() {
                 const viewport = document.getElementById('viewport');
-                const vw = Math.max(200, viewport.clientWidth - 96);
-                const vh = Math.max(200, viewport.clientHeight - 96);
-                const pageW = this.mmToPx(346);
-                const pageH = this.mmToPx(306);
-                const scale = Math.min(vw / pageW, vh / pageH);
+                if (!viewport) return;
+                const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+                const pad = isMobile ? 24 : 96;
+                const vw = Math.max(160, viewport.clientWidth - pad);
+                const vh = Math.max(160, viewport.clientHeight - pad);
+                const specs = this.engine.specs;
+                const pageW = this.mmToPx(specs.widthMm + (specs.bleedMm * 2));
+                const pageH = this.mmToPx(specs.heightMm + (specs.bleedMm * 2));
+                const scale = Math.max(0.25, Math.min(1.5, Math.min(vw / pageW, vh / pageH)));
                 this.setZoom(scale);
             }
 
@@ -292,7 +299,7 @@ class InMenuStudioApp {
                 const topRuler = document.getElementById('ruler-top');
                 const leftRuler = document.getElementById('ruler-left');
                 const pageEl = document.getElementById('spread-page');
-                if (!topRuler || !leftRuler || !pageEl) return;
+                if (!topRuler || !leftRuler || !pageEl || topRuler.offsetParent === null) return;
 
                 const pageRect = pageEl.getBoundingClientRect();
                 const topRect = topRuler.getBoundingClientRect();
@@ -2961,6 +2968,21 @@ class InMenuStudioApp {
             }
 
             closeTopModal() {
+                const modalMobileTools = document.getElementById('modal-mobile-tools');
+                if (modalMobileTools && !modalMobileTools.classList.contains('hidden')) {
+                    this.closeMobileToolsMenu();
+                    return true;
+                }
+                const leftDock = document.getElementById('left-dock');
+                if (leftDock && leftDock.classList.contains('mobile-drawer-open')) {
+                    this.closeMobileDrawers();
+                    return true;
+                }
+                const rightDock = document.getElementById('right-dock');
+                if (rightDock && rightDock.classList.contains('mobile-drawer-open')) {
+                    this.closeMobileDrawers();
+                    return true;
+                }
                 const modalFormat = document.getElementById('modal-format');
                 if (modalFormat && !modalFormat.classList.contains('hidden')) {
                     this.closeFormatModal();
@@ -3076,6 +3098,10 @@ class InMenuStudioApp {
                 const formatLabel = document.getElementById('header-format-label');
                 if (formatLabel) {
                     formatLabel.textContent = specs.name || `${specs.widthMm}×${specs.heightMm} mm`;
+                }
+                const formatLabelPill = document.getElementById('header-format-label-pill');
+                if (formatLabelPill) {
+                    formatLabelPill.textContent = `${specs.widthMm}×${specs.heightMm}`;
                 }
                 const specsBanner = document.getElementById('left-specs-banner');
                 if (specsBanner) {
@@ -3529,6 +3555,56 @@ class InMenuStudioApp {
                 this.renderCurrentFace();
                 this.renderInspector();
                 this.showToast('Gabarit Flyer Promotionnel A4 appliqué !');
+            }
+
+            // ==========================================
+            // MOBILE RESPONSIVE DRAWERS & TOOLS
+            // ==========================================
+            openMobileDrawer(type) {
+                const leftDock = document.getElementById('left-dock');
+                const rightDock = document.getElementById('right-dock');
+                const backdrop = document.getElementById('mobile-drawer-backdrop');
+
+                this.closeMobileToolsMenu();
+
+                if (type === 'pages' || type === 'blocks' || type === 'illustrations') {
+                    this.switchLeftTab(type);
+                    if (rightDock) rightDock.classList.remove('mobile-drawer-open');
+                    if (leftDock) leftDock.classList.add('mobile-drawer-open');
+                    if (backdrop) backdrop.classList.remove('hidden');
+                } else if (type === 'inspector') {
+                    if (leftDock) leftDock.classList.remove('mobile-drawer-open');
+                    if (rightDock) rightDock.classList.add('mobile-drawer-open');
+                    if (backdrop) backdrop.classList.remove('hidden');
+                    this.renderInspector();
+                }
+            }
+
+            closeMobileDrawers() {
+                const leftDock = document.getElementById('left-dock');
+                const rightDock = document.getElementById('right-dock');
+                const backdrop = document.getElementById('mobile-drawer-backdrop');
+
+                if (leftDock) leftDock.classList.remove('mobile-drawer-open');
+                if (rightDock) rightDock.classList.remove('mobile-drawer-open');
+                if (backdrop) backdrop.classList.add('hidden');
+                this.closeMobileToolsMenu();
+            }
+
+            toggleMobileToolsMenu() {
+                const modal = document.getElementById('modal-mobile-tools');
+                if (!modal) return;
+                this.closeMobileDrawers();
+                if (modal.classList.contains('hidden')) {
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            closeMobileToolsMenu() {
+                const modal = document.getElementById('modal-mobile-tools');
+                if (modal) modal.classList.add('hidden');
             }
         }
 

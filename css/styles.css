@@ -78,3 +78,55 @@ input, textarea, select {
     writing-mode: vertical-rl;
     transform: rotate(180deg);
 }
+
+/* ==========================================================================
+   MOBILE & RESPONSIVE OPTIMIZATIONS
+   ========================================================================== */
+
+/* Mobile Touch Scrolling & Safe-Area */
+@media (max-width: 1024px) {
+    #viewport {
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y pinch-zoom;
+    }
+
+    /* Mobile drawer slide-in */
+    #left-dock.mobile-drawer-open {
+        transform: translateX(0) !important;
+    }
+    #right-dock.mobile-drawer-open {
+        transform: translateX(0) !important;
+    }
+}
+
+/* Slide-up animation for mobile action sheet */
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+.animate-slide-up {
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Touch-friendly handles on coarse pointers */
+@media (pointer: coarse) {
+    .resize-handle {
+        width: 14px;
+        height: 14px;
+        border-radius: 2px;
+    }
+    .handle-nw { top: -7px; left: -7px; }
+    .handle-n  { top: -7px; left: calc(50% - 7px); }
+    .handle-ne { top: -7px; right: -7px; }
+    .handle-e  { top: calc(50% - 7px); right: -7px; }
+    .handle-se { bottom: -7px; right: -7px; }
+    .handle-s  { bottom: -7px; left: calc(50% - 7px); }
+    .handle-sw { bottom: -7px; left: -7px; }
+    .handle-w  { top: calc(50% - 7px); left: -7px; }
+}
