@@ -36,7 +36,37 @@ class InMenuStudioApp {
                 this.updateUndoRedoButtons();
                 this.updateAutoSaveUI(this.engine.lastSaveSuccess);
                 this.bindGlobalShortcuts();
+                this.initModalBackdrops();
+
+                // Asynchronously verify if larger project exists in IndexedDB
+                if (this.engine.loadFromAsyncStorage) {
+                    this.engine.loadFromAsyncStorage().then(loaded => {
+                        if (loaded) {
+                            this.renderSpreadsNavigator();
+                            this.populateQuickDishSelect();
+                            this.renderCurrentFace();
+                            this.renderInspector();
+                            this.updateUndoRedoButtons();
+                            this.updateAutoSaveUI(true);
+                        }
+                    }).catch(() => {});
+                }
+
                 requestAnimationFrame(() => this.renderRulers());
+            }
+
+            initModalBackdrops() {
+                const modalIds = ['modal-database', 'modal-export', 'modal-3d', 'modal-engine', 'modal-word-import'];
+                modalIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('click', (e) => {
+                            if (e.target === el) {
+                                this.closeTopModal();
+                            }
+                        });
+                    }
+                });
             }
 
             bindViewportEvents() {
@@ -59,7 +89,7 @@ class InMenuStudioApp {
             commitState(skipRender = false) {
                 clearTimeout(this.debounceSaveTimer);
                 this.debounceSaveTimer = null;
-                const saved = this.engine.saveState();
+                const saved = this.engine.saveState(this.currentFaceIndex);
                 this.updateAutoSaveUI(saved);
                 this.updateUndoRedoButtons();
                 if (!skipRender) {
@@ -71,7 +101,7 @@ class InMenuStudioApp {
                 clearTimeout(this.debounceSaveTimer);
                 this.debounceSaveTimer = setTimeout(() => {
                     this.debounceSaveTimer = null;
-                    const saved = this.engine.saveState();
+                    const saved = this.engine.saveState(this.currentFaceIndex);
                     this.updateAutoSaveUI(saved);
                     this.updateUndoRedoButtons();
                 }, 400);
@@ -86,7 +116,7 @@ class InMenuStudioApp {
                 if (!this.debounceSaveTimer) return;
                 clearTimeout(this.debounceSaveTimer);
                 this.debounceSaveTimer = null;
-                const saved = this.engine.saveState();
+                const saved = this.engine.saveState(this.currentFaceIndex);
                 this.updateAutoSaveUI(saved);
                 this.updateUndoRedoButtons();
             }
@@ -310,10 +340,11 @@ class InMenuStudioApp {
                 wrapper.style.height = `${this.mmToPx(obj.h)}px`;
                 wrapper.style.zIndex = zIndex + 1;
                 wrapper.style.opacity = obj.opacity !== undefined ? obj.opacity : 1;
-                wrapper.className = `group cursor-move select-none ${
+                const cursorClass = obj.locked ? 'cursor-default' : 'cursor-move';
+                wrapper.className = `group ${cursorClass} select-none ${
                     isSelected
-                        ? 'ring-2 ring-blue-500'
-                        : (!this.previewMode ? 'hover:ring-1 hover:ring-blue-400/60' : '')
+                        ? (obj.locked ? 'ring-2 ring-amber-500' : 'ring-2 ring-blue-500')
+                        : (!this.previewMode ? (obj.locked ? 'hover:ring-1 hover:ring-amber-400/60' : 'hover:ring-1 hover:ring-blue-400/60') : '')
                 }`;
 
                 // Mouse Down to Select & Drag
@@ -322,11 +353,20 @@ class InMenuStudioApp {
                     if (this.selectedObjectId !== obj.id) {
                         this.selectObject(obj.id);
                     }
-                    const currentObj = this.currentFace.objects.find(o => o.id === obj.id);
-                    if (currentObj) {
-                        this.startDragObject(e, currentObj);
+                    if (!obj.locked) {
+                        const currentObj = this.currentFace.objects.find(o => o.id === obj.id);
+                        if (currentObj) {
+                            this.startDragObject(e, currentObj);
+                        }
                     }
                 });
+
+                if (obj.locked && !this.previewMode) {
+                    const lockBadge = document.createElement('div');
+                    lockBadge.className = 'absolute top-1 right-1 bg-amber-500 text-slate-900 rounded px-1 py-0.5 text-[8px] font-bold shadow flex items-center space-x-1 pointer-events-none z-30';
+                    lockBadge.innerHTML = '<i class="fa-solid fa-lock"></i>';
+                    wrapper.appendChild(lockBadge);
+                }
 
                 // Inner Visual Content according to Block Type
                 const content = document.createElement('div');
@@ -417,6 +457,25 @@ class InMenuStudioApp {
                     });
                     html += `</div>`;
                     content.innerHTML = html;
+
+                    // Détection de débordement de texte en mode édition
+                    if (!this.previewMode && typeof WordMenuImporter !== 'undefined') {
+                        const estimatedH = WordMenuImporter.estimateBlockHeightMm(dishes, Boolean(obj.title));
+                        if (estimatedH > obj.h + 2) {
+                            const overflowBadge = document.createElement('button');
+                            overflowBadge.type = 'button';
+                            overflowBadge.className = 'absolute bottom-1 right-1 bg-red-600 hover:bg-red-500 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded shadow z-40 flex items-center space-x-1 cursor-pointer';
+                            overflowBadge.title = `Débordement de texte détecté (${Math.round(estimatedH)} mm requis vs ${obj.h} mm actuel). Cliquez pour ajuster automatiquement.`;
+                            overflowBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><span>+${Math.round(estimatedH - obj.h)}mm</span>`;
+                            overflowBadge.addEventListener('mousedown', (e) => e.stopPropagation());
+                            overflowBadge.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                this.updateObjProp('h', Math.round(estimatedH));
+                                this.renderInspector();
+                            });
+                            wrapper.appendChild(overflowBadge);
+                        }
+                    }
                 }
                 else if (obj.type === 'photo') {
                     content.style.borderRadius = `${this.mmToPx(obj.radius ?? 4)}px`;
@@ -456,26 +515,28 @@ class InMenuStudioApp {
 
                 wrapper.appendChild(content);
 
-                // If Selected: Add 8 Resize Handles + Millimeter Coordinate Pill
+                // If Selected: Add 8 Resize Handles (if unlocked) + Millimeter Coordinate Pill
                 if (isSelected) {
-                    const dirs = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-                    dirs.forEach(dir => {
-                        const h = document.createElement('div');
-                        h.className = `resize-handle handle-${dir}`;
-                        h.addEventListener('mousedown', (e) => {
-                            e.stopPropagation();
-                            const currentObj = this.currentFace.objects.find(o => o.id === obj.id);
-                            if (currentObj) {
-                                this.startResizeObject(e, currentObj, dir);
-                            }
+                    if (!obj.locked) {
+                        const dirs = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+                        dirs.forEach(dir => {
+                            const h = document.createElement('div');
+                            h.className = `resize-handle handle-${dir}`;
+                            h.addEventListener('mousedown', (e) => {
+                                e.stopPropagation();
+                                const currentObj = this.currentFace.objects.find(o => o.id === obj.id);
+                                if (currentObj) {
+                                    this.startResizeObject(e, currentObj, dir);
+                                }
+                            });
+                            wrapper.appendChild(h);
                         });
-                        wrapper.appendChild(h);
-                    });
+                    }
 
                     const badge = document.createElement('div');
                     badge.id = `coord_pill_${obj.id}`;
-                    badge.className = 'absolute -top-5 left-0 bg-blue-600 text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-50';
-                    badge.textContent = `${obj.w} × ${obj.h} mm  (X:${obj.x}, Y:${obj.y})`;
+                    badge.className = `absolute -top-5 left-0 ${obj.locked ? 'bg-amber-600' : 'bg-blue-600'} text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-50 flex items-center space-x-1`;
+                    badge.textContent = `${obj.locked ? '🔒 ' : ''}${obj.w} × ${obj.h} mm  (X:${obj.x}, Y:${obj.y})`;
                     wrapper.appendChild(badge);
                 }
 
@@ -573,7 +634,7 @@ class InMenuStudioApp {
             }
 
             startResizeObject(e, obj, dir) {
-                if (this.previewMode || (e.button !== undefined && e.button !== 0)) return;
+                if (this.previewMode || obj.locked || (e.button !== undefined && e.button !== 0)) return;
                 const startMouseX = e.clientX;
                 const startMouseY = e.clientY;
                 const origX = obj.x, origY = obj.y, origW = obj.w, origH = obj.h;
@@ -602,6 +663,38 @@ class InMenuStudioApp {
                         y = +(origY + (origH - clampedH)).toFixed(1);
                     }
 
+                    if (this.snapEnabled) {
+                        const snapped = this.computeSmartSnap(x, y, w, h);
+                        if (dir.includes('w')) {
+                            const diffX = snapped.x - x;
+                            x = snapped.x;
+                            w = Math.max(8, +(w - diffX).toFixed(1));
+                        } else if (dir.includes('e')) {
+                            const rightEdge = x + w;
+                            const vGuides = [10, 85, 160, 170, 180, 255, 330, 340];
+                            for (const gx of vGuides) {
+                                if (Math.abs(rightEdge - gx) < 2.0) {
+                                    w = Math.max(8, +(gx - x).toFixed(1));
+                                    break;
+                                }
+                            }
+                        }
+                        if (dir.includes('n')) {
+                            const diffY = snapped.y - y;
+                            y = snapped.y;
+                            h = Math.max(6, +(h - diffY).toFixed(1));
+                        } else if (dir.includes('s')) {
+                            const bottomEdge = y + h;
+                            const hGuides = [10, 150, 290, 300];
+                            for (const gy of hGuides) {
+                                if (Math.abs(bottomEdge - gy) < 2.0) {
+                                    h = Math.max(6, +(gy - y).toFixed(1));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     obj.x = x; obj.y = y; obj.w = w; obj.h = h;
 
                     if (domEl) {
@@ -617,6 +710,7 @@ class InMenuStudioApp {
                 };
 
                 const onUp = () => {
+                    this.hideSmartGuides();
                     window.removeEventListener('mousemove', onMove);
                     window.removeEventListener('mouseup', onUp);
                     if (obj.x !== origX || obj.y !== origY || obj.w !== origW || obj.h !== origH) {
@@ -826,7 +920,18 @@ class InMenuStudioApp {
                     return;
                 }
 
-                badge.textContent = obj.type.toUpperCase();
+                badge.textContent = `${obj.type.toUpperCase()}${obj.locked ? ' (VERROUILLÉ)' : ''}`;
+
+                // Lock notice if locked
+                const lockNoticeHTML = obj.locked ? `
+                    <div class="bg-amber-500/15 border border-amber-500/40 text-amber-300 p-2 rounded text-[10px] flex items-center justify-between">
+                        <span class="flex items-center space-x-1.5">
+                            <i class="fa-solid fa-lock text-amber-400"></i>
+                            <span>Bloc <strong>verrouillé</strong> (protégé contre déplacement et suppression)</span>
+                        </span>
+                        <button onclick="app.toggleLockSelected()" class="text-amber-300 underline font-semibold ml-2 hover:text-white shrink-0">Déverrouiller</button>
+                    </div>
+                ` : '';
 
                 // Warning if object crosses the central fold safety zone (160mm to 180mm) and isn't a full background
                 const crossesFold = (obj.x < 180 && (obj.x + obj.w) > 160 && obj.w < 300);
@@ -839,6 +944,7 @@ class InMenuStudioApp {
 
                 // Common Geometry Controls (X, Y, W, H in mm) + Alignment Buttons
                 let html = `
+                    ${lockNoticeHTML}
                     ${foldWarningHTML}
                     <!-- Quick Panel Alignment -->
                     <div>
@@ -984,6 +1090,28 @@ class InMenuStudioApp {
                                 <label class="text-gray-400 text-[10px] block mb-1">Taille Police Plats (pt)</label>
                                 <input type="number" min="6" step="0.5" value="${obj.fontSize || 10.5}" onchange="app.updateObjProp('fontSize', parseFloat(this.value), false)" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
                             </div>
+                            ${(() => {
+                                if (typeof WordMenuImporter === 'undefined') return '';
+                                const allDishes = this.engine.getDishesByCategory(obj.category);
+                                const dishes = (obj.sliceStart !== undefined || obj.sliceEnd !== undefined)
+                                    ? allDishes.slice(obj.sliceStart || 0, obj.sliceEnd)
+                                    : allDishes;
+                                const estimatedH = WordMenuImporter.estimateBlockHeightMm(dishes, Boolean(obj.title));
+                                if (estimatedH > obj.h + 2) {
+                                    return `
+                                        <div class="bg-red-500/15 border border-red-500/40 text-red-300 p-2 rounded text-[10px] space-y-1.5 mt-2">
+                                            <div class="flex items-center space-x-1.5 font-bold">
+                                                <i class="fa-solid fa-triangle-exclamation text-red-400"></i>
+                                                <span>Débordement : ${dishes.length} plats nécessitent ≈ ${Math.round(estimatedH)} mm (hauteur : ${obj.h} mm).</span>
+                                            </div>
+                                            <button onclick="app.updateObjProp('h', ${Math.round(estimatedH)}); app.renderInspector();" class="w-full bg-red-600 hover:bg-red-500 text-white py-1 rounded font-bold text-[10px] shadow">
+                                                Ajuster la hauteur à ${Math.round(estimatedH)} mm
+                                            </button>
+                                        </div>
+                                    `;
+                                }
+                                return '';
+                            })()}
                         </div>
                     `;
                 }
@@ -1153,13 +1281,16 @@ class InMenuStudioApp {
                     `;
                 }
 
-                // Duplicate & Delete Actions
+                // Duplicate, Lock & Delete Actions
                 html += `
                     <div class="pt-3 border-t border-idBorder flex space-x-2">
-                        <button onclick="app.duplicateSelected()" class="flex-1 bg-idInput hover:bg-white/10 text-gray-200 border border-idBorder py-1.5 rounded font-medium">
+                        <button onclick="app.toggleLockSelected()" class="px-2.5 bg-idInput hover:bg-white/10 ${obj.locked ? 'text-amber-400 border-amber-500/60' : 'text-gray-300 border-idBorder'} border py-1.5 rounded font-medium text-[11px]" title="${obj.locked ? 'Déverrouiller ce bloc' : 'Verrouiller ce bloc (protège contre déplacement et suppression)'}">
+                            <i class="fa-solid ${obj.locked ? 'fa-lock' : 'fa-lock-open'} mr-1"></i> ${obj.locked ? 'Déverrouiller' : 'Verrouiller'}
+                        </button>
+                        <button onclick="app.duplicateSelected()" class="flex-1 bg-idInput hover:bg-white/10 text-gray-200 border border-idBorder py-1.5 rounded font-medium text-[11px]">
                             <i class="fa-regular fa-clone mr-1"></i> Dupliquer
                         </button>
-                        <button onclick="app.deleteSelected()" class="flex-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 py-1.5 rounded font-medium">
+                        <button onclick="app.deleteSelected()" class="flex-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 py-1.5 rounded font-medium text-[11px]">
                             <i class="fa-regular fa-trash-can mr-1"></i> Supprimer
                         </button>
                     </div>
@@ -1271,12 +1402,20 @@ class InMenuStudioApp {
                         c.width = Math.max(1, Math.round(img.naturalWidth * ratio));
                         c.height = Math.max(1, Math.round(img.naturalHeight * ratio));
                         const cx = c.getContext('2d');
-                        cx.fillStyle = '#ffffff';
-                        cx.fillRect(0, 0, c.width, c.height);
-                        cx.drawImage(img, 0, 0, c.width, c.height);
-                        const out = c.toDataURL('image/jpeg', 0.9);
-                        c.width = c.height = 0;
-                        resolve(out.length < dataUrl.length ? out : dataUrl);
+                        if (keepsAlpha) {
+                            cx.drawImage(img, 0, 0, c.width, c.height);
+                            const mime = /webp/i.test(file.type || '') ? 'image/webp' : 'image/png';
+                            const out = c.toDataURL(mime);
+                            c.width = c.height = 0;
+                            resolve(out.length < dataUrl.length ? out : dataUrl);
+                        } else {
+                            cx.fillStyle = '#ffffff';
+                            cx.fillRect(0, 0, c.width, c.height);
+                            cx.drawImage(img, 0, 0, c.width, c.height);
+                            const out = c.toDataURL('image/jpeg', 0.9);
+                            c.width = c.height = 0;
+                            resolve(out.length < dataUrl.length ? out : dataUrl);
+                        }
                     };
                     img.onerror = reject;
                     img.src = dataUrl;
@@ -1314,8 +1453,23 @@ class InMenuStudioApp {
                 this.renderInspector();
             }
 
+            toggleLockSelected(targetId = null) {
+                const id = targetId || this.selectedObjectId;
+                if (!id) return;
+                const obj = this.currentFace.objects.find(o => o.id === id);
+                if (!obj) return;
+                obj.locked = !obj.locked;
+                this.commitState(false);
+                this.renderInspector();
+            }
+
             deleteSelected() {
                 if (!this.selectedObjectId) return;
+                const obj = this.selectedObject;
+                if (obj && obj.locked) {
+                    this.showToast('Cet élément est verrouillé. Déverrouillez-le avant de le supprimer.');
+                    return;
+                }
                 this.currentFace.objects = this.currentFace.objects.filter(o => o.id !== this.selectedObjectId);
                 this.selectedObjectId = null;
                 this.commitState(false);
@@ -1369,14 +1523,29 @@ class InMenuStudioApp {
                         <div data-obj-id="${escapeHTML(obj.id)}" onclick="app.selectObject(this.dataset.objId)" class="px-2.5 py-1.5 rounded flex items-center justify-between cursor-pointer ${
                             active ? 'bg-blue-600/30 border border-blue-500 text-white' : 'bg-idInput hover:bg-white/5 text-gray-300 border border-transparent'
                         }">
-                            <div class="truncate flex items-center space-x-2">
-                                <span class="w-2 h-2 rounded-full bg-blue-400 shrink-0"></span>
-                                <span class="truncate font-medium">${escapeHTML(obj.name || obj.type)}</span>
+                            <div class="truncate flex items-center space-x-2 min-w-0">
+                                <span class="w-2 h-2 rounded-full ${obj.locked ? 'bg-amber-400' : 'bg-blue-400'} shrink-0"></span>
+                                <span class="truncate font-medium text-[11px]">${escapeHTML(obj.name || obj.type)}</span>
                             </div>
-                            <span class="font-mono text-[9px] text-gray-400 ml-2 shrink-0">${obj.x},${obj.y}mm</span>
+                            <div class="flex items-center space-x-2 shrink-0 ml-2">
+                                <button type="button" onclick="event.stopPropagation(); app.toggleLockSelected('${escapeHTML(obj.id)}')" class="p-0.5 text-[10px] ${obj.locked ? 'text-amber-400' : 'text-gray-500 hover:text-gray-300'}" title="${obj.locked ? 'Déverrouiller' : 'Verrouiller'}">
+                                    <i class="fa-solid ${obj.locked ? 'fa-lock' : 'fa-lock-open'}"></i>
+                                </button>
+                                <span class="font-mono text-[9px] text-gray-400">${obj.x},${obj.y}mm</span>
+                            </div>
                         </div>
                     `;
                 }).join('');
+            }
+
+            bringToFront() {
+                const objs = this.currentFace.objects;
+                const idx = objs.findIndex(o => o.id === this.selectedObjectId);
+                if (idx >= 0 && idx < objs.length - 1) {
+                    const [obj] = objs.splice(idx, 1);
+                    objs.push(obj);
+                    this.commitState(false);
+                }
             }
 
             bringForward() {
@@ -1393,6 +1562,16 @@ class InMenuStudioApp {
                 const idx = objs.findIndex(o => o.id === this.selectedObjectId);
                 if (idx > 0) {
                     [objs[idx], objs[idx - 1]] = [objs[idx - 1], objs[idx]];
+                    this.commitState(false);
+                }
+            }
+
+            sendToBack() {
+                const objs = this.currentFace.objects;
+                const idx = objs.findIndex(o => o.id === this.selectedObjectId);
+                if (idx > 0) {
+                    const [obj] = objs.splice(idx, 1);
+                    objs.unshift(obj);
                     this.commitState(false);
                 }
             }
@@ -1528,13 +1707,25 @@ class InMenuStudioApp {
 
             renderDatabaseTable() {
                 const filter = document.getElementById('db-filter-cat').value;
+                const searchEl = document.getElementById('db-search-input');
+                const query = (searchEl ? searchEl.value : '').trim().toLowerCase();
                 const tbody = document.getElementById('db-table-body');
-                const list = filter === 'ALL'
+                let list = filter === 'ALL'
                     ? this.engine.dishesDB
                     : this.engine.dishesDB.filter(d => d.category === filter);
 
+                if (query) {
+                    list = list.filter(d =>
+                        (d.name && d.name.toLowerCase().includes(query)) ||
+                        (d.desc && d.desc.toLowerCase().includes(query)) ||
+                        (d.price && d.price.toLowerCase().includes(query)) ||
+                        (d.id && d.id.toLowerCase().includes(query)) ||
+                        (d.category && d.category.toLowerCase().includes(query))
+                    );
+                }
+
                 if (list.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-gray-500 text-xs">Aucun plat dans cette catégorie.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-gray-500 text-xs">${query ? 'Aucun plat ne correspond à votre recherche.' : 'Aucun plat dans cette catégorie.'}</td></tr>`;
                     return;
                 }
 
@@ -1752,6 +1943,15 @@ class InMenuStudioApp {
                 return Math.max(2, Number.isFinite(val) ? val : 11.81);
             }
 
+            getReadingPageNumber(faceIndex, side) {
+                // Face 0 (Sheet 1 Recto): Right = Page 1 (Couverture), Left = Page 20 (Dos)
+                if (faceIndex === 0) {
+                    return side === 'right' ? 1 : 20;
+                }
+                // Interior faces 1..9: Left = fIdx*2, Right = fIdx*2 + 1 (Pages 2..19)
+                return side === 'left' ? (faceIndex * 2) : (faceIndex * 2 + 1);
+            }
+
             async exportCurrentFacePNG() {
                 const includeCropMarks = document.getElementById('exp-cropmarks').checked;
                 const includeBleed = document.getElementById('exp-bleed').checked;
@@ -1759,7 +1959,7 @@ class InMenuStudioApp {
                 const progress = document.getElementById('export-progress');
                 const progressText = document.getElementById('export-progress-text');
                 progress.classList.remove('hidden');
-                if (progressText) progressText.textContent = `Rendu PNG ${this.currentFace.name}...`;
+                if (progressText) progressText.textContent = `Rendu PNG 34×30cm ${this.currentFace.name}...`;
 
                 try {
                     const { canvas, failedImages } = await this.exporter.renderFaceToCanvas(this.currentFace, {
@@ -1774,22 +1974,75 @@ class InMenuStudioApp {
                     canvas.width = 0;
                     canvas.height = 0;
 
-                    // Blob + Object URL : évite les data-URL géantes (plusieurs dizaines de Mo à 300 DPI)
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
-                    link.download = `Menu_34x30_${this.currentFace.id}.png`;
+                    link.download = `Menu_Planche_34x30_${this.currentFace.id}.png`;
                     link.href = url;
                     link.click();
                     setTimeout(() => URL.revokeObjectURL(url), 2000);
 
                     if (failedImages && failedImages.length > 0) {
-                        this.showToast(`PNG exporté avec avertissement : ${failedImages.length} photo(s) externe(s) bloquée(s) (CORS/réseau).`);
+                        this.showToast(`PNG exporté avec avertissement : ${failedImages.length} photo(s) externe(s) bloquée(s).`);
                     } else {
-                        this.showToast('Planche exportée en PNG Haute Définition !');
+                        this.showToast('Planche 34×30 cm exportée en PNG !');
                     }
                 } catch (err) {
                     console.error(err);
                     this.showToast('Erreur lors de la génération PNG');
+                } finally {
+                    progress.classList.add('hidden');
+                }
+            }
+
+            /**
+             * Télécharge SÉPARÉMENT les 2 panneaux 17×30 cm (Gauche + Droite) de la feuille active
+             * pour que l'imprimeur puisse les assembler/imposer librement.
+             */
+            async exportSeparatePanelsPNG() {
+                const includeCropMarks = document.getElementById('exp-cropmarks').checked;
+                const includeBleed = document.getElementById('exp-bleed').checked;
+                const scalePxPerMm = this.getSelectedExportScale();
+                const progress = document.getElementById('export-progress');
+                const progressText = document.getElementById('export-progress-text');
+                progress.classList.remove('hidden');
+
+                try {
+                    const sides = ['left', 'right'];
+                    for (const side of sides) {
+                        const pageNum = this.getReadingPageNumber(this.currentFaceIndex, side);
+                        const sideLabel = side === 'left' ? 'Gauche' : 'Droite';
+                        if (progressText) {
+                            progressText.textContent = `Rendu Panneau ${sideLabel} (Page ${pageNum}/20 — 17×30 cm)...`;
+                        }
+                        await new Promise(r => setTimeout(r, 40));
+
+                        const { canvas } = await this.exporter.renderSinglePanelToCanvas(
+                            this.currentFace,
+                            side,
+                            pageNum,
+                            { includeBleed, includeCropMarks, scalePxPerMm }
+                        );
+
+                        const blob = await new Promise((resolve, reject) => {
+                            canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob a échoué')), 'image/png');
+                        });
+                        canvas.width = 0;
+                        canvas.height = 0;
+
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        const numStr = String(pageNum).padStart(2, '0');
+                        link.download = `Menu_Page_${numStr}_sur_20_${this.currentFace.id}_${sideLabel}_17x30cm.png`;
+                        link.href = url;
+                        link.click();
+                        await new Promise(r => setTimeout(r, 250));
+                        setTimeout(() => URL.revokeObjectURL(url), 3000);
+                    }
+
+                    this.showToast('Les 2 pages 17×30 cm (Gauche & Droite) ont été téléchargées séparément !');
+                } catch (err) {
+                    console.error(err);
+                    this.showToast('Erreur lors de l\'export séparé des 2 panneaux');
                 } finally {
                     progress.classList.add('hidden');
                 }
@@ -1812,14 +2065,76 @@ class InMenuStudioApp {
 
                 try {
                     const { jsPDF } = window.jspdf;
-                    const facesToExport = scope === 'all' ? this.engine.faces : [this.currentFace];
                     const allFailedImages = new Set();
-
                     let pdf = null;
+
+                    // MODE 1 : Pages séparées 17×30 cm (Recommandé pour l'imprimeur qui fait l'assemblage/agrafage)
+                    if (scope === 'single_pages_20' || scope === 'current_2_panels') {
+                        const panelQueue = [];
+                        if (scope === 'current_2_panels') {
+                            panelQueue.push(
+                                { face: this.currentFace, side: 'left', pageNum: this.getReadingPageNumber(this.currentFaceIndex, 'left') },
+                                { face: this.currentFace, side: 'right', pageNum: this.getReadingPageNumber(this.currentFaceIndex, 'right') }
+                            );
+                        } else {
+                            // Ordre de lecture séquentiel Page 1 à Page 20 pour l'imprimeur :
+                            // Page 1 = Couverture (Face 0 Droite)
+                            panelQueue.push({ face: this.engine.faces[0], side: 'right', pageNum: 1 });
+                            // Pages 2 à 19 = Faces intérieures 1..9 (Gauche puis Droite : jamais de catégorie coupée !)
+                            for (let fIdx = 1; fIdx < 10; fIdx++) {
+                                panelQueue.push({ face: this.engine.faces[fIdx], side: 'left', pageNum: fIdx * 2 });
+                                panelQueue.push({ face: this.engine.faces[fIdx], side: 'right', pageNum: fIdx * 2 + 1 });
+                            }
+                            // Page 20 = Dos de couverture (Face 0 Gauche)
+                            panelQueue.push({ face: this.engine.faces[0], side: 'left', pageNum: 20 });
+                        }
+
+                        for (let i = 0; i < panelQueue.length; i++) {
+                            const item = panelQueue[i];
+                            progressText.textContent = `Rendu Page séparée ${item.pageNum}/20 (17×30 cm)...`;
+                            await new Promise(r => setTimeout(r, 25));
+
+                            const { canvas, totalWidthMm, totalHeightMm, failedImages } = await this.exporter.renderSinglePanelToCanvas(
+                                item.face,
+                                item.side,
+                                item.pageNum,
+                                { includeBleed, includeCropMarks, scalePxPerMm }
+                            );
+
+                            if (failedImages) failedImages.forEach(u => allFailedImages.add(u));
+                            const imgData = canvas.toDataURL('image/jpeg', 0.94);
+                            canvas.width = 0;
+                            canvas.height = 0;
+
+                            const orient = totalWidthMm > totalHeightMm ? 'landscape' : 'portrait';
+                            if (i === 0) {
+                                pdf = new jsPDF({
+                                    orientation: orient,
+                                    unit: 'mm',
+                                    format: [totalWidthMm, totalHeightMm]
+                                });
+                            } else {
+                                pdf.addPage([totalWidthMm, totalHeightMm], orient);
+                            }
+                            pdf.addImage(imgData, 'JPEG', 0, 0, totalWidthMm, totalHeightMm);
+                        }
+
+                        const filename = scope === 'single_pages_20'
+                            ? 'Menu_Grey_Corner_20_Pages_Separees_17x30cm_Imprimeur.pdf'
+                            : `Menu_Grey_Corner_${this.currentFace.id}_2_Pages_Separees_17x30cm.pdf`;
+
+                        pdf.save(filename);
+                        this.showToast('PDF en pages séparées 17×30 cm généré pour l\'imprimeur !');
+                        this.closeExportModal();
+                        return;
+                    }
+
+                    // MODE 2 : Planches ouvertes 34×30 cm
+                    const facesToExport = scope === 'all' ? this.engine.faces : [this.currentFace];
 
                     for (let i = 0; i < facesToExport.length; i++) {
                         const face = facesToExport[i];
-                        progressText.textContent = `Rendu Pré-Presse ${face.name} (${i + 1}/${facesToExport.length})...`;
+                        progressText.textContent = `Rendu Planche 34×30cm ${face.name} (${i + 1}/${facesToExport.length})...`;
                         await new Promise(r => setTimeout(r, 30));
 
                         const { canvas, totalWidthMm, totalHeightMm, failedImages } = await this.exporter.renderFaceToCanvas(face, {
@@ -1850,14 +2165,14 @@ class InMenuStudioApp {
                     }
 
                     const filename = scope === 'all'
-                        ? 'Menu_Complet_10_Faces_34x30cm_PrePresse.pdf'
+                        ? 'Menu_Complet_10_Planches_34x30cm_PrePresse.pdf'
                         : `Menu_${this.currentFace.id}_34x30cm.pdf`;
 
                     pdf.save(filename);
                     if (allFailedImages.size > 0) {
-                        this.showToast(`PDF généré, mais ${allFailedImages.size} photo(s) externe(s) n'ont pas pu être intégrées (CORS/réseau).`);
+                        this.showToast(`PDF généré, mais ${allFailedImages.size} photo(s) externe(s) n'ont pas pu être intégrées.`);
                     } else {
-                        this.showToast('PDF Imprimeur généré avec traits de coupe & pli !');
+                        this.showToast('PDF Imprimeur généré avec succès !');
                     }
                     this.closeExportModal();
                 } catch (err) {
@@ -1872,6 +2187,9 @@ class InMenuStudioApp {
             undo() {
                 this.flushPendingSave();
                 if (this.engine.undo()) {
+                    if (typeof this.engine.activeFaceIndex === 'number' && this.engine.activeFaceIndex >= 0 && this.engine.activeFaceIndex < this.engine.faces.length) {
+                        this.currentFaceIndex = this.engine.activeFaceIndex;
+                    }
                     this.selectedObjectId = null;
                     this.populateQuickDishSelect();
                     this.renderCurrentFace();
@@ -1885,6 +2203,9 @@ class InMenuStudioApp {
             redo() {
                 this.flushPendingSave();
                 if (this.engine.redo()) {
+                    if (typeof this.engine.activeFaceIndex === 'number' && this.engine.activeFaceIndex >= 0 && this.engine.activeFaceIndex < this.engine.faces.length) {
+                        this.currentFaceIndex = this.engine.activeFaceIndex;
+                    }
                     this.selectedObjectId = null;
                     this.populateQuickDishSelect();
                     this.renderCurrentFace();
@@ -2285,6 +2606,18 @@ class InMenuStudioApp {
                     } else if (keyLower === 'w' && !e.ctrlKey && !e.metaKey && !e.altKey) {
                         e.preventDefault();
                         this.togglePreviewMode();
+                    } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                        const obj = this.selectedObject;
+                        if (obj && !obj.locked && !this.previewMode) {
+                            e.preventDefault();
+                            const step = e.shiftKey ? 2.0 : 0.5;
+                            if (e.key === 'ArrowLeft') obj.x = +(obj.x - step).toFixed(1);
+                            else if (e.key === 'ArrowRight') obj.x = +(obj.x + step).toFixed(1);
+                            else if (e.key === 'ArrowUp') obj.y = +(obj.y - step).toFixed(1);
+                            else if (e.key === 'ArrowDown') obj.y = +(obj.y + step).toFixed(1);
+                            this.commitState(false);
+                            this.renderInspector();
+                        }
                     }
                 });
             }
@@ -2300,9 +2633,13 @@ class InMenuStudioApp {
             }
         }
 
-        // Launch Application on Window Load
+        // Launch Application on DOM ready
         let app;
-        window.onload = function () {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                app = new InMenuStudioApp();
+            });
+        } else {
             app = new InMenuStudioApp();
-        };
+        }
     

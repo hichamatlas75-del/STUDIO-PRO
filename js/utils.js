@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * SHARED HELPERS: Sanitization, ID Generation & Typographic Constants
+ * SHARED HELPERS: Sanitization, ID Generation, Typographic & Storage Constants
  * ============================================================================
  */
 const PT_TO_MM = 0.3528;
@@ -30,3 +30,90 @@ function generateUniqueId(prefix = 'obj') {
 function isSansFontFamily(family) {
     return family === 'Inter' || family === 'Montserrat';
 }
+
+function getFontFallback(family) {
+    if (family === 'Inter' || family === 'Montserrat') return 'sans-serif';
+    if (family === 'JetBrains Mono') return 'monospace';
+    return 'serif';
+}
+
+/**
+ * High-Capacity Storage Engine using IndexedDB (up to several GBs)
+ * with transparent localStorage fallback for backward compatibility.
+ */
+const InMenuStorage = {
+    DB_NAME: 'InMenuStudioDB',
+    STORE_NAME: 'projects',
+    STORAGE_KEY: 'inmenu_studio_v3_greycorner_split',
+    _dbPromise: null,
+
+    getDB() {
+        if (!this._dbPromise) {
+            this._dbPromise = new Promise((resolve, reject) => {
+                if (typeof indexedDB === 'undefined' || !indexedDB) {
+                    return reject(new Error('IndexedDB non disponible'));
+                }
+                const req = indexedDB.open(this.DB_NAME, 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(this.STORE_NAME)) {
+                        db.createObjectStore(this.STORE_NAME);
+                    }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error || new Error('Erreur ouverture IndexedDB'));
+            });
+        }
+        return this._dbPromise;
+    },
+
+    async setItem(key, value) {
+        let idbSuccess = false;
+        try {
+            const db = await this.getDB();
+            await new Promise((resolve, reject) => {
+                const tx = db.transaction(this.STORE_NAME, 'readwrite');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.put(value, key);
+                req.onsuccess = () => resolve(true);
+                req.onerror = () => reject(req.error);
+            });
+            idbSuccess = true;
+        } catch (_) {
+            // Fallback transparent vers localStorage si IndexedDB n'est pas disponible dans l'environnement
+        }
+
+        // Try localStorage as mirror (si la taille le permet)
+        let lsSuccess = false;
+        try {
+            localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+            lsSuccess = true;
+        } catch (_) {
+            // normal si le projet dépasse 5 Mo avec photos
+        }
+
+        return idbSuccess || lsSuccess;
+    },
+
+    async getItem(key) {
+        // 1. Try IndexedDB first (holds large projects with photos)
+        try {
+            const db = await this.getDB();
+            const val = await new Promise((resolve, reject) => {
+                const tx = db.transaction(this.STORE_NAME, 'readonly');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.get(key);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            if (val !== undefined && val !== null) return val;
+        } catch (_) {}
+
+        // 2. Fallback to localStorage
+        try {
+            return localStorage.getItem(key);
+        } catch (_) {
+            return null;
+        }
+    }
+};

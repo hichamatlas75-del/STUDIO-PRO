@@ -72,6 +72,130 @@ class PrintExporter {
                 return { canvas, totalWidthMm, totalHeightMm, failedImages };
             }
 
+            
+            /**
+             * Renders a SINGLE 170 x 300 mm Panel ('left' or 'right') from a 340 x 300 mm face
+             * for printers who impose single pages (Page 1 to Page 20) into a saddle-stitched booklet.
+             * @param {Object} face - The spread face object from DocumentEngine
+             * @param {String} side - 'left' (0..170mm) or 'right' (170..340mm)
+             * @param {Number} pageNumber - Sequential page number (1..20)
+             * @param {Object} options - { includeBleed, includeCropMarks, scalePxPerMm }
+             */
+            async renderSinglePanelToCanvas(face, side, pageNumber, options = {}) {
+                if (document.fonts && document.fonts.ready) {
+                    try { await document.fonts.ready; } catch (_) {}
+                }
+
+                const panelWidthMm = 170;
+                const panelHeightMm = 300;
+                const specs = this.engine.specs;
+                const includeBleed = options.includeBleed !== false;
+                const includeCropMarks = options.includeCropMarks !== false;
+                const pxPerMm = options.scalePxPerMm || 4;
+
+                const bleed = includeBleed ? specs.bleedMm : 0;
+                const slugMargin = includeCropMarks ? 15 : 0;
+
+                const totalWidthMm = panelWidthMm + (bleed * 2) + (slugMargin * 2);
+                const totalHeightMm = panelHeightMm + (bleed * 2) + (slugMargin * 2);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(totalWidthMm * pxPerMm);
+                canvas.height = Math.round(totalHeightMm * pxPerMm);
+                const ctx = canvas.getContext('2d');
+
+                const trimOriginX = (slugMargin + bleed) * pxPerMm;
+                const trimOriginY = (slugMargin + bleed) * pxPerMm;
+                const offsetXMm = side === 'right' ? 170 : 0;
+                const failedImages = [];
+
+                // 1. Fill Slug background white
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 2. Clip to 170x300mm (+3mm bleed) box
+                ctx.save();
+                const clipX = slugMargin * pxPerMm;
+                const clipY = slugMargin * pxPerMm;
+                const clipW = (panelWidthMm + bleed * 2) * pxPerMm;
+                const clipH = (panelHeightMm + bleed * 2) * pxPerMm;
+
+                ctx.beginPath();
+                ctx.rect(clipX, clipY, clipW, clipH);
+                ctx.clip();
+
+                ctx.fillStyle = face.bgColor || '#fdfbf7';
+                ctx.fillRect(clipX, clipY, clipW, clipH);
+
+                // 3. Shift origin by -170mm when rendering right panel so objects in [170..340] map to [0..170]
+                const shiftedOriginX = trimOriginX - (offsetXMm * pxPerMm);
+                for (const obj of face.objects) {
+                    await this.drawObjectOnCanvas(ctx, obj, shiftedOriginX, trimOriginY, pxPerMm, failedImages);
+                }
+
+                ctx.restore();
+
+                // 4. Draw Corner Crop Marks for this 170x300mm single page
+                if (includeCropMarks) {
+                    this.drawSinglePanelMarks(
+                        ctx,
+                        trimOriginX,
+                        trimOriginY,
+                        panelWidthMm * pxPerMm,
+                        panelHeightMm * pxPerMm,
+                        bleed * pxPerMm,
+                        pxPerMm,
+                        pageNumber,
+                        face,
+                        side
+                    );
+                }
+
+                return { canvas, totalWidthMm, totalHeightMm, failedImages };
+            }
+
+            drawSinglePanelMarks(ctx, trimX, trimY, trimW, trimH, bleedPx, pxPerMm, pageNumber, face, side) {
+                ctx.save();
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 0.25 * pxPerMm;
+
+                const offset = bleedPx + (1.5 * pxPerMm);
+                const len = 6 * pxPerMm;
+
+                // 4 Corners Crop Marks
+                ctx.beginPath();
+                // Top-Left
+                ctx.moveTo(trimX - offset - len, trimY); ctx.lineTo(trimX - offset, trimY);
+                ctx.moveTo(trimX, trimY - offset - len); ctx.lineTo(trimX, trimY - offset);
+                // Top-Right
+                ctx.moveTo(trimX + trimW + offset, trimY); ctx.lineTo(trimX + trimW + offset + len, trimY);
+                ctx.moveTo(trimX + trimW, trimY - offset - len); ctx.lineTo(trimX + trimW, trimY - offset);
+                // Bottom-Left
+                ctx.moveTo(trimX - offset - len, trimY + trimH); ctx.lineTo(trimX - offset, trimY + trimH);
+                ctx.moveTo(trimX, trimY + trimH + offset); ctx.lineTo(trimX, trimY + trimH + offset + len);
+                // Bottom-Right
+                ctx.moveTo(trimX + trimW + offset, trimY + trimH); ctx.lineTo(trimX + trimW + offset + len, trimY + trimH);
+                ctx.moveTo(trimX + trimW, trimY + trimH + offset); ctx.lineTo(trimX + trimW, trimY + trimH + offset + len);
+                ctx.stroke();
+
+                // Slug info at top
+                const slugY = trimY - offset - len - (2.0 * pxPerMm);
+                ctx.fillStyle = '#000000';
+                ctx.font = `600 ${2.3 * pxPerMm}px "JetBrains Mono", monospace`;
+                ctx.textBaseline = 'bottom';
+
+                ctx.textAlign = 'left';
+                const sideLabel = side === 'left' ? 'PANNEAU GAUCHE' : 'PANNEAU DROIT';
+                ctx.fillText(
+                    `GREY CORNER | PAGE ${String(pageNumber).padStart(2, '0')} / 20 (${sideLabel}) | 170×300mm (+3mm)`,
+                    trimX + (1 * pxPerMm),
+                    slugY,
+                    Math.max(40 * pxPerMm, trimW - 4 * pxPerMm)
+                );
+
+                ctx.restore();
+            }
+
             wrapCanvasText(ctx, text, maxWidth) {
                 const rawLines = String(text ?? '').split('\n');
                 const out = [];
@@ -307,7 +431,7 @@ class PrintExporter {
 
                     const fontPx = Math.max(1, (obj.fontSize || 12) * PT_TO_MM * pxPerMm);
                     const family = obj.fontFamily || 'Playfair Display';
-                    const fallback = isSansFontFamily(family) ? 'sans-serif' : 'serif';
+                    const fallback = typeof getFontFallback === 'function' ? getFontFallback(family) : (isSansFontFamily(family) ? 'sans-serif' : 'serif');
                     ctx.fillStyle = obj.color || '#1e293b';
                     ctx.font = `${obj.fontWeight || '500'} ${fontPx}px "${family}", ${fallback}`;
                     ctx.textBaseline = 'top';
