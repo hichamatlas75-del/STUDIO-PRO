@@ -83,6 +83,10 @@
                     <i class="fa-solid fa-code"></i>
                     <span>Moteur</span>
                 </button>
+                <button onclick="app.openTemplatesModal()" class="flex items-center space-x-1.5 bg-gradient-to-r from-purple-600/30 to-pink-600/30 hover:from-purple-600/40 hover:to-pink-600/40 text-purple-200 border border-purple-500/50 px-2 py-1 rounded font-semibold transition" title="Banque de Modèles & Gabarits InDesign (Menus 34×30, Flyers A4, Dépliants, Projets Vierges)">
+                    <i class="fa-solid fa-shapes text-pink-400"></i>
+                    <span>Modèles InDesign</span>
+                </button>
                 <button onclick="app.openFormatModal()" class="flex items-center space-x-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 px-2 py-1 rounded font-medium transition" title="Changer le format du document (Menu 34×30, Flyer A4, A5...)">
                     <i class="fa-solid fa-expand text-cyan-400"></i>
                     <span id="header-format-label">34×30 cm</span>
@@ -196,7 +200,7 @@
                     <i class="fa-solid fa-shapes mr-1"></i> Blocs
                 </button>
                 <button onclick="app.switchLeftTab('illustrations')" id="tab-btn-illustrations" class="flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200">
-                    <i class="fa-solid fa-wand-magic-sparkles mr-1 text-amber-400"></i> Pack Canva
+                    <i class="fa-solid fa-feather-pointed mr-1 text-pink-400"></i> Pack InDesign
                 </button>
                 <button onclick="app.switchLeftTab('pages')" id="tab-btn-pages" class="flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200">
                     <i class="fa-solid fa-copy mr-1"></i> Pages (<span id="tab-pages-count">10</span>)
@@ -339,9 +343,29 @@
 
                 <!-- Preset Page Templates Generator -->
                 <div class="border-t border-idBorder pt-3">
-                    <h3 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
-                        Gabarits de Planche Prêts à l'Emploi
-                    </h3>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                            Modèles & Gabarits InDesign
+                        </h3>
+                        <button onclick="app.openTemplatesModal()" class="text-[10px] text-pink-400 hover:text-pink-300 font-semibold flex items-center space-x-1">
+                            <i class="fa-solid fa-shapes"></i>
+                            <span>Banque Pro</span>
+                        </button>
+                    </div>
+
+                    <button onclick="app.openTemplatesModal()" class="w-full mb-2.5 p-2.5 rounded-lg bg-gradient-to-r from-purple-900/40 via-purple-800/40 to-pink-900/40 border border-purple-500/40 hover:border-purple-400 text-left transition flex items-center justify-between group shadow-sm">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-7 h-7 rounded bg-purple-500/20 text-pink-400 flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-shapes"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white group-hover:text-pink-300 transition">Banque de Gabarits InDesign</div>
+                                <div class="text-[9px] text-gray-400">Menus 34×30, Flyers A4, Dépliants, Projets Vierges</div>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-arrow-right text-gray-400 group-hover:text-white text-xs"></i>
+                    </button>
+
                     <div class="space-y-1.5">
                         <button onclick="app.applySpreadTemplate('cover_back')" class="w-full text-left px-2.5 py-1.5 rounded bg-idInput hover:bg-white/5 border border-idBorder flex items-center justify-between">
                             <span><i class="fa-solid fa-book-bookmark text-amber-400 mr-1.5"></i> Couverture + Dos (Panneau D/G)</span>
@@ -363,7 +387,7 @@
                 </div>
             </div>
 
-            <!-- TAB 2: PACK DES ILLUSTRATIONS STYLE CANVA -->
+            <!-- TAB 2: PACK DES ILLUSTRATIONS ET ORNEMENTS INDESIGN -->
             <div id="left-tab-illustrations" class="hidden flex-1 overflow-y-auto p-3 space-y-3">
                 <!-- Populated dynamically by app.renderIllustrationsTab() -->
             </div>
@@ -929,6 +953,49 @@
     </div>
 
     
+    <!-- ==================== MODAL: BANQUE DE GABARITS & MODÈLES INDESIGN ==================== -->
+    <div id="modal-templates" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6">
+        <div class="bg-idPanel border border-idBorder rounded-xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden max-h-[92vh]">
+            <!-- Header -->
+            <div class="bg-idHeader px-5 py-3.5 border-b border-idBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500/30 to-pink-500/30 border border-purple-500/50 text-pink-300 flex items-center justify-center text-base shadow">
+                        <i class="fa-solid fa-shapes"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h2 class="text-sm font-bold text-white">Banque de Modèles & Gabarits InDesign</h2>
+                            <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">Édition Pro</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400">Modèles professionnels prêts à l'emploi (Menus 34×30, Flyers A4, Dépliants, Projets Vierges) avec rigueur PAO.</p>
+                    </div>
+                </div>
+                <button onclick="app.closeTemplatesModal()" class="text-gray-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Toolbar: Search + Category Filters -->
+            <div class="px-5 py-3 border-b border-idBorder bg-idHeader/50 space-y-2.5 shrink-0">
+                <div class="relative">
+                    <input type="text" id="templates-search-input" 
+                           oninput="app.searchTemplates(this.value)"
+                           placeholder="Rechercher un modèle (gastronomique, bistrot, flyer brunch, burger, vierge...)" 
+                           class="w-full bg-idInput border border-idBorder rounded-lg px-3 py-2 pl-9 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-purple-400">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+                </div>
+                <div id="templates-category-filters" class="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-thin text-xs">
+                    <!-- Populated by app.renderTemplatesModalCategories() -->
+                </div>
+            </div>
+
+            <!-- Templates Grid Container -->
+            <div id="templates-modal-grid" class="p-5 overflow-y-auto space-y-3.5 max-h-[65vh]">
+                <!-- Populated by app.renderTemplatesModalCards() -->
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== MODAL 4: FORMAT DU DOCUMENT ==================== -->
     <div id="modal-format" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
         <div class="bg-idPanel border border-idBorder rounded-lg shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden">
@@ -1140,7 +1207,12 @@
                     </button>
                 </div>
 
-                <div class="border-t border-idBorder pt-3 text-[11px] text-gray-400 font-bold uppercase tracking-wider">Gabarits Complets de Planche</div>
+                <div class="border-t border-idBorder pt-3 text-[11px] text-gray-400 font-bold uppercase tracking-wider flex items-center justify-between">
+                    <span>Gabarits Complets de Planche</span>
+                    <button onclick="app.closeMobileSheets(); app.openTemplatesModal();" class="text-pink-400 hover:text-pink-300 normal-case font-semibold text-[10px]">
+                        Banque InDesign (12) →
+                    </button>
+                </div>
                 <div class="space-y-2">
                     <button onclick="app.applySpreadTemplate('cover_spread'); app.closeMobileSheets();" class="w-full p-2.5 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg flex items-center justify-between text-left text-xs transition">
                         <span class="font-bold text-white flex items-center space-x-2"><i class="fa-solid fa-book-bookmark text-amber-400"></i><span>Couverture + Dos (Feuille 1)</span></span>
@@ -1159,13 +1231,13 @@
         </div>
     </div>
 
-    <!-- SHEET 3: PACK ILLUSTRATIONS CANVA (MOBILE) -->
+    <!-- SHEET 3: PACK ILLUSTRATIONS INDESIGN (MOBILE) -->
     <div id="sheet-mobile-canva" class="hidden fixed inset-x-0 bottom-0 z-50 flex flex-col justify-end">
         <div class="bg-idPanel border-t border-idBorder rounded-t-2xl shadow-2xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
             <div class="bg-idHeader px-4 py-3 border-b border-idBorder flex items-center justify-between shrink-0">
                 <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-wand-magic-sparkles text-pink-400 text-sm"></i>
-                    <span class="font-bold text-white text-sm">Pack Illustrations Canva</span>
+                    <i class="fa-solid fa-feather-pointed text-pink-400 text-sm"></i>
+                    <span class="font-bold text-white text-sm">Pack Vectoriel InDesign</span>
                 </div>
                 <button onclick="app.closeMobileSheets()" class="text-gray-400 hover:text-white p-1">
                     <i class="fa-solid fa-xmark text-base"></i>
@@ -1212,6 +1284,13 @@
             </div>
             <div class="p-3.5 space-y-2 overflow-y-auto">
                 <div class="grid grid-cols-2 gap-2 text-xs">
+                    <button onclick="app.closeMobileToolsMenu(); app.openTemplatesModal();" class="p-3 bg-idInput hover:bg-white/10 border border-purple-500/40 rounded-lg text-left flex items-start space-x-2.5 transition">
+                        <i class="fa-solid fa-shapes text-pink-400 text-lg mt-0.5"></i>
+                        <div>
+                            <div class="font-bold text-white">Gabarits InDesign</div>
+                            <div class="text-[10px] text-gray-400">Menus, Flyers, Vierges</div>
+                        </div>
+                    </button>
                     <button onclick="app.closeMobileToolsMenu(); app.openWordImportModal();" class="p-3 bg-idInput hover:bg-white/10 border border-idBorder rounded-lg text-left flex items-start space-x-2.5 transition">
                         <i class="fa-solid fa-file-word text-indigo-400 text-lg mt-0.5"></i>
                         <div>
@@ -1280,8 +1359,8 @@
             <span>Ajouter</span>
         </button>
         <button onclick="app.openMobileSheet('canva')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-300 hover:text-white transition">
-            <i class="fa-solid fa-wand-magic-sparkles text-sm mb-0.5 text-pink-400"></i>
-            <span>Canva</span>
+            <i class="fa-solid fa-feather-pointed text-sm mb-0.5 text-pink-400"></i>
+            <span>InDesign</span>
         </button>
         <button onclick="app.openMobileSheet('inspector')" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-300 hover:text-white transition">
             <i class="fa-solid fa-sliders text-sm mb-0.5 text-purple-400"></i>
@@ -1310,6 +1389,7 @@
     <script src="js/word-importer.js"></script>
     <script src="js/illustrations-pack.js"></script>
     <script src="js/engine.js"></script>
+    <script src="js/indesign-templates.js"></script>
     <script src="js/print-exporter.js"></script>
     <script src="js/app.js"></script>
 </body>

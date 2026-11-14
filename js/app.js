@@ -2979,6 +2979,11 @@ class InMenuStudioApp {
                 if (this.closeMobileSheets()) {
                     return true;
                 }
+                const modalTemplates = document.getElementById('modal-templates');
+                if (modalTemplates && !modalTemplates.classList.contains('hidden')) {
+                    this.closeTemplatesModal();
+                    return true;
+                }
                 const modalFormat = document.getElementById('modal-format');
                 if (modalFormat && !modalFormat.classList.contains('hidden')) {
                     this.closeFormatModal();
@@ -3185,6 +3190,181 @@ class InMenuStudioApp {
             }
 
             // ==========================================
+            // BANQUE DE GABARITS & MODÈLES INDESIGN
+            // ==========================================
+            openTemplatesModal() {
+                const modal = document.getElementById('modal-templates');
+                if (!modal) return;
+                this.renderTemplatesModalCategories();
+                this.renderTemplatesModalCards();
+                modal.classList.remove('hidden');
+            }
+
+            closeTemplatesModal() {
+                const modal = document.getElementById('modal-templates');
+                if (modal) modal.classList.add('hidden');
+            }
+
+            renderTemplatesModalCategories() {
+                const container = document.getElementById('templates-category-filters');
+                if (!container) return;
+                const bank = window.InDesignTemplatesBank || (typeof InDesignTemplatesBank !== 'undefined' ? InDesignTemplatesBank : null);
+                if (!bank) return;
+                const activeCat = this.activeTemplateCategory || 'all';
+
+                container.innerHTML = bank.categories.map(cat => `
+                    <button onclick="app.filterTemplates('${cat.id}')" class="px-3 py-1 rounded-full text-[11px] whitespace-nowrap font-medium transition flex items-center space-x-1.5 ${
+                        activeCat === cat.id
+                            ? 'bg-purple-600 text-white font-bold shadow'
+                            : 'bg-idInput text-gray-300 hover:bg-white/10 hover:text-white'
+                    }">
+                        <i class="fa-solid ${cat.icon} text-[10px]"></i>
+                        <span>${escapeHTML(cat.name)}</span>
+                    </button>
+                `).join('');
+            }
+
+            renderTemplatesModalCards() {
+                const container = document.getElementById('templates-modal-grid');
+                if (!container) return;
+                const bank = window.InDesignTemplatesBank || (typeof InDesignTemplatesBank !== 'undefined' ? InDesignTemplatesBank : null);
+                if (!bank) {
+                    container.innerHTML = '<div class="p-4 text-center text-gray-400">Banque de gabarits en cours de chargement...</div>';
+                    return;
+                }
+
+                const activeCat = this.activeTemplateCategory || 'all';
+                const query = this.templatesSearchQuery || '';
+                const templates = bank.filter(activeCat, query);
+
+                if (templates.length === 0) {
+                    container.innerHTML = `
+                        <div class="p-8 text-center text-gray-400 space-y-2">
+                            <i class="fa-solid fa-shapes text-3xl text-gray-600"></i>
+                            <div class="text-xs">Aucun gabarit trouvé pour votre recherche.</div>
+                            <button onclick="app.searchTemplates(''); app.filterTemplates('all');" class="text-xs text-purple-400 hover:underline">Réinitialiser les filtres</button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const presets = window.FORMAT_PRESETS || (typeof FORMAT_PRESETS !== 'undefined' ? FORMAT_PRESETS : {});
+
+                container.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        ${templates.map(tpl => {
+                            const p = presets[tpl.format] || {};
+                            const colorSwatches = (tpl.colors || []).map(c => `
+                                <span class="w-3.5 h-3.5 rounded-full border border-white/20 inline-block shadow-sm" style="background-color: ${c};" title="${c}"></span>
+                            `).join('');
+
+                            return `
+                                <div class="bg-idInput/90 border border-idBorder hover:border-purple-500/60 rounded-xl p-4 flex flex-col justify-between transition group shadow-md hover:shadow-xl">
+                                    <div>
+                                        <div class="flex items-start justify-between gap-2 mb-2">
+                                            <div class="flex items-center space-x-2.5">
+                                                <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 flex items-center justify-center shrink-0">
+                                                    <i class="fa-solid ${tpl.icon || 'fa-shapes'} text-sm"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 class="font-bold text-white text-xs group-hover:text-purple-300 transition">${escapeHTML(tpl.name)}</h3>
+                                                    <div class="text-[10px] text-gray-400 font-mono flex items-center space-x-1.5 mt-0.5">
+                                                        <span>${p.widthMm || '340'} × ${p.heightMm || '300'} mm</span>
+                                                        <span>•</span>
+                                                        <span>${p.hasFold ? 'Plié 2 volets' : 'Page simple'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span class="text-[9px] px-2 py-0.5 rounded-full font-semibold border shrink-0 ${tpl.badgeColor || 'bg-white/10 text-gray-300 border-white/10'}">
+                                                ${escapeHTML(tpl.badge || 'Gabarit')}
+                                            </span>
+                                        </div>
+
+                                        <p class="text-[11px] text-gray-300/90 leading-relaxed mb-3">
+                                            ${escapeHTML(tpl.subtitle || '')}
+                                        </p>
+
+                                        <div class="flex items-center justify-between text-[10px] text-gray-400 py-1.5 border-t border-idBorder/50 mb-3">
+                                            <span class="flex items-center space-x-1.5">
+                                                <span>Palette :</span>
+                                                <span class="flex items-center space-x-1">${colorSwatches}</span>
+                                            </span>
+                                            <span class="font-mono text-cyan-400 text-[9px]">${tpl.format}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-idBorder/50">
+                                        <button onclick="app.startProjectFromTemplate('${tpl.id}')" 
+                                                class="py-2 px-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-[11px] shadow flex items-center justify-center space-x-1.5 transition active:scale-95">
+                                            <i class="fa-solid fa-file-circle-plus"></i>
+                                            <span>Nouveau Projet</span>
+                                        </button>
+                                        <button onclick="app.applyTemplateToActivePage('${tpl.id}')" 
+                                                class="py-2 px-2.5 rounded-lg bg-idHeader hover:bg-white/10 border border-idBorder hover:border-gray-400 text-gray-200 font-semibold text-[11px] flex items-center justify-center space-x-1.5 transition active:scale-95">
+                                            <i class="fa-solid fa-copy text-pink-400"></i>
+                                            <span>Sur cette page</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+
+            filterTemplates(cat) {
+                this.activeTemplateCategory = cat;
+                this.renderTemplatesModalCategories();
+                this.renderTemplatesModalCards();
+            }
+
+            searchTemplates(query) {
+                this.templatesSearchQuery = query;
+                const input = document.getElementById('templates-search-input');
+                if (input && input.value !== query) input.value = query;
+                this.renderTemplatesModalCards();
+            }
+
+            startProjectFromTemplate(tplId) {
+                const bank = window.InDesignTemplatesBank || (typeof InDesignTemplatesBank !== 'undefined' ? InDesignTemplatesBank : null);
+                if (!bank) return;
+                const tpl = bank.getById(tplId);
+                if (!tpl) return;
+
+                const hasObjects = this.engine.faces.some(f => f.objects && f.objects.length > 0);
+                if (hasObjects) {
+                    const confirmMsg = `Démarrer un nouveau projet à partir du modèle « ${tpl.name} » ?\n(Les modifications actuelles non enregistrées seront remplacées).`;
+                    if (!window.confirm(confirmMsg)) {
+                        return;
+                    }
+                }
+
+                tpl.builder(this.engine, 'new_project');
+                this.setupGeometryDOM();
+                this.renderCurrentFace();
+                this.renderInspector();
+                this.renderSpreadsNavigator();
+                this.updateFormatHeaderUI();
+                this.commitState(false);
+                this.closeTemplatesModal();
+                this.showToast(`Nouveau projet « ${tpl.name} » initialisé avec succès !`);
+            }
+
+            applyTemplateToActivePage(tplId) {
+                const bank = window.InDesignTemplatesBank || (typeof InDesignTemplatesBank !== 'undefined' ? InDesignTemplatesBank : null);
+                if (!bank) return;
+                const tpl = bank.getById(tplId);
+                if (!tpl) return;
+
+                tpl.builder(this.engine, 'single_face');
+                this.renderCurrentFace();
+                this.renderInspector();
+                this.commitState();
+                this.closeTemplatesModal();
+                this.showToast(`Gabarit « ${tpl.name} » appliqué à ${this.currentFace.name} !`);
+            }
+
+            // ==========================================
             // AUTOMATED PAGE NUMBERING METHODS
             // ==========================================
             openPageNumberingModal() {
@@ -3310,13 +3490,13 @@ class InMenuStudioApp {
             }
 
             // ==========================================
-            // CANVA-STYLE ILLUSTRATIONS PACK METHODS
+            // INDESIGN-STYLE VECTOR ASSETS & ILLUSTRATIONS PACK
             // ==========================================
             renderIllustrationsTab() {
                 const tabEl = document.getElementById('left-tab-illustrations');
                 if (!tabEl) return;
 
-                const pack = window.CanvaIllustrationsPack || (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null);
+                const pack = window.InDesignIllustrationsPack || window.CanvaIllustrationsPack || (typeof InDesignIllustrationsPack !== 'undefined' ? InDesignIllustrationsPack : (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null));
                 if (!pack || !pack.items) {
                     tabEl.innerHTML = '<div class="p-4 text-center text-gray-400">Pack d\'illustrations en cours de chargement...</div>';
                     return;
@@ -3343,7 +3523,7 @@ class InMenuStudioApp {
                             <input type="text" 
                                    value="${escapeHTML(this.illustrationsSearchQuery || '')}" 
                                    oninput="app.searchIllustrations(this.value)"
-                                   placeholder="Rechercher (café, burger, ornement...)" 
+                                   placeholder="Rechercher (filet, losange, sceau, chef, café, vegan...)" 
                                    class="w-full bg-idInput border border-idBorder rounded-lg px-3 py-2 pl-8 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400">
                             <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
                             ${query ? `
@@ -3402,13 +3582,13 @@ class InMenuStudioApp {
             }
 
             addIllustrationObject(id) {
-                const pack = window.CanvaIllustrationsPack || (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null);
+                const pack = window.InDesignIllustrationsPack || window.CanvaIllustrationsPack || (typeof InDesignIllustrationsPack !== 'undefined' ? InDesignIllustrationsPack : (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null));
                 if (!pack) return;
                 const item = pack.getItem ? pack.getItem(id) : pack.getById(id);
                 if (!item) return;
 
-                const wMm = item.category === 'ornements' ? 80 : 35;
-                const hMm = item.category === 'ornements' ? 12 : 35;
+                const wMm = item.defaultW || (item.category === 'ornements' ? 75 : (item.category === 'allergenes_regimes' ? 18 : 32));
+                const hMm = item.defaultH || (item.category === 'ornements' ? 8 : (item.category === 'allergenes_regimes' ? 18 : 32));
                 const xMm = Math.max(10, Math.round((this.engine.specs.widthMm - wMm) / 2));
                 const yMm = Math.max(10, Math.round((this.engine.specs.heightMm - hMm) / 2));
 
@@ -3657,7 +3837,7 @@ class InMenuStudioApp {
                 const container = document.getElementById('mobile-canva-content');
                 if (!container) return;
 
-                const pack = window.CanvaIllustrationsPack || (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null);
+                const pack = window.InDesignIllustrationsPack || window.CanvaIllustrationsPack || (typeof InDesignIllustrationsPack !== 'undefined' ? InDesignIllustrationsPack : (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null));
                 if (!pack || !pack.items) {
                     container.innerHTML = '<div class="p-4 text-center text-gray-400">Pack en cours de chargement...</div>';
                     return;
@@ -3683,7 +3863,7 @@ class InMenuStudioApp {
                         <input type="text" 
                                value="${escapeHTML(this.illustrationsSearchQuery || '')}" 
                                oninput="app.searchIllustrations(this.value); app.renderMobileCanvaSheet();"
-                               placeholder="Rechercher (café, burger, ornement...)" 
+                               placeholder="Rechercher (filet, losange, sceau, chef, café, vegan...)" 
                                class="w-full bg-idInput border border-idBorder rounded-xl px-3 py-2.5 pl-8 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-pink-400">
                         <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-3 text-gray-400 text-xs"></i>
                         ${query ? `
