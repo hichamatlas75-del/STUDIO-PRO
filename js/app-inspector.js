@@ -10,14 +10,61 @@ Object.assign(InMenuStudioApp.prototype, {
         const safeHex = (val, fallback) => /^#[0-9a-fA-F]{6}$/.test(String(val || '').trim()) ? String(val).trim() : fallback;
 
         if (!obj) {
-            badge.textContent = 'Planche 34×30cm';
+            const specs = this.engine.specs || { widthMm: 340, heightMm: 300, bleedMm: 3 };
+            badge.textContent = `Page ${this.currentFaceIndex + 1} / ${this.engine.faces.length} (${specs.widthMm}×${specs.heightMm}mm)`;
             const faceBg = safeHex(this.currentFace.bgColor, '#fdfbf7');
+            const pagePillsHTML = this.engine.faces.map((f, idx) => `
+                <button type="button" data-action="go-to-face" data-index="${idx}" class="px-2 py-1 rounded text-[10px] font-mono font-bold border transition ${
+                    idx === this.currentFaceIndex
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow'
+                        : 'bg-idPanel text-gray-300 border-idBorder hover:border-gray-500'
+                }" title="${escapeHTML(f.name || `Page ${idx + 1}`)}">
+                    P.${idx + 1}
+                </button>
+            `).join('');
+
             container.innerHTML = `
-                <div class="space-y-4">
-                    <div class="bg-idInput p-3 rounded border border-idBorder space-y-2">
-                        <div class="font-semibold text-white">${escapeHTML(this.currentFace.name)}</div>
-                        <div class="text-[11px] text-gray-400">Aucun bloc sélectionné. Cliquez sur un élément du canevas pour le modifier ou ajoutez un bloc depuis la boîte à outils à gauche.</div>
+                <div class="space-y-3.5">
+                    <!-- Gestion des Pages du Projet (Ajout / Duplication / Navigation) -->
+                    <div class="bg-blue-500/10 border border-blue-500/30 p-2.5 rounded-lg space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                                <i class="fa-solid fa-copy mr-1"></i>Pages du Projet (${this.engine.faces.length})
+                            </span>
+                            <span class="text-[9.5px] font-mono text-gray-400">${specs.widthMm} × ${specs.heightMm} mm</span>
+                        </div>
+
+                        <div class="flex flex-wrap gap-1">
+                            ${pagePillsHTML}
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-1.5 pt-1">
+                            <button type="button" data-action="add-new-page" class="py-1.5 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10.5px] font-bold flex items-center justify-center space-x-1 shadow">
+                                <i class="fa-solid fa-file-circle-plus"></i>
+                                <span>+ Ajouter Page</span>
+                            </button>
+                            <button type="button" data-action="duplicate-current-page" class="py-1.5 px-2 bg-purple-600 hover:bg-purple-500 text-white rounded text-[10.5px] font-bold flex items-center justify-center space-x-1 shadow">
+                                <i class="fa-regular fa-clone"></i>
+                                <span>Dupliquer Page</span>
+                            </button>
+                        </div>
+
+                        ${this.engine.faces.length > 1 ? `
+                            <button type="button" data-action="remove-current-page" class="w-full py-1 px-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 rounded text-[10px] font-semibold flex items-center justify-center space-x-1">
+                                <i class="fa-regular fa-trash-can"></i>
+                                <span>Supprimer cette page (${this.currentFaceIndex + 1}/${this.engine.faces.length})</span>
+                            </button>
+                        ` : ''}
                     </div>
+
+                    <div class="bg-idInput p-2.5 rounded border border-idBorder space-y-2">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 mb-1">Nom de la page active :</label>
+                            <input type="text" value="${escapeHTML(this.currentFace.name || '')}" data-input="face-name" data-change="face-name" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white font-semibold text-xs">
+                        </div>
+                        <div class="text-[10.5px] text-gray-400">Cliquez sur un élément du canevas pour le modifier ou double-cliquez sur un texte pour l'éditer directement.</div>
+                    </div>
+
                     <div>
                         <label class="block text-[11px] text-gray-400 mb-1">Couleur de fond du papier :</label>
                         <div class="flex items-center space-x-2">
@@ -25,23 +72,21 @@ Object.assign(InMenuStudioApp.prototype, {
                             <input type="text" value="${escapeHTML(this.currentFace.bgColor || '#fdfbf7')}" data-change="face-bg-color" class="flex-1 bg-idInput border border-idBorder rounded px-2 py-1 font-mono text-white">
                         </div>
                     </div>
+
                     <div class="pt-2 border-t border-idBorder space-y-1.5">
                         <div class="text-[10px] font-bold uppercase text-gray-400">Vérification Pré-Presse</div>
                         <div class="flex items-center justify-between text-[11px] bg-idInput px-2.5 py-1.5 rounded">
-                            <span class="text-gray-300">Dimensions ouvertes</span>
-                            <span class="font-mono text-emerald-400">340 × 300 mm</span>
+                            <span class="text-gray-300">Dimensions de la page</span>
+                            <span class="font-mono text-emerald-400">${specs.widthMm} × ${specs.heightMm} mm</span>
                         </div>
+                        ${specs.hasFold ? `
                         <div class="flex items-center justify-between text-[11px] bg-idInput px-2.5 py-1.5 rounded">
-                            <span class="text-gray-300">Ligne de pli centrale</span>
-                            <span class="font-mono text-cyan-400">X = 170 mm</span>
-                        </div>
+                            <span class="text-gray-300">Ligne de pli</span>
+                            <span class="font-mono text-cyan-400">X = ${specs.foldXMm || 170} mm</span>
+                        </div>` : ''}
                         <div class="flex items-center justify-between text-[11px] bg-idInput px-2.5 py-1.5 rounded">
                             <span class="text-gray-300">Fond perdu (Bleed)</span>
-                            <span class="font-mono text-red-400">3 mm (346×306)</span>
-                        </div>
-                        <div class="flex items-center justify-between text-[11px] bg-idInput px-2.5 py-1.5 rounded">
-                            <span class="text-gray-300">Zone sécurité pli</span>
-                            <span class="font-mono text-cyan-300">160 à 180 mm</span>
+                            <span class="font-mono text-red-400">+${specs.bleedMm || 3} mm</span>
                         </div>
                     </div>
                 </div>
@@ -1091,10 +1136,31 @@ Object.assign(InMenuStudioApp.prototype, {
 
     renderSpreadsNavigator() {
         const container = document.getElementById('spreads-navigator-list');
+        const pagesCountEl = document.getElementById('tab-pages-count');
+        if (pagesCountEl) pagesCountEl.textContent = this.engine.faces.length;
         if (!container) return;
 
         const specs = this.engine.specs;
-        let html = '';
+        let html = `
+            <div class="bg-idInput border border-idBorder rounded-lg p-2.5 space-y-2 mb-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-cyan-300 uppercase tracking-wider">
+                        Pages du Projet (${this.engine.faces.length})
+                    </span>
+                    <span class="text-[9.5px] font-mono text-gray-400">${specs.widthMm}×${specs.heightMm}mm</span>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button type="button" data-action="add-new-page" class="py-1.5 px-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] flex items-center justify-center space-x-1 shadow">
+                        <i class="fa-solid fa-file-circle-plus"></i>
+                        <span>+ Ajouter Page</span>
+                    </button>
+                    <button type="button" data-action="duplicate-current-page" class="py-1.5 px-2 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] flex items-center justify-center space-x-1 shadow">
+                        <i class="fa-regular fa-clone"></i>
+                        <span>Dupliquer Active</span>
+                    </button>
+                </div>
+            </div>
+        `;
 
         if (specs.hasFold) {
             const sheetCount = Math.ceil(this.engine.faces.length / 2);
@@ -1122,7 +1188,15 @@ Object.assign(InMenuStudioApp.prototype, {
                                 </div>
                                 <div class="flex items-center justify-between text-[10px]">
                                     <span class="font-semibold text-white truncate">${escapeHTML(recto.name || 'Recto')}</span>
-                                    <span class="text-gray-400 font-mono">${recto.objects.length} blocs</span>
+                                    <div class="flex items-center space-x-1 shrink-0" data-action="noop">
+                                        <button type="button" data-action="duplicate-page" data-index="${rectoIdx}" class="p-0.5 text-gray-400 hover:text-purple-300" title="Dupliquer cette planche">
+                                            <i class="fa-regular fa-clone text-[9px]"></i>
+                                        </button>
+                                        ${this.engine.faces.length > 1 ? `
+                                        <button type="button" data-action="remove-page" data-index="${rectoIdx}" class="p-0.5 text-gray-400 hover:text-rose-400" title="Supprimer cette planche">
+                                            <i class="fa-regular fa-trash-can text-[9px]"></i>
+                                        </button>` : ''}
+                                    </div>
                                 </div>
                             </div>` : ''}
 
@@ -1137,7 +1211,15 @@ Object.assign(InMenuStudioApp.prototype, {
                                 </div>
                                 <div class="flex items-center justify-between text-[10px]">
                                     <span class="font-semibold text-white truncate">${escapeHTML(verso.name || 'Verso')}</span>
-                                    <span class="text-gray-400 font-mono">${verso.objects.length} blocs</span>
+                                    <div class="flex items-center space-x-1 shrink-0" data-action="noop">
+                                        <button type="button" data-action="duplicate-page" data-index="${versoIdx}" class="p-0.5 text-gray-400 hover:text-purple-300" title="Dupliquer cette planche">
+                                            <i class="fa-regular fa-clone text-[9px]"></i>
+                                        </button>
+                                        ${this.engine.faces.length > 1 ? `
+                                        <button type="button" data-action="remove-page" data-index="${versoIdx}" class="p-0.5 text-gray-400 hover:text-rose-400" title="Supprimer cette planche">
+                                            <i class="fa-regular fa-trash-can text-[9px]"></i>
+                                        </button>` : ''}
+                                    </div>
                                 </div>
                             </div>` : ''}
                         </div>
@@ -1145,17 +1227,8 @@ Object.assign(InMenuStudioApp.prototype, {
                 `;
             }
         } else {
-            // Single Page Format (e.g. Flyer A4, Flyer A5)
-            html += `
-                <div class="flex items-center justify-between pb-1 mb-2">
-                    <span class="text-[11px] font-bold text-cyan-300 uppercase tracking-wider">Pages du Flyer (${this.engine.faces.length})</span>
-                    <button type="button" data-action="add-new-page" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[10px] flex items-center space-x-1 shadow">
-                        <i class="fa-solid fa-plus"></i>
-                        <span>+ Page</span>
-                    </button>
-                </div>
-                <div class="space-y-2">
-            `;
+            // Single Page Format (e.g. Flyer A4 Portrait, Set de Table A4 Paysage, Chevalet A5)
+            html += `<div class="space-y-2">`;
             this.engine.faces.forEach((face, idx) => {
                 const isCurrent = this.currentFaceIndex === idx;
                 html += `
@@ -1172,8 +1245,9 @@ Object.assign(InMenuStudioApp.prototype, {
                             </div>
                         </div>
                         <div class="flex items-center space-x-1 shrink-0" data-action="noop">
-                            <button type="button" data-action="duplicate-page" data-index="${idx}" class="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white text-[10px]" title="Dupliquer cette page">
+                            <button type="button" data-action="duplicate-page" data-index="${idx}" class="px-1.5 py-1 bg-purple-600/25 hover:bg-purple-600/45 border border-purple-500/40 rounded text-purple-200 hover:text-white text-[10px] flex items-center space-x-1" title="Dupliquer cette page entière">
                                 <i class="fa-regular fa-clone"></i>
+                                <span>Dupliquer</span>
                             </button>
                             ${this.engine.faces.length > 1 ? `
                             <button type="button" data-action="remove-page" data-index="${idx}" class="p-1 hover:bg-rose-500/20 rounded text-gray-400 hover:text-rose-400 text-[10px]" title="Supprimer cette page">
@@ -1192,35 +1266,65 @@ Object.assign(InMenuStudioApp.prototype, {
     addNewPage() {
         const newFace = this.engine.addPage();
         this.currentFaceIndex = this.engine.faces.length - 1;
+        this.selectedObjectId = null;
         this.renderCurrentFace();
         this.renderInspector();
         this.renderSpreadsNavigator();
-        this.showToast(`Nouvelle page ajoutée (${newFace.name}) !`);
+        this.updateFormatHeaderUI();
+        this.showToast(`Nouvelle page ajoutée (${newFace.name} — ${this.currentFaceIndex + 1}/${this.engine.faces.length}) !`);
     },
 
     duplicatePage(idx) {
-        const dup = this.engine.duplicatePage(idx);
+        const targetIdx = Number.isFinite(idx) ? idx : this.currentFaceIndex;
+        const dup = this.engine.duplicatePage(targetIdx);
         if (dup) {
-            this.currentFaceIndex = idx + 1;
+            this.currentFaceIndex = targetIdx + 1;
+            this.selectedObjectId = null;
             this.renderCurrentFace();
             this.renderInspector();
             this.renderSpreadsNavigator();
-            this.showToast('Page dupliquée avec succès !');
+            this.updateFormatHeaderUI();
+            this.showToast(`Page entière dupliquée (${dup.name} — ${this.currentFaceIndex + 1}/${this.engine.faces.length}) !`);
         }
+    },
+
+    duplicateCurrentPage() {
+        this.duplicatePage(this.currentFaceIndex);
     },
 
     removePage(idx) {
         try {
-            const ok = this.engine.removePage(idx);
+            const targetIdx = Number.isFinite(idx) ? idx : this.currentFaceIndex;
+            const ok = this.engine.removePage(targetIdx);
             if (ok) {
-                this.currentFaceIndex = Math.min(idx, this.engine.faces.length - 1);
+                this.currentFaceIndex = Math.min(targetIdx, this.engine.faces.length - 1);
+                this.selectedObjectId = null;
                 this.renderCurrentFace();
                 this.renderInspector();
                 this.renderSpreadsNavigator();
+                this.updateFormatHeaderUI();
                 this.showToast('Page supprimée.');
             }
         } catch (e) {
             this.showToast(e.message || 'Erreur lors de la suppression.');
+        }
+    },
+
+    removeCurrentPage() {
+        this.removePage(this.currentFaceIndex);
+    },
+
+    updateFaceName(name, debounce = false) {
+        if (!this.currentFace) return;
+        this.currentFace.name = String(name ?? '');
+        if (debounce) {
+            const footerFaceTitle = document.getElementById('footer-face-title');
+            if (footerFaceTitle) footerFaceTitle.textContent = this.currentFace.name;
+            this.renderSpreadsNavigator();
+            this.commitStateDebounced();
+        } else {
+            this.commitState(false);
+            this.renderInspector();
         }
     },
 

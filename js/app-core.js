@@ -275,9 +275,17 @@ class InMenuStudioApp {
                 this.duplicatePage(parseInt(el.dataset.index, 10));
                 if (el.dataset.refreshMobile === 'true') this.renderMobilePagesList();
                 break;
+            case 'duplicate-current-page':
+                this.duplicateCurrentPage();
+                if (el.dataset.refreshMobile === 'true') this.renderMobilePagesList();
+                break;
             case 'remove-page':
                 e.stopPropagation();
                 this.removePage(parseInt(el.dataset.index, 10));
+                if (el.dataset.refreshMobile === 'true') this.renderMobilePagesList();
+                break;
+            case 'remove-current-page':
+                this.removeCurrentPage();
                 if (el.dataset.refreshMobile === 'true') this.renderMobilePagesList();
                 break;
             case 'zoom-step':
@@ -409,6 +417,9 @@ class InMenuStudioApp {
             case 'face-bg-color':
                 this.updateFaceBgColor(el.value, true);
                 break;
+            case 'face-name':
+                this.updateFaceName(el.value, true);
+                break;
             case 'obj-prop':
                 this.handleInspectorPropEvent(el, true);
                 break;
@@ -465,6 +476,9 @@ class InMenuStudioApp {
                 break;
             case 'face-bg-color':
                 this.updateFaceBgColor(el.value, false);
+                break;
+            case 'face-name':
+                this.updateFaceName(el.value, false);
                 break;
             case 'obj-prop':
                 this.handleInspectorPropEvent(el, false);

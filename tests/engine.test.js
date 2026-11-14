@@ -97,7 +97,8 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         'updateFaceBgColor', 'uploadPhotoFile', 'downscaleImageDataUrl', 'alignSelected', 'duplicateSelected',
         'toggleLockSelected', 'deleteSelected', 'updateTopTransformBar', 'updateSelectedFromTopBar',
         'renderLayersList', 'bringToFront', 'bringForward', 'sendBackward', 'sendToBack',
-        'renderSpreadsNavigator', 'addNewPage', 'duplicatePage', 'removePage',
+        'renderSpreadsNavigator', 'addNewPage', 'duplicatePage', 'duplicateCurrentPage',
+        'removePage', 'removeCurrentPage', 'updateFaceName',
         'goToFace', 'prevFace', 'nextFace', 'switchLeftTab',
         // app-db-word.js
         'populateQuickDishSelect', 'refreshDbCategoryFilter', 'openDatabaseModal', 'closeDatabaseModal',

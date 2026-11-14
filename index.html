@@ -365,26 +365,35 @@
 
             <!-- TAB 3: PAGES & PLANCHES NAVIGATOR -->
             <div id="left-tab-pages" class="hidden flex-1 overflow-y-auto p-3 space-y-3">
-                <div class="text-[11px] text-gray-400 bg-idInput p-2 rounded border border-idBorder">
-                    Le menu comporte <strong>5 feuilles 34×30 cm</strong> (pli central à 17 cm), soit <strong>10 faces</strong> au total (Recto & Verso).
-                </div>
                 <div id="spreads-navigator-list" class="space-y-2.5">
                     <!-- Populated dynamically by DocumentEngine -->
                 </div>
             </div>
 
-            <!-- Left Footer: Current Face Quick Switcher -->
-            <div class="p-2.5 bg-idHeader border-t border-idBorder flex items-center justify-between">
-                <button type="button" data-action="prev-face" class="px-2 py-1 bg-idInput hover:bg-white/10 rounded border border-idBorder text-gray-300">
-                    <i class="fa-solid fa-chevron-left"></i>
-                </button>
-                <div class="text-center">
-                    <div id="footer-face-title" class="font-bold text-white text-[11px]">Feuille 1 — Recto</div>
-                    <div id="footer-face-sub" class="text-[9px] text-cyan-400 font-mono">Faces 1 & 2 / 10 (34×30 cm)</div>
+            <!-- Left Footer: Current Face Quick Switcher + Add / Duplicate Page -->
+            <div class="p-2.5 bg-idHeader border-t border-idBorder space-y-2">
+                <div class="flex items-center justify-between">
+                    <button type="button" data-action="prev-face" class="px-2 py-1 bg-idInput hover:bg-white/10 rounded border border-idBorder text-gray-300" title="Page précédente">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <div class="text-center min-w-0 px-1">
+                        <div id="footer-face-title" class="font-bold text-white text-[11px] truncate">Feuille 1 — Recto</div>
+                        <div id="footer-face-sub" class="text-[9px] text-cyan-400 font-mono truncate">Faces 1 & 2 / 10 (34×30 cm)</div>
+                    </div>
+                    <button type="button" data-action="next-face" class="px-2 py-1 bg-idInput hover:bg-white/10 rounded border border-idBorder text-gray-300" title="Page suivante">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
                 </div>
-                <button type="button" data-action="next-face" class="px-2 py-1 bg-idInput hover:bg-white/10 rounded border border-idBorder text-gray-300">
-                    <i class="fa-solid fa-chevron-right"></i>
-                </button>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button type="button" data-action="add-new-page" class="py-1 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold flex items-center justify-center space-x-1 shadow" title="Ajouter une nouvelle page au projet">
+                        <i class="fa-solid fa-file-circle-plus"></i>
+                        <span>+ Ajouter Page</span>
+                    </button>
+                    <button type="button" data-action="duplicate-current-page" class="py-1 px-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 rounded text-[10px] font-bold flex items-center justify-center space-x-1" title="Dupliquer la page entière avec tous ses éléments">
+                        <i class="fa-regular fa-clone"></i>
+                        <span>Dupliquer Page</span>
+                    </button>
+                </div>
             </div>
         </aside>
 
@@ -1125,6 +1134,10 @@
                     <button type="button" data-action="add-new-page" data-refresh-mobile="true" class="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow flex items-center space-x-1">
                         <i class="fa-solid fa-plus"></i>
                         <span>+ Page</span>
+                    </button>
+                    <button type="button" data-action="duplicate-current-page" data-refresh-mobile="true" class="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow flex items-center space-x-1">
+                        <i class="fa-regular fa-clone"></i>
+                        <span>Dupliquer</span>
                     </button>
                     <button type="button" data-action="close-mobile-sheets" class="text-gray-400 hover:text-white p-1 ml-1">
                         <i class="fa-solid fa-xmark text-base"></i>

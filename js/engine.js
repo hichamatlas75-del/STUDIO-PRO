@@ -323,19 +323,20 @@ class DocumentEngine {
     }
 
     /**
-     * Add a new page / face
+     * Add a new page / face to the current project
      */
-    addPage(name = null, bgColor = '#ffffff') {
+    addPage(name = null, bgColor = null) {
         const nextIdx = this.faces.length + 1;
-        const isFlyer = this.currentFormat.startsWith('flyer_');
-        const defaultName = isFlyer ? `Flyer — Page ${nextIdx}` : `Planche ${nextIdx}`;
+        const badge = (this.specs && this.specs.badge) ? this.specs.badge : 'Page';
+        const defaultName = `${badge} — Page ${nextIdx}`;
+        const lastFaceBg = this.faces.length > 0 ? this.faces[this.faces.length - 1].bgColor : null;
 
         const newFace = {
             id: generateUniqueId('face'),
             sheetNumber: Math.ceil(nextIdx / 2),
             side: nextIdx % 2 === 1 ? 'Recto' : 'Verso',
             name: name || defaultName,
-            bgColor: bgColor || (this.specs.defaultBgColor || '#ffffff'),
+            bgColor: bgColor || lastFaceBg || (this.specs && this.specs.defaultBgColor) || '#ffffff',
             objects: []
         };
         this.faces.push(newFace);
@@ -344,17 +345,18 @@ class DocumentEngine {
     }
 
     /**
-     * Duplicate a page / face
+     * Duplicate an entire page / face (with all its objects and background)
      */
     duplicatePage(faceIndex) {
         if (faceIndex < 0 || faceIndex >= this.faces.length) return null;
         const src = this.faces[faceIndex];
         const copy = JSON.parse(JSON.stringify(src));
         copy.id = generateUniqueId('face_copy');
-        copy.name = `${src.name} (Copie)`;
-        copy.objects.forEach((o, idx) => {
-            o.id = generateUniqueId(`obj_dup_${idx}`);
-        });
+        const cleanBase = String(src.name || 'Page').replace(/\s*\(Copie(?:\s*\d+)?\)$/i, '');
+        copy.name = `${cleanBase} (Copie)`;
+        copy.objects = (copy.objects || []).map((o, idx) => Object.assign({}, o, {
+            id: generateUniqueId(`obj_dup_${idx}`)
+        }));
 
         this.faces.splice(faceIndex + 1, 0, copy);
         this.saveState(faceIndex + 1);
