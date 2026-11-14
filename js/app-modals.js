@@ -497,7 +497,13 @@ Object.assign(InMenuStudioApp.prototype, {
             }
         }
 
+        this.engine.currentFace = this.currentFace;
         tpl.builder(this.engine, 'new_project');
+        if (typeof bank.normalizeEngineFaces === 'function') {
+            bank.normalizeEngineFaces(this.engine);
+        }
+        this.currentFaceIndex = 0;
+        this.selectedObjectId = null;
         this.setupGeometryDOM();
         this.renderCurrentFace();
         this.renderInspector();
@@ -514,7 +520,12 @@ Object.assign(InMenuStudioApp.prototype, {
         const tpl = bank.getById(tplId);
         if (!tpl) return;
 
+        this.engine.currentFace = this.currentFace;
         tpl.builder(this.engine, 'single_face');
+        if (typeof bank.normalizeFace === 'function') {
+            bank.normalizeFace(this.currentFace);
+        }
+        this.selectedObjectId = null;
         this.renderCurrentFace();
         this.renderInspector();
         this.commitState();

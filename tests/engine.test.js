@@ -190,4 +190,70 @@ test('mode 100% hors-ligne : assets locaux présents et aucun CDN dans index.htm
     }
 });
 
+test('Banque de gabarits InDesign : 29 modèles valides, constructibles et normalisés', () => {
+    const rootDir = path.join(__dirname, '..');
+    const illCode = fs.readFileSync(path.join(rootDir, 'js', 'illustrations-pack.js'), 'utf8');
+    vm.runInContext(illCode + '\n;this.__exp.InDesignIllustrationsPack = InDesignIllustrationsPack;', ctx);
+    const tplCode = fs.readFileSync(path.join(rootDir, 'js', 'indesign-templates.js'), 'utf8');
+    vm.runInContext(tplCode + '\n;this.__exp.InDesignTemplatesBank = InDesignTemplatesBank;', ctx);
+
+    const { InDesignTemplatesBank, InDesignIllustrationsPack, FORMAT_PRESETS } = ctx.__exp;
+    assert.ok(InDesignTemplatesBank, 'InDesignTemplatesBank doit être défini');
+    assert.strictEqual(InDesignTemplatesBank.templates.length, 29, 'La banque doit contenir 29 gabarits');
+
+    const validCategories = new Set(InDesignTemplatesBank.categories.map(c => c.id));
+    const validTypes = new Set([
+        'shape', 'text', 'dish_item', 'vertical_banner',
+        'badge_new', 'logo', 'photo', 'illustration', 'category_list'
+    ]);
+    const seenIds = new Set();
+
+    for (const tpl of InDesignTemplatesBank.templates) {
+        assert.ok(tpl.id && !seenIds.has(tpl.id), `ID de gabarit unique requis : ${tpl.id}`);
+        seenIds.add(tpl.id);
+        assert.ok(validCategories.has(tpl.category), `Catégorie valide requise pour ${tpl.id}`);
+        assert.ok(FORMAT_PRESETS[tpl.format], `Format ${tpl.format} valide requis pour ${tpl.id}`);
+        assert.strictEqual(typeof tpl.builder, 'function', `Builder requis pour ${tpl.id}`);
+
+        // Test en mode new_project
+        const engProject = new DocumentEngine();
+        engProject.persistReady = false;
+        tpl.builder(engProject, 'new_project');
+        InDesignTemplatesBank.normalizeEngineFaces(engProject);
+
+        assert.strictEqual(engProject.currentFormat, tpl.format);
+        assert.ok(Array.isArray(engProject.faces) && engProject.faces.length >= 1);
+
+        const objIds = new Set();
+        for (const face of engProject.faces) {
+            assert.ok(Array.isArray(face.objects), `face.objects doit être un tableau (${tpl.id})`);
+            for (const obj of face.objects) {
+                assert.ok(obj.id && !objIds.has(obj.id), `Chaque objet normalisé doit avoir un ID unique (${tpl.id})`);
+                objIds.add(obj.id);
+                assert.ok(validTypes.has(obj.type), `Type d'objet canonique "${obj.type}" invalide dans ${tpl.id}`);
+                if (obj.type === 'illustration') {
+                    assert.ok(
+                        InDesignIllustrationsPack.getById(obj.illustrationId),
+                        `Illustration "${obj.illustrationId}" introuvable dans InDesignIllustrationsPack (${tpl.id})`
+                    );
+                }
+                assert.strictEqual(typeof obj.x, 'number', `Coordonnée x numérique requise dans ${tpl.id}`);
+                assert.strictEqual(typeof obj.y, 'number', `Coordonnée y numérique requise dans ${tpl.id}`);
+                assert.strictEqual(typeof obj.w, 'number', `Largeur w numérique requise dans ${tpl.id}`);
+                assert.strictEqual(typeof obj.h, 'number', `Hauteur h numérique requise dans ${tpl.id}`);
+            }
+        }
+
+        // Test en mode single_face
+        const engSingle = new DocumentEngine();
+        engSingle.persistReady = false;
+        engSingle.setFormat(tpl.format, true);
+        engSingle.currentFace = engSingle.faces[0];
+        tpl.builder(engSingle, 'single_face');
+        InDesignTemplatesBank.normalizeFace(engSingle.currentFace);
+        assert.ok(Array.isArray(engSingle.currentFace.objects));
+    }
+});
+
+
 

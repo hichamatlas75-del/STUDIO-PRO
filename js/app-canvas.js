@@ -264,12 +264,13 @@ Object.assign(InMenuStudioApp.prototype, {
         const content = document.createElement('div');
         content.className = 'w-full h-full overflow-hidden relative';
 
-        if (obj.type === 'shape') {
-            content.style.backgroundColor = obj.bgColor || 'transparent';
+        if (obj.type === 'shape' || obj.type === 'frame') {
+            const bw = obj.borderWidth ?? obj.borderWidthPt ?? 0;
+            content.style.backgroundColor = obj.bgColor || obj.backgroundColor || 'transparent';
             content.style.borderColor = obj.borderColor || 'transparent';
-            content.style.borderWidth = `${obj.borderWidth || 0}px`;
-            content.style.borderStyle = (obj.borderWidth > 0 && obj.borderColor !== 'transparent') ? 'solid' : 'none';
-            content.style.borderRadius = `${this.mmToPx(obj.radius ?? 0)}px`;
+            content.style.borderWidth = `${bw}px`;
+            content.style.borderStyle = (bw > 0 && obj.borderColor && obj.borderColor !== 'transparent') ? (obj.borderStyle || 'solid') : 'none';
+            content.style.borderRadius = `${this.mmToPx(obj.radius ?? obj.borderRadius ?? 0)}px`;
         }
         else if (obj.type === 'vertical_banner') {
             content.style.backgroundColor = obj.bgColor || '#1e293b';
@@ -313,15 +314,15 @@ Object.assign(InMenuStudioApp.prototype, {
         else if (obj.type === 'dish_item') {
             const dish = this.engine.getDishById(obj.dishId) || {
                 name: obj.customName || 'Plat Personnalisé',
-                desc: obj.customDesc || 'Ingrédients et préparation',
-                price: obj.customPrice || '00 DH',
-                badge: ''
+                desc: obj.customDesc ?? 'Ingrédients et préparation',
+                price: obj.customPrice ?? '00 DH',
+                badge: obj.customBadge || ''
             };
             content.innerHTML = this.buildDishRowHTML(dish, {
-                nameColor: obj.textColor || '#1e293b',
-                descColor: obj.descColor || '#64748b',
-                priceColor: obj.priceColor || '#9a3412',
-                fontSize: obj.fontSize || 11
+                nameColor: obj.textColor || obj.color || '#1e293b',
+                descColor: obj.descColor || obj.dotsColor || '#64748b',
+                priceColor: obj.priceColor || obj.color || '#9a3412',
+                fontSize: obj.fontSize || obj.fontSizePt || 11
             });
         }
         else if (obj.type === 'category_list') {
@@ -394,15 +395,15 @@ Object.assign(InMenuStudioApp.prototype, {
                 content.appendChild(capEl);
             }
         }
-        else if (obj.type === 'text') {
+        else if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header') {
             content.style.fontFamily = obj.fontFamily || 'Playfair Display';
             content.style.fontSize = `${this.mmToPx((obj.fontSize || obj.fontSizePt || 12) * PT_TO_MM)}px`;
             content.style.lineHeight = '1.35';
             content.style.color = obj.color || '#1e293b';
             content.style.textAlign = obj.align || obj.textAlign || 'left';
-            content.style.fontWeight = obj.fontWeight || '500';
+            content.style.fontWeight = obj.fontWeight || (obj.type === 'title_heading' ? '700' : '500');
             content.className += ' whitespace-pre-line';
-            content.textContent = obj.text ?? obj.content ?? '';
+            content.textContent = obj.text ?? obj.customName ?? obj.content ?? '';
         }
         else if (obj.type === 'illustration') {
             const item = typeof CanvaIllustrationsPack !== 'undefined'

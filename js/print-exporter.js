@@ -253,14 +253,17 @@ class PrintExporter {
                 ctx.save();
                 ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1;
 
-                if (obj.type === 'shape') {
-                    this.roundRect(ctx, x, y, w, h, (obj.radius ?? 0) * pxPerMm);
-                    if (obj.bgColor && obj.bgColor !== 'transparent') {
-                        ctx.fillStyle = obj.bgColor;
+                if (obj.type === 'shape' || obj.type === 'frame') {
+                    const bg = obj.bgColor || obj.backgroundColor || 'transparent';
+                    const bw = obj.borderWidth ?? obj.borderWidthPt ?? 0;
+                    const rad = obj.radius ?? obj.borderRadius ?? 0;
+                    this.roundRect(ctx, x, y, w, h, rad * pxPerMm);
+                    if (bg && bg !== 'transparent') {
+                        ctx.fillStyle = bg;
                         ctx.fill();
                     }
-                    if (obj.borderWidth > 0 && obj.borderColor && obj.borderColor !== 'transparent') {
-                        ctx.lineWidth = obj.borderWidth * (pxPerMm * 0.35);
+                    if (bw > 0 && obj.borderColor && obj.borderColor !== 'transparent') {
+                        ctx.lineWidth = bw * (pxPerMm * 0.35);
                         ctx.strokeStyle = obj.borderColor;
                         ctx.stroke();
                     }
@@ -343,15 +346,15 @@ class PrintExporter {
                     ctx.clip();
                     const dish = this.engine.getDishById(obj.dishId) || {
                         name: obj.customName || 'Plat Personnalisé',
-                        desc: obj.customDesc || 'Ingrédients et préparation',
-                        price: obj.customPrice || '00 DH',
-                        badge: ''
+                        desc: obj.customDesc ?? 'Ingrédients et préparation',
+                        price: obj.customPrice ?? '00 DH',
+                        badge: obj.customBadge || ''
                     };
                     this.drawSingleDishRow(ctx, dish, x, y, w, pxPerMm, {
-                        nameColor: obj.textColor || '#1e293b',
-                        descColor: obj.descColor || '#64748b',
-                        priceColor: obj.priceColor || '#9a3412',
-                        fontSize: obj.fontSize || 11
+                        nameColor: obj.textColor || obj.color || '#1e293b',
+                        descColor: obj.descColor || obj.dotsColor || '#64748b',
+                        priceColor: obj.priceColor || obj.color || '#9a3412',
+                        fontSize: obj.fontSize || obj.fontSizePt || 11
                     });
                     ctx.restore();
                 }
@@ -446,28 +449,32 @@ class PrintExporter {
                         ctx.stroke();
                     }
                 }
-                else if (obj.type === 'text') {
+                else if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header') {
                     ctx.save();
                     ctx.beginPath();
                     ctx.rect(x, y, w, h);
                     ctx.clip();
 
-                    const fontPx = Math.max(1, (obj.fontSize || 12) * PT_TO_MM * pxPerMm);
+                    const fontPt = obj.fontSize || obj.fontSizePt || 12;
+                    const fontPx = Math.max(1, fontPt * PT_TO_MM * pxPerMm);
                     const family = obj.fontFamily || 'Playfair Display';
                     const fallback = typeof getFontFallback === 'function' ? getFontFallback(family) : (isSansFontFamily(family) ? 'sans-serif' : 'serif');
+                    const weight = obj.fontWeight || (obj.type === 'title_heading' ? '700' : '500');
+                    const align = obj.align || obj.textAlign || 'left';
                     ctx.fillStyle = obj.color || '#1e293b';
-                    ctx.font = `${obj.fontWeight || '500'} ${fontPx}px "${family}", ${fallback}`;
+                    ctx.font = `${weight} ${fontPx}px "${family}", ${fallback}`;
                     ctx.textBaseline = 'top';
 
-                    const lines = this.wrapCanvasText(ctx, obj.text || '', Math.max(10, w));
+                    const rawText = obj.text ?? obj.customName ?? obj.content ?? '';
+                    const lines = this.wrapCanvasText(ctx, rawText, Math.max(10, w));
                     let lineY = y;
                     for (const line of lines) {
                         if (lineY > y + h) break;
                         let lineX = x;
-                        if (obj.align === 'center') {
+                        if (align === 'center') {
                             ctx.textAlign = 'center';
                             lineX = x + w / 2;
-                        } else if (obj.align === 'right') {
+                        } else if (align === 'right') {
                             ctx.textAlign = 'right';
                             lineX = x + w;
                         } else {

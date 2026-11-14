@@ -144,26 +144,43 @@ Object.assign(InMenuStudioApp.prototype, {
             `;
         }
         else if (obj.type === 'dish_item') {
-            const dishOptions = this.engine.dishesDB.map(d =>
-                `<option value="${escapeHTML(d.id)}" ${d.id === obj.dishId ? 'selected' : ''}>[${escapeHTML(d.category)}] ${escapeHTML(d.name)} (${escapeHTML(d.price)})</option>`
-            ).join('');
+            const dishOptions = `<option value="" ${!obj.dishId ? 'selected' : ''}>— Plat personnalisé (Édition directe) —</option>` +
+                this.engine.dishesDB.map(d =>
+                    `<option value="${escapeHTML(d.id)}" ${d.id === obj.dishId ? 'selected' : ''}>[${escapeHTML(d.category)}] ${escapeHTML(d.name)} (${escapeHTML(d.price)})</option>`
+                ).join('');
             html += `
                 <div class="space-y-2.5 border-t border-idBorder pt-3">
                     <div class="bg-emerald-500/10 border border-emerald-500/30 p-2 rounded">
                         <label class="text-emerald-300 font-semibold text-[11px] block mb-1">
-                            <i class="fa-solid fa-link mr-1"></i>Plat lié (Base de Données Centrale)
+                            <i class="fa-solid fa-link mr-1"></i>Source du Plat (BDD ou Personnalisé)
                         </label>
-                        <select data-change="obj-prop" data-prop="dishId" class="w-full bg-idInput border border-idBorder rounded px-2 py-1.5 text-white text-[11px]">
-                            ${dishOptions || '<option value="">Aucun plat en base</option>'}
+                        <select data-change="obj-prop" data-prop="dishId" data-refresh-inspector="true" class="w-full bg-idInput border border-idBorder rounded px-2 py-1.5 text-white text-[11px]">
+                            ${dishOptions}
                         </select>
                         <button type="button" data-action="open-database" class="mt-2 w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 py-1 rounded text-[10px] font-semibold">
                             Modifier le texte/prix dans la BDD Centrale
                         </button>
                     </div>
+                    ${!obj.dishId ? `
+                    <div class="space-y-2 bg-idInput/70 p-2 rounded border border-idBorder">
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-0.5">Intitulé du Plat</label>
+                            <input type="text" value="${escapeHTML(obj.customName || '')}" data-input="obj-prop" data-change="obj-prop" data-prop="customName" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white font-semibold text-[11px]">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-0.5">Description / Accompagnement</label>
+                            <textarea rows="2" data-input="obj-prop" data-change="obj-prop" data-prop="customDesc" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-gray-200 text-[11px]">${escapeHTML(obj.customDesc || '')}</textarea>
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-0.5">Prix affiché</label>
+                            <input type="text" value="${escapeHTML(obj.customPrice || '')}" data-input="obj-prop" data-change="obj-prop" data-prop="customPrice" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-amber-300 font-mono font-bold text-[11px]">
+                        </div>
+                    </div>
+                    ` : ''}
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="text-gray-400 text-[10px] block mb-1">Nom Plat</label>
-                            <input type="color" value="${safeHex(obj.textColor, '#1e293b')}" data-input="obj-prop" data-change="obj-prop" data-prop="textColor" class="w-full h-7 rounded bg-idInput border border-idBorder">
+                            <input type="color" value="${safeHex(obj.textColor || obj.color, '#1e293b')}" data-input="obj-prop" data-change="obj-prop" data-prop="textColor" class="w-full h-7 rounded bg-idInput border border-idBorder">
                         </div>
                         <div>
                             <label class="text-gray-400 text-[10px] block mb-1">Description</label>
@@ -176,7 +193,7 @@ Object.assign(InMenuStudioApp.prototype, {
                     </div>
                     <div>
                         <label class="text-gray-400 text-[10px] block mb-1">Taille Police (pt)</label>
-                        <input type="number" min="6" step="0.5" value="${obj.fontSize || 11}" data-change="obj-prop" data-prop="fontSize" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                        <input type="number" min="6" step="0.5" value="${obj.fontSize || obj.fontSizePt || 11}" data-change="obj-prop" data-prop="fontSize" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
                     </div>
                 </div>
             `;
