@@ -125,15 +125,46 @@
                 <span>Pliage 3D</span>
             </button>
 
-            <!-- Save / Load JSON -->
-            <div class="flex items-center bg-idInput rounded border border-idBorder">
-                <button onclick="app.exportProjectJSON()" class="px-2 py-1 hover:bg-white/10 text-gray-300" title="Sauvegarder le projet (.inmenu.json)">
-                    <i class="fa-solid fa-download"></i> JSON
+            <!-- Google Drive / Local Disk Sync (Option A) -->
+            <div id="drive-sync-wrapper" class="flex items-center bg-idInput border border-idBorder rounded shadow-sm">
+                <button onclick="app.saveProjectToDisk(false)" id="btn-save-disk" class="flex items-center space-x-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white px-2.5 py-1 font-semibold text-xs transition" title="Enregistrer directement dans votre dossier Google Drive (Ctrl+S)">
+                    <i class="fa-brands fa-google-drive text-amber-300"></i>
+                    <span id="label-save-disk">Enregistrer (Ctrl+S)</span>
+                    <span id="drive-sync-dot" class="hidden w-2 h-2 rounded-full bg-emerald-300 ml-1 animate-pulse"></span>
                 </button>
-                <label class="px-2 py-1 hover:bg-white/10 text-gray-300 cursor-pointer border-l border-idBorder" title="Importer un projet JSON">
-                    <i class="fa-solid fa-upload"></i>
-                    <input type="file" accept=".json" onchange="app.importProjectJSON(event)" class="hidden">
-                </label>
+                <div class="relative group">
+                    <button class="px-2 py-1 text-gray-300 hover:text-white hover:bg-white/10 border-l border-idBorder text-xs h-full flex items-center" title="Options de synchronisation Google Drive">
+                        <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                    </button>
+                    <div class="hidden group-hover:block absolute right-0 top-full mt-1 w-64 bg-idPanel border border-idBorder rounded-lg shadow-2xl py-1.5 z-50 text-xs text-gray-200">
+                        <div class="px-3 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">Synchronisation Drive</div>
+                        <div id="drive-sync-filename" class="px-3 py-1 font-mono text-[11px] text-emerald-300 truncate font-semibold border-b border-idBorder/50 mb-1">
+                            Prêt pour synchronisation
+                        </div>
+                        <button onclick="app.saveProjectToDisk(false)" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+                            <i class="fa-solid fa-floppy-disk text-emerald-400 w-4"></i>
+                            <span>Enregistrer (Ctrl+S)</span>
+                        </button>
+                        <button onclick="app.saveProjectToDisk(true)" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+                            <i class="fa-solid fa-folder-plus text-amber-400 w-4"></i>
+                            <span>Enregistrer sous... (Google Drive)</span>
+                        </button>
+                        <button onclick="app.openProjectFromDisk()" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+                            <i class="fa-regular fa-folder-open text-cyan-400 w-4"></i>
+                            <span>Ouvrir depuis le dossier Drive</span>
+                        </button>
+                        <div class="border-t border-idBorder my-1"></div>
+                        <button onclick="app.exportProjectJSON()" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-gray-400 hover:text-white">
+                            <i class="fa-solid fa-download w-4"></i>
+                            <span>Télécharger copie locale (.json)</span>
+                        </button>
+                        <label class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-gray-400 hover:text-white cursor-pointer">
+                            <i class="fa-solid fa-upload w-4"></i>
+                            <span>Importer fichier .json</span>
+                            <input type="file" id="disk-import-input-fallback" accept=".json" onchange="app.importProjectJSON(event)" class="hidden">
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <!-- Export Print Modal Button -->
@@ -438,6 +469,11 @@
                         <span class="text-gray-300">Panneau Gauche: <strong class="text-white font-mono">0–170 mm</strong></span>
                         <span class="text-gray-600">•</span>
                         <span class="text-gray-300">Panneau Droit: <strong class="text-white font-mono">170–340 mm</strong></span>
+                        <span class="text-gray-600 hidden md:inline">|</span>
+                        <span id="footer-drive-status" class="hidden md:flex items-center text-emerald-400 font-mono text-[10px]">
+                            <i class="fa-brands fa-google-drive mr-1 text-emerald-400"></i>
+                            <span>Drive: Prêt (Ctrl+S)</span>
+                        </span>
                     </div>
 
                     <!-- Right: Zoom & Snap Controls -->

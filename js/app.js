@@ -27,6 +27,11 @@ class InMenuStudioApp {
                 this.activeIllustrationCategory = 'all';
                 this.illustrationsSearchQuery = '';
 
+                // Google Drive / Local Disk Synchronization State (Option A)
+                this.activeFileHandle = null;
+                this.activeFileName = (typeof localStorage !== 'undefined' && localStorage.getItem('inmenu_last_synced_filename')) || null;
+                this.isSavingDisk = false;
+
                 this.init();
             }
 
@@ -44,6 +49,7 @@ class InMenuStudioApp {
                 this.initModalBackdrops();
                 this.renderIllustrationsTab();
                 this.updateFormatHeaderUI();
+                this.updateDiskSyncUI(true);
 
                 // Asynchronously verify if larger project exists in IndexedDB
                 if (this.engine.loadFromAsyncStorage) {
@@ -99,6 +105,9 @@ class InMenuStudioApp {
                 const saved = this.engine.saveState(this.currentFaceIndex);
                 this.updateAutoSaveUI(saved);
                 this.updateUndoRedoButtons();
+                if (this.activeFileName) {
+                    this.updateDiskSyncUI(false);
+                }
                 if (!skipRender) {
                     this.renderCurrentFace();
                 }
@@ -111,6 +120,9 @@ class InMenuStudioApp {
                     const saved = this.engine.saveState(this.currentFaceIndex);
                     this.updateAutoSaveUI(saved);
                     this.updateUndoRedoButtons();
+                    if (this.activeFileName) {
+                        this.updateDiskSyncUI(false);
+                    }
                 }, 400);
             }
 
@@ -2470,15 +2482,161 @@ class InMenuStudioApp {
                 document.getElementById('btn-redo').disabled = this.engine.redoStack.length === 0;
             }
 
+            // ==========================================
+            // GOOGLE DRIVE / LOCAL DISK SYNC (OPTION A)
+            // ==========================================
+            async saveProjectToDisk(forceSaveAs = false) {
+                if (this.isSavingDisk) return;
+                this.isSavingDisk = true;
+                this.flushPendingSave();
+
+                try {
+                    if ('showSaveFilePicker' in window) {
+                        let handle = this.activeFileHandle;
+
+                        if (!handle || forceSaveAs) {
+                            const defaultFormatName = (this.engine.specs.name || 'Menu').replace(/[^a-zA-Z0-9_-]/g, '_');
+                            const suggested = this.activeFileName || `Projet_${defaultFormatName}.inmenu.json`;
+
+                            handle = await window.showSaveFilePicker({
+                                suggestedName: suggested,
+                                types: [{
+                                    description: 'Projet InMenu Studio (.inmenu.json)',
+                                    accept: { 'application/json': ['.inmenu.json', '.json'] }
+                                }]
+                            });
+
+                            this.activeFileHandle = handle;
+                            this.activeFileName = handle.name;
+                            try {
+                                localStorage.setItem('inmenu_last_synced_filename', handle.name);
+                            } catch (_) {}
+                        }
+
+                        const json = this.engine.toJSON(true);
+                        const writable = await handle.createWritable();
+                        await writable.write(json);
+                        await writable.close();
+
+                        this.updateDiskSyncUI(true);
+                        this.showToast(`✅ Enregistré sur Google Drive : ${this.activeFileName}`);
+                    } else {
+                        // Fallback pour navigateurs sans File System Access API
+                        this.exportProjectJSON();
+                        this.showToast('Enregistré en téléchargement. Placez le fichier dans votre dossier Google Drive.');
+                    }
+                } catch (err) {
+                    if (err && err.name !== 'AbortError') {
+                        console.error('Erreur sauvegarde disque:', err);
+                        this.showToast(`Erreur d'enregistrement : ${err.message || 'accès refusé'}`);
+                    }
+                } finally {
+                    this.isSavingDisk = false;
+                }
+            }
+
+            async openProjectFromDisk() {
+                try {
+                    if ('showOpenFilePicker' in window) {
+                        const [handle] = await window.showOpenFilePicker({
+                            types: [{
+                                description: 'Projet InMenu Studio (.inmenu.json, .json)',
+                                accept: { 'application/json': ['.inmenu.json', '.json'] }
+                            }],
+                            multiple: false
+                        });
+
+                        const file = await handle.getFile();
+                        const text = await file.text();
+                        this.engine.fromJSON(text);
+
+                        this.activeFileHandle = handle;
+                        this.activeFileName = handle.name;
+                        try {
+                            localStorage.setItem('inmenu_last_synced_filename', handle.name);
+                        } catch (_) {}
+
+                        this.currentFaceIndex = 0;
+                        this.selectedObjectId = null;
+                        this.setupGeometryDOM();
+                        this.populateQuickDishSelect();
+                        this.renderCurrentFace();
+                        this.renderInspector();
+                        this.renderSpreadsNavigator();
+                        this.updateUndoRedoButtons();
+                        this.updateFormatHeaderUI();
+                        this.updateDiskSyncUI(true);
+                        this.showToast(`Projet chargé depuis Google Drive : ${this.activeFileName}`);
+                    } else {
+                        const input = document.getElementById('disk-import-input-fallback');
+                        if (input) input.click();
+                    }
+                } catch (err) {
+                    if (err && err.name !== 'AbortError') {
+                        console.error('Erreur ouverture disque:', err);
+                        this.showToast('Erreur lors de l\'ouverture du fichier.');
+                    }
+                }
+            }
+
+            updateDiskSyncUI(isSynced = true) {
+                const labelEl = document.getElementById('label-save-disk');
+                const syncDotEl = document.getElementById('drive-sync-dot');
+                const fileNameEl = document.getElementById('drive-sync-filename');
+                const footerDriveStatus = document.getElementById('footer-drive-status');
+
+                const now = new Date();
+                const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+                if (this.activeFileName) {
+                    if (labelEl) {
+                        labelEl.textContent = isSynced ? `Enregistré (Ctrl+S)` : `Enregistrer (Ctrl+S)*`;
+                    }
+                    if (syncDotEl) {
+                        syncDotEl.classList.remove('hidden');
+                        syncDotEl.className = isSynced
+                            ? 'w-2 h-2 rounded-full bg-emerald-300 ml-1 inline-block animate-pulse'
+                            : 'w-2 h-2 rounded-full bg-amber-400 ml-1 inline-block';
+                    }
+                    if (fileNameEl) {
+                        fileNameEl.textContent = this.activeFileName;
+                        fileNameEl.title = `Fichier actif : ${this.activeFileName}\nStatut : ${isSynced ? 'Synchronisé' : 'Modifications non enregistrées sur disque'}`;
+                    }
+                    if (footerDriveStatus) {
+                        footerDriveStatus.innerHTML = `
+                            <i class="fa-brands fa-google-drive mr-1 ${isSynced ? 'text-emerald-400' : 'text-amber-400'}"></i>
+                            <span>Drive: <strong class="${isSynced ? 'text-emerald-300' : 'text-amber-300'} font-mono">${escapeHTML(this.activeFileName)}</strong> ${isSynced ? `(${timeStr})` : '• Modifié*'}</span>
+                        `;
+                    }
+                } else {
+                    if (labelEl) {
+                        labelEl.textContent = `Enregistrer (Ctrl+S)`;
+                    }
+                    if (syncDotEl) {
+                        syncDotEl.classList.add('hidden');
+                    }
+                    if (fileNameEl) {
+                        fileNameEl.textContent = 'Prêt pour synchronisation';
+                    }
+                    if (footerDriveStatus) {
+                        footerDriveStatus.innerHTML = `
+                            <i class="fa-brands fa-google-drive mr-1 text-emerald-400"></i>
+                            <span>Drive: Prêt (Ctrl+S)</span>
+                        `;
+                    }
+                }
+            }
+
             exportProjectJSON() {
                 const blob = new Blob([this.engine.toJSON()], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
-                link.download = 'Projet_Menu_34x30cm.inmenu.json';
+                const defaultFormatName = (this.engine.specs.name || 'Menu').replace(/[^a-zA-Z0-9_-]/g, '_');
+                link.download = this.activeFileName || `Projet_${defaultFormatName}.inmenu.json`;
                 link.href = url;
                 link.click();
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
-                this.showToast('Sauvegarde JSON téléchargée !');
+                this.showToast('Copie JSON téléchargée !');
             }
 
             importProjectJSON(event) {
@@ -2491,12 +2649,20 @@ class InMenuStudioApp {
                         this.engine.fromJSON(e.target.result);
                         this.currentFaceIndex = 0;
                         this.selectedObjectId = null;
+                        this.activeFileName = file.name;
+                        try {
+                            localStorage.setItem('inmenu_last_synced_filename', file.name);
+                        } catch (_) {}
+                        this.setupGeometryDOM();
                         this.populateQuickDishSelect();
                         this.renderCurrentFace();
                         this.renderInspector();
+                        this.renderSpreadsNavigator();
                         this.updateUndoRedoButtons();
+                        this.updateFormatHeaderUI();
                         this.updateAutoSaveUI(this.engine.lastSaveSuccess);
-                        this.showToast('Projet JSON chargé avec succès !');
+                        this.updateDiskSyncUI(true);
+                        this.showToast(`Projet « ${file.name} » chargé avec succès !`);
                     } catch (err) {
                         console.error(err);
                         this.showToast('Fichier JSON invalide');
@@ -2830,6 +2996,15 @@ class InMenuStudioApp {
 
             bindGlobalShortcuts() {
                 window.addEventListener('keydown', (e) => {
+                    const keyLower = e.key.toLowerCase();
+
+                    // Ctrl + S or Cmd + S: Save directly to Google Drive / Disk file
+                    if ((e.ctrlKey || e.metaKey) && keyLower === 's') {
+                        e.preventDefault();
+                        this.saveProjectToDisk(false);
+                        return;
+                    }
+
                     if (e.key === 'Escape') {
                         if (this.closeTopModal()) {
                             e.preventDefault();
@@ -2846,7 +3021,6 @@ class InMenuStudioApp {
                     const tag = document.activeElement ? document.activeElement.tagName : '';
                     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-                    const keyLower = e.key.toLowerCase();
                     if ((e.ctrlKey || e.metaKey) && keyLower === 'z') {
                         e.preventDefault();
                         if (e.shiftKey) {
