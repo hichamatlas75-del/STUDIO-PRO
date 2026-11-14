@@ -386,6 +386,21 @@ class InMenuStudioApp {
                     this.renderInspector();
                 }
                 break;
+            case 'add-dish-to-category':
+                this.addDishToSelectedCategory();
+                break;
+            case 'delete-dish-from-inspector':
+                this.deleteDishFromInspector(el.dataset.dishId);
+                break;
+            case 'split-category-columns':
+                this.splitSelectedCategoryIntoColumns();
+                break;
+            case 'sync-category-title':
+                this.syncSelectedCategoryTitle();
+                break;
+            case 'text-transform-case':
+                this.transformSelectedTextCase(el.dataset.case);
+                break;
         }
     }
 
@@ -396,6 +411,9 @@ class InMenuStudioApp {
                 break;
             case 'obj-prop':
                 this.handleInspectorPropEvent(el, true);
+                break;
+            case 'inline-dish-field':
+                this.updateInlineDishFromInspector(el.dataset.dishId, el.dataset.field, el.value, true);
                 break;
             case 'db-search':
                 this.renderDatabaseTable();
@@ -450,6 +468,12 @@ class InMenuStudioApp {
                 break;
             case 'obj-prop':
                 this.handleInspectorPropEvent(el, false);
+                break;
+            case 'inline-dish-field':
+                this.updateInlineDishFromInspector(el.dataset.dishId, el.dataset.field, el.value, false);
+                break;
+            case 'category-slice':
+                this.updateCategorySlice(el.dataset.bound, el.value);
                 break;
             case 'upload-photo':
                 this.uploadPhotoFile(e);
@@ -688,8 +712,9 @@ class InMenuStudioApp {
             }
 
             if (this.isAnyModalOpen()) return;
-            const tag = document.activeElement ? document.activeElement.tagName : '';
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            const activeEl = document.activeElement;
+            const tag = activeEl ? activeEl.tagName : '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (activeEl && activeEl.isContentEditable)) return;
 
             if ((e.ctrlKey || e.metaKey) && keyLower === 'z') {
                 e.preventDefault();

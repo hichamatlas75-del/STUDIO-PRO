@@ -144,7 +144,13 @@ Object.assign(InMenuStudioApp.prototype, {
             `;
         }
         else if (obj.type === 'dish_item') {
-            const dishOptions = `<option value="" ${!obj.dishId ? 'selected' : ''}>— Plat personnalisé (Édition directe) —</option>` +
+            const linkedDish = obj.dishId ? this.engine.getDishById(obj.dishId) : null;
+            const currentName = linkedDish ? linkedDish.name : (obj.customName || '');
+            const currentDesc = linkedDish ? (linkedDish.desc || '') : (obj.customDesc || '');
+            const currentPrice = linkedDish ? (linkedDish.price || '') : (obj.customPrice || '');
+            const currentBadge = linkedDish ? (linkedDish.badge || '') : (obj.customBadge || '');
+
+            const dishOptions = `<option value="" ${!obj.dishId ? 'selected' : ''}>— Plat personnalisé (Indépendant) —</option>` +
                 this.engine.dishesDB.map(d =>
                     `<option value="${escapeHTML(d.id)}" ${d.id === obj.dishId ? 'selected' : ''}>[${escapeHTML(d.category)}] ${escapeHTML(d.name)} (${escapeHTML(d.price)})</option>`
                 ).join('');
@@ -157,26 +163,37 @@ Object.assign(InMenuStudioApp.prototype, {
                         <select data-change="obj-prop" data-prop="dishId" data-refresh-inspector="true" class="w-full bg-idInput border border-idBorder rounded px-2 py-1.5 text-white text-[11px]">
                             ${dishOptions}
                         </select>
-                        <button type="button" data-action="open-database" class="mt-2 w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 py-1 rounded text-[10px] font-semibold">
-                            Modifier le texte/prix dans la BDD Centrale
-                        </button>
                     </div>
-                    ${!obj.dishId ? `
-                    <div class="space-y-2 bg-idInput/70 p-2 rounded border border-idBorder">
-                        <div>
-                            <label class="text-gray-400 text-[10px] block mb-0.5">Intitulé du Plat</label>
-                            <input type="text" value="${escapeHTML(obj.customName || '')}" data-input="obj-prop" data-change="obj-prop" data-prop="customName" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white font-semibold text-[11px]">
+                    <div class="space-y-2 bg-idInput/80 p-2.5 rounded border border-emerald-500/30">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                                <i class="fa-solid fa-pen-to-square mr-1"></i>Modifier le Texte du Plat
+                            </span>
+                            <span class="text-[9px] text-gray-400">${linkedDish ? 'Synchronisé BDD' : 'Texte libre'}</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <div class="col-span-2">
+                                <label class="text-gray-400 text-[10px] block mb-0.5">Intitulé du Plat</label>
+                                <input type="text" value="${escapeHTML(currentName)}" data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(obj.dishId || '')}" data-field="name" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white font-semibold text-[11px]">
+                            </div>
+                            <div>
+                                <label class="text-gray-400 text-[10px] block mb-0.5">Prix</label>
+                                <input type="text" value="${escapeHTML(currentPrice)}" data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(obj.dishId || '')}" data-field="price" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-amber-300 font-mono font-bold text-[11px]">
+                            </div>
                         </div>
                         <div>
-                            <label class="text-gray-400 text-[10px] block mb-0.5">Description / Accompagnement</label>
-                            <textarea rows="2" data-input="obj-prop" data-change="obj-prop" data-prop="customDesc" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-gray-200 text-[11px]">${escapeHTML(obj.customDesc || '')}</textarea>
+                            <label class="text-gray-400 text-[10px] block mb-0.5">Description / Ingrédients</label>
+                            <textarea rows="2" data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(obj.dishId || '')}" data-field="desc" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-gray-200 text-[11px]">${escapeHTML(currentDesc)}</textarea>
                         </div>
-                        <div>
-                            <label class="text-gray-400 text-[10px] block mb-0.5">Prix affiché</label>
-                            <input type="text" value="${escapeHTML(obj.customPrice || '')}" data-input="obj-prop" data-change="obj-prop" data-prop="customPrice" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-amber-300 font-mono font-bold text-[11px]">
+                        <div class="flex items-center justify-between gap-2">
+                            <label class="text-gray-400 text-[10px]">Badge :</label>
+                            <select data-change="inline-dish-field" data-dish-id="${escapeHTML(obj.dishId || '')}" data-field="badge" class="flex-1 bg-idPanel border border-idBorder rounded px-2 py-1 text-white text-[10px]">
+                                <option value="" ${!currentBadge ? 'selected' : ''}>Aucun badge</option>
+                                <option value="NOUVEAU" ${currentBadge === 'NOUVEAU' ? 'selected' : ''}>NOUVEAU</option>
+                                <option value="CHEF" ${currentBadge === 'CHEF' ? 'selected' : ''}>★ CHEF</option>
+                            </select>
                         </div>
                     </div>
-                    ` : ''}
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="text-gray-400 text-[10px] block mb-1">Nom Plat</label>
@@ -203,17 +220,83 @@ Object.assign(InMenuStudioApp.prototype, {
             const catMissing = obj.category && !cats.includes(obj.category);
             const catOptions = (catMissing ? `<option value="${escapeHTML(obj.category)}" selected>${escapeHTML(obj.category)} (aucun plat)</option>` : '') +
                 cats.map(c => `<option value="${escapeHTML(c)}" ${c === obj.category ? 'selected' : ''}>${escapeHTML(c)}</option>`).join('');
+            const allDishes = this.engine.getDishesByCategory(obj.category);
+            const startIdx = obj.sliceStart !== undefined ? obj.sliceStart : 0;
+            const endIdx = obj.sliceEnd !== undefined ? obj.sliceEnd : allDishes.length;
+            const dishes = allDishes.slice(startIdx, endIdx);
+
             html += `
                 <div class="space-y-2.5 border-t border-idBorder pt-3">
-                    <div class="bg-blue-500/10 border border-blue-500/30 p-2 rounded space-y-2">
+                    <div class="bg-blue-500/10 border border-blue-500/30 p-2.5 rounded space-y-2">
                         <label class="text-blue-300 font-semibold text-[11px] block">
                             <i class="fa-solid fa-database mr-1"></i>Catégorie liée à la Base de Données
                         </label>
                         <select data-change="obj-prop" data-prop="category" class="w-full bg-idInput border border-idBorder rounded px-2 py-1.5 text-white">
                             ${catOptions}
                         </select>
-                        <input type="text" value="${escapeHTML(obj.title || '')}" placeholder="Sous-titre de section" data-input="obj-prop" data-change="obj-prop" data-prop="title" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-gray-300 text-[10px] font-semibold">Titre de section affiché sur le menu</label>
+                                <button type="button" data-action="sync-category-title" class="text-[9px] text-cyan-300 hover:text-cyan-200 underline" title="Copier le nom de la catégorie dans le titre">
+                                    = Nom catégorie
+                                </button>
+                            </div>
+                            <input type="text" value="${escapeHTML(obj.title || '')}" placeholder="Ex: PETIT DÉJEUNER (laisser vide pour masquer)" data-input="obj-prop" data-change="obj-prop" data-prop="title" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white font-semibold">
+                        </div>
                     </div>
+
+                    <!-- Plage de plats / Multi-colonnes -->
+                    <div class="bg-idInput/70 border border-idBorder p-2 rounded space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-gray-300">Plats affichés (${dishes.length} / ${allDishes.length})</span>
+                            ${allDishes.length >= 2 ? `
+                                <button type="button" data-action="split-category-columns" class="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-2 py-0.5 rounded text-[9.5px] font-bold">
+                                    <i class="fa-solid fa-table-columns mr-1"></i>Scinder en 2 colonnes
+                                </button>
+                            ` : ''}
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-[10px]">
+                            <div>
+                                <label class="text-gray-400 block mb-0.5">Du plat N° (1-${Math.max(1, allDishes.length)})</label>
+                                <input type="number" min="1" max="${Math.max(1, allDishes.length)}" value="${allDishes.length ? startIdx + 1 : 1}" data-change="category-slice" data-bound="start" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white font-mono">
+                            </div>
+                            <div>
+                                <label class="text-gray-400 block mb-0.5">Au plat N° (1-${Math.max(1, allDishes.length)})</label>
+                                <input type="number" min="1" max="${Math.max(1, allDishes.length)}" value="${endIdx}" data-change="category-slice" data-bound="end" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white font-mono">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ÉDITION DIRECTE DES TEXTES & PRIX DES PLATS -->
+                    <div class="bg-idInput/80 border border-emerald-500/30 rounded p-2 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                                <i class="fa-solid fa-pen-to-square mr-1"></i>Modifier les Textes & Prix (${dishes.length})
+                            </span>
+                            <button type="button" data-action="add-dish-to-category" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 rounded text-[9.5px] font-bold">
+                                + Ajouter plat
+                            </button>
+                        </div>
+                        <div class="text-[9.5px] text-gray-400">
+                            Modifiez ci-dessous ou <strong>double-cliquez directement sur un texte du canevas</strong>.
+                        </div>
+                        <div class="max-h-56 overflow-y-auto space-y-2 pr-1">
+                            ${dishes.map((d, idx) => `
+                                <div class="bg-idPanel border border-idBorder rounded p-1.5 space-y-1">
+                                    <div class="flex items-center space-x-1">
+                                        <span class="text-[9px] font-mono text-gray-400 w-4 shrink-0">#${startIdx + idx + 1}</span>
+                                        <input type="text" value="${escapeHTML(d.name || '')}" placeholder="Nom du plat" data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(d.id)}" data-field="name" class="flex-1 min-w-0 bg-idInput border border-idBorder rounded px-1.5 py-0.5 text-white font-semibold text-[10.5px]">
+                                        <input type="text" value="${escapeHTML(d.price || '')}" placeholder="Prix" data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(d.id)}" data-field="price" class="w-16 bg-idInput border border-idBorder rounded px-1.5 py-0.5 text-amber-300 font-mono font-bold text-[10.5px] text-right">
+                                        <button type="button" data-action="delete-dish-from-inspector" data-dish-id="${escapeHTML(d.id)}" class="text-gray-400 hover:text-rose-400 px-1" title="Supprimer ce plat">
+                                            <i class="fa-solid fa-trash-can text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                    <input type="text" value="${escapeHTML(d.desc || '')}" placeholder="Description / ingrédients..." data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(d.id)}" data-field="desc" class="w-full bg-idInput border border-idBorder rounded px-1.5 py-0.5 text-gray-300 text-[10px]">
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="text-gray-400 text-[10px] block mb-1">Couleur Titre</label>
@@ -238,10 +321,6 @@ Object.assign(InMenuStudioApp.prototype, {
                     </div>
                     ${(() => {
                         if (typeof WordMenuImporter === 'undefined') return '';
-                        const allDishes = this.engine.getDishesByCategory(obj.category);
-                        const dishes = (obj.sliceStart !== undefined || obj.sliceEnd !== undefined)
-                            ? allDishes.slice(obj.sliceStart || 0, obj.sliceEnd)
-                            : allDishes;
                         const estimatedH = WordMenuImporter.estimateBlockHeightMm(dishes, Boolean(obj.title));
                         if (estimatedH > obj.h + 2) {
                             return `
@@ -335,12 +414,24 @@ Object.assign(InMenuStudioApp.prototype, {
                 </div>
             `;
         }
-        else if (obj.type === 'text') {
+        else if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header') {
             html += `
                 <div class="space-y-2.5 border-t border-idBorder pt-3">
                     <div>
-                        <label class="text-gray-400 text-[11px] block mb-1">Contenu du Texte</label>
-                        <textarea rows="3" data-input="obj-prop" data-change="obj-prop" data-prop="text" class="w-full bg-idInput border border-idBorder rounded p-2 text-white">${escapeHTML(obj.text ?? obj.content ?? '')}</textarea>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-emerald-300 font-semibold text-[11px]">
+                                <i class="fa-solid fa-pen-to-square mr-1"></i>Contenu du Texte
+                            </label>
+                            <div class="flex items-center space-x-1">
+                                <button type="button" data-action="text-transform-case" data-case="upper" class="px-1.5 py-0.5 bg-idInput hover:bg-white/10 border border-idBorder rounded text-[9px] font-mono text-gray-300" title="Tout en MAJUSCULES">AA</button>
+                                <button type="button" data-action="text-transform-case" data-case="title" class="px-1.5 py-0.5 bg-idInput hover:bg-white/10 border border-idBorder rounded text-[9px] font-mono text-gray-300" title="Initiales En Majuscules">Aa</button>
+                                <button type="button" data-action="text-transform-case" data-case="lower" class="px-1.5 py-0.5 bg-idInput hover:bg-white/10 border border-idBorder rounded text-[9px] font-mono text-gray-300" title="Tout en minuscules">aa</button>
+                            </div>
+                        </div>
+                        <textarea rows="4" data-input="obj-prop" data-change="obj-prop" data-prop="text" class="w-full bg-idInput border border-emerald-500/40 rounded p-2 text-white text-xs leading-relaxed">${escapeHTML(obj.text ?? obj.customName ?? obj.content ?? '')}</textarea>
+                        <div class="text-[9.5px] text-gray-400 mt-1">
+                            Astuce : vous pouvez aussi <strong>double-cliquer sur le texte dans le canevas</strong> pour l'éditer sur place.
+                        </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
@@ -569,9 +660,18 @@ Object.assign(InMenuStudioApp.prototype, {
             val = trimmed;
         }
 
+        const prevCat = obj.category;
         obj[prop] = val;
         if (prop === 'text' && 'content' in obj) obj.content = val;
+        if (prop === 'text' && 'customName' in obj) obj.customName = val;
         if (prop === 'fontSize' && 'fontSizePt' in obj) obj.fontSizePt = val;
+        if (prop === 'category' && obj.type === 'category_list') {
+            delete obj.sliceStart;
+            delete obj.sliceEnd;
+            if (!obj.title || obj.title === 'NOUVELLE CATÉGORIE' || obj.title === 'Sélection du Chef' || obj.title === prevCat) {
+                obj.title = val;
+            }
+        }
 
         if (debounce) {
             this.renderCurrentFace();
@@ -582,6 +682,169 @@ Object.assign(InMenuStudioApp.prototype, {
                 this.renderInspector();
             }
         }
+    },
+
+    /**
+     * Modifie le texte / prix / description / badge d'un plat directement depuis l'Inspecteur
+     * (pour les blocs category_list et dish_item)
+     */
+    updateInlineDishFromInspector(dishId, field, value, isLive = false) {
+        const obj = this.selectedObject;
+        if (!obj) return;
+
+        if (dishId) {
+            const dish = this.engine.getDishById(dishId);
+            if (dish && ['name', 'price', 'desc', 'badge'].includes(field)) {
+                dish[field] = value;
+            }
+        } else if (obj.type === 'dish_item') {
+            if (field === 'name') obj.customName = value;
+            else if (field === 'price') obj.customPrice = value;
+            else if (field === 'desc') obj.customDesc = value;
+            else if (field === 'badge') obj.customBadge = value;
+        }
+
+        if (isLive) {
+            this.renderCurrentFace();
+            this.commitStateDebounced();
+        } else {
+            this.populateQuickDishSelect();
+            this.commitState(false);
+        }
+    },
+
+    addDishToSelectedCategory() {
+        const obj = this.selectedObject;
+        if (!obj || obj.type !== 'category_list') return;
+        const cat = obj.category || 'NOUVELLE CATÉGORIE';
+        const newDish = {
+            id: generateUniqueId('dish'),
+            category: cat,
+            name: 'Nouveau Plat',
+            desc: 'Description et ingrédients',
+            price: '45 DH',
+            badge: ''
+        };
+        this.engine.dishesDB.push(newDish);
+        if (obj.sliceEnd !== undefined) {
+            obj.sliceEnd += 1;
+        }
+        this.populateQuickDishSelect();
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Plat ajouté dans « ${cat} »`);
+    },
+
+    deleteDishFromInspector(dishId) {
+        if (!dishId) return;
+        const idx = this.engine.dishesDB.findIndex(d => d.id === dishId);
+        if (idx === -1) return;
+        const removed = this.engine.dishesDB.splice(idx, 1)[0];
+        this.populateQuickDishSelect();
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Plat « ${removed.name} » supprimé`);
+    },
+
+    syncSelectedCategoryTitle() {
+        const obj = this.selectedObject;
+        if (!obj || obj.type !== 'category_list') return;
+        obj.title = obj.category || '';
+        this.commitState(false);
+        this.renderInspector();
+    },
+
+    updateCategorySlice(bound, rawVal) {
+        const obj = this.selectedObject;
+        if (!obj || obj.type !== 'category_list') return;
+        const allDishes = this.engine.getDishesByCategory(obj.category);
+        const total = allDishes.length;
+        if (total === 0) return;
+
+        let curStart = obj.sliceStart !== undefined ? obj.sliceStart : 0;
+        let curEnd = obj.sliceEnd !== undefined ? obj.sliceEnd : total;
+        const num = parseInt(rawVal, 10);
+        if (!Number.isFinite(num)) return;
+
+        if (bound === 'start') {
+            curStart = Math.max(0, Math.min(total - 1, num - 1));
+            if (curEnd <= curStart) curEnd = total;
+        } else {
+            curEnd = Math.max(curStart + 1, Math.min(total, num));
+        }
+
+        if (curStart === 0 && curEnd === total) {
+            delete obj.sliceStart;
+            delete obj.sliceEnd;
+        } else {
+            obj.sliceStart = curStart;
+            obj.sliceEnd = curEnd;
+        }
+        this.commitState(false);
+        this.renderInspector();
+    },
+
+    splitSelectedCategoryIntoColumns() {
+        const obj = this.selectedObject;
+        if (!obj || obj.type !== 'category_list') return;
+        const allDishes = this.engine.getDishesByCategory(obj.category);
+        const startIdx = obj.sliceStart !== undefined ? obj.sliceStart : 0;
+        const endIdx = obj.sliceEnd !== undefined ? obj.sliceEnd : allDishes.length;
+        const count = endIdx - startIdx;
+        if (count < 2) {
+            this.showToast('Il faut au moins 2 plats pour scinder en 2 colonnes.');
+            return;
+        }
+        const mid = startIdx + Math.ceil(count / 2);
+
+        // Colonne 1 (bloc actuel)
+        obj.sliceStart = startIdx;
+        obj.sliceEnd = mid;
+        const firstSlice = allDishes.slice(startIdx, mid);
+        if (typeof WordMenuImporter !== 'undefined') {
+            obj.h = Math.max(40, Math.round(WordMenuImporter.estimateBlockHeightMm(firstSlice, Boolean(obj.title)) + 4));
+        }
+
+        // Colonne 2 (nouveau bloc côte à côte)
+        const secondSlice = allDishes.slice(mid, endIdx);
+        const copy = JSON.parse(JSON.stringify(obj));
+        copy.id = generateUniqueId('obj');
+        copy.name = `${obj.category} (Suite)`;
+        copy.title = ''; // Pas besoin de répéter le titre en 2e colonne
+        copy.sliceStart = mid;
+        copy.sliceEnd = endIdx;
+        const pageW = this.engine.specs ? this.engine.specs.widthMm : 340;
+        const nextX = +(obj.x + obj.w + 8).toFixed(1);
+        copy.x = (nextX + copy.w <= pageW - 5) ? nextX : +(obj.x + 15).toFixed(1);
+        copy.y = Math.max(12, obj.y);
+        if (typeof WordMenuImporter !== 'undefined') {
+            copy.h = Math.max(40, Math.round(WordMenuImporter.estimateBlockHeightMm(secondSlice, false) + 4));
+        }
+
+        this.currentFace.objects.push(copy);
+        this.selectedObjectId = copy.id;
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Catégorie scindée en 2 colonnes (${firstSlice.length} + ${secondSlice.length} plats)`);
+    },
+
+    transformSelectedTextCase(mode) {
+        const obj = this.selectedObject;
+        if (!obj) return;
+        const cur = String(obj.text ?? obj.customName ?? obj.content ?? '');
+        let next = cur;
+        if (mode === 'upper') {
+            next = cur.toUpperCase();
+        } else if (mode === 'lower') {
+            next = cur.toLowerCase();
+        } else if (mode === 'title') {
+            next = cur.toLowerCase().replace(/(?:^|\s|['’-])\S/g, m => m.toUpperCase());
+        }
+        obj.text = next;
+        if ('content' in obj) obj.content = next;
+        if ('customName' in obj) obj.customName = next;
+        this.commitState(false);
+        this.renderInspector();
     },
 
     updateFaceBgColor(color, debounce = false) {

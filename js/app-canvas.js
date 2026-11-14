@@ -241,6 +241,10 @@ Object.assign(InMenuStudioApp.prototype, {
 
         // Mouse Down to Select & Drag
         wrapper.addEventListener('mousedown', (e) => {
+            if (e.target && (e.target.isContentEditable || (e.target.closest && e.target.closest('[contenteditable="true"]')))) {
+                e.stopPropagation();
+                return;
+            }
             e.stopPropagation();
             if (this.selectedObjectId !== obj.id) {
                 this.selectObject(obj.id);
@@ -280,8 +284,13 @@ Object.assign(InMenuStudioApp.prototype, {
             content.style.fontSize = `${this.mmToPx((obj.fontSize || 12) * PT_TO_MM)}px`;
             const span = document.createElement('span');
             span.className = 'vertical-banner-text whitespace-nowrap';
+            span.title = 'Double-cliquez pour modifier le texte du bandeau';
             span.textContent = obj.text || 'CATÉGORIE';
             content.appendChild(span);
+            this.attachInlineTextEditing(span, obj, (val) => {
+                obj.text = val;
+                obj.name = `Bandeau : ${val || 'CATÉGORIE'}`;
+            }, { singleLine: true });
         }
         else if (obj.type === 'badge_new') {
             content.style.backgroundColor = obj.bgColor || '#e11d48';
@@ -290,8 +299,13 @@ Object.assign(InMenuStudioApp.prototype, {
             content.className += ' flex items-center justify-center font-montserrat font-extrabold tracking-wider uppercase shadow-md';
             content.style.fontSize = `${Math.max(this.mmToPx(2.8), this.mmToPx(obj.h) * 0.42)}px`;
             const span = document.createElement('span');
+            span.title = 'Double-cliquez pour modifier le texte du badge';
             span.textContent = obj.text || 'NOUVEAU';
             content.appendChild(span);
+            this.attachInlineTextEditing(span, obj, (val) => {
+                obj.text = val;
+                obj.name = `Badge : ${val || 'NOUVEAU'}`;
+            }, { singleLine: true });
         }
         else if (obj.type === 'logo') {
             const color = obj.color || '#c8a96a';
@@ -307,12 +321,17 @@ Object.assign(InMenuStudioApp.prototype, {
                 <div class="rounded-full flex items-center justify-center shrink-0" style="width:${crestSize}px; height:${crestSize}px; border:${Math.max(1, hPx * 0.018)}px solid ${escapeHTML(color)}; margin-bottom:${Math.max(2, hPx * 0.05)}px;">
                     <i class="fa-solid fa-utensils" style="font-size:${iconSize}px;"></i>
                 </div>
-                <div class="font-cinzel font-bold tracking-widest leading-none truncate max-w-full" style="font-size:${titleSize}px;">${escapeHTML(obj.title ?? 'GREY CORNER')}</div>
-                <div class="font-montserrat tracking-[0.22em] opacity-85 truncate max-w-full" style="font-size:${subSize}px; margin-top:${Math.max(2, hPx * 0.04)}px;">${escapeHTML(obj.subtitle ?? 'CAFÉ • SINCE 2024')}</div>
+                <div data-logo-field="title" title="Double-cliquez pour modifier le nom" class="font-cinzel font-bold tracking-widest leading-none truncate max-w-full" style="font-size:${titleSize}px;">${escapeHTML(obj.title ?? 'GREY CORNER')}</div>
+                <div data-logo-field="subtitle" title="Double-cliquez pour modifier le sous-titre" class="font-montserrat tracking-[0.22em] opacity-85 truncate max-w-full" style="font-size:${subSize}px; margin-top:${Math.max(2, hPx * 0.04)}px;">${escapeHTML(obj.subtitle ?? 'CAFÉ • SINCE 2024')}</div>
             `;
+            const titleEl = content.querySelector('[data-logo-field="title"]');
+            const subEl = content.querySelector('[data-logo-field="subtitle"]');
+            if (titleEl) this.attachInlineTextEditing(titleEl, obj, (val) => { obj.title = val; }, { singleLine: true });
+            if (subEl) this.attachInlineTextEditing(subEl, obj, (val) => { obj.subtitle = val; }, { singleLine: true });
         }
         else if (obj.type === 'dish_item') {
             const dish = this.engine.getDishById(obj.dishId) || {
+                id: '',
                 name: obj.customName || 'Plat Personnalisé',
                 desc: obj.customDesc ?? 'Ingrédients et préparation',
                 price: obj.customPrice ?? '00 DH',
@@ -324,6 +343,7 @@ Object.assign(InMenuStudioApp.prototype, {
                 priceColor: obj.priceColor || obj.color || '#9a3412',
                 fontSize: obj.fontSize || obj.fontSizePt || 11
             });
+            this.attachDishInlineEditing(content, obj);
         }
         else if (obj.type === 'category_list') {
             const allDishes = this.engine.getDishesByCategory(obj.category);
@@ -335,7 +355,7 @@ Object.assign(InMenuStudioApp.prototype, {
                 const titleSizePx = this.mmToPx(4.4);
                 html += `
                     <div class="border-b flex items-center justify-between" style="border-color:${escapeHTML(obj.titleColor || '#9a3412')}; padding-bottom:${this.mmToPx(1.2)}px;">
-                        <span class="font-serif font-bold tracking-wide truncate" style="color:${escapeHTML(obj.titleColor || '#9a3412')}; font-size:${titleSizePx}px; line-height:1.15;">${escapeHTML(obj.title)}</span>
+                        <span data-edit-cat-title="true" title="Double-cliquez pour modifier le titre de section" class="font-serif font-bold tracking-wide truncate" style="color:${escapeHTML(obj.titleColor || '#9a3412')}; font-size:${titleSizePx}px; line-height:1.15;">${escapeHTML(obj.title)}</span>
                         ${this.previewMode ? '' : `<span class="font-mono opacity-60 shrink-0 ml-2" style="color:${escapeHTML(obj.titleColor || '#9a3412')}; font-size:${this.mmToPx(2.5)}px;" title="Indication éditeur (non imprimée)">${dishes.length} plats</span>`}
                     </div>
                 `;
@@ -350,6 +370,14 @@ Object.assign(InMenuStudioApp.prototype, {
             });
             html += `</div>`;
             content.innerHTML = html;
+
+            const catTitleEl = content.querySelector('[data-edit-cat-title="true"]');
+            if (catTitleEl) {
+                this.attachInlineTextEditing(catTitleEl, obj, (val) => {
+                    obj.title = val;
+                }, { singleLine: true });
+            }
+            this.attachDishInlineEditing(content, obj);
 
             // Détection de débordement de texte en mode édition
             if (!this.previewMode && typeof WordMenuImporter !== 'undefined') {
@@ -391,19 +419,29 @@ Object.assign(InMenuStudioApp.prototype, {
                 capEl.className = 'absolute bottom-0 inset-x-0 bg-black/65 text-white font-serif italic px-2 flex items-center justify-center text-center truncate';
                 capEl.style.height = `${this.mmToPx(7.5)}px`;
                 capEl.style.fontSize = `${this.mmToPx(3.1)}px`;
+                capEl.title = 'Double-cliquez pour modifier la légende';
                 capEl.textContent = obj.caption;
                 content.appendChild(capEl);
+                this.attachInlineTextEditing(capEl, obj, (val) => { obj.caption = val; }, { singleLine: true });
             }
         }
         else if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header') {
             content.style.fontFamily = obj.fontFamily || 'Playfair Display';
             content.style.fontSize = `${this.mmToPx((obj.fontSize || obj.fontSizePt || 12) * PT_TO_MM)}px`;
-            content.style.lineHeight = '1.35';
+            content.style.lineHeight = obj.lineHeight || '1.35';
+            if (obj.letterSpacing) content.style.letterSpacing = `${obj.letterSpacing}em`;
             content.style.color = obj.color || '#1e293b';
             content.style.textAlign = obj.align || obj.textAlign || 'left';
             content.style.fontWeight = obj.fontWeight || (obj.type === 'title_heading' ? '700' : '500');
             content.className += ' whitespace-pre-line';
+            content.title = 'Double-cliquez pour modifier ce texte directement sur le canevas';
             content.textContent = obj.text ?? obj.customName ?? obj.content ?? '';
+            this.attachInlineTextEditing(content, obj, (val) => {
+                obj.text = val;
+                if ('content' in obj) obj.content = val;
+                if ('customName' in obj) obj.customName = val;
+                obj.name = `Texte : ${(val || '').slice(0, 28)}`;
+            }, { singleLine: false });
         }
         else if (obj.type === 'illustration') {
             const item = typeof CanvaIllustrationsPack !== 'undefined'
@@ -428,7 +466,9 @@ Object.assign(InMenuStudioApp.prototype, {
             content.style.fontSize = `${this.mmToPx((obj.fontSize || 8.5) * PT_TO_MM)}px`;
             content.style.color = obj.color || '#64748b';
             content.style.fontWeight = '600';
+            content.title = 'Double-cliquez pour modifier le numéro de page';
             content.textContent = obj.text || `— ${this.currentFaceIndex + 1} —`;
+            this.attachInlineTextEditing(content, obj, (val) => { obj.text = val; }, { singleLine: true });
         }
 
         wrapper.appendChild(content);
@@ -451,14 +491,156 @@ Object.assign(InMenuStudioApp.prototype, {
                 });
             }
 
+            const isTextEditableType = ['text', 'title_heading', 'category_header', 'dish_item', 'category_list', 'vertical_banner', 'badge_new', 'logo', 'page_number'].includes(obj.type);
             const badge = document.createElement('div');
             badge.id = `coord_pill_${obj.id}`;
-            badge.className = `absolute -top-5 left-0 ${obj.locked ? 'bg-amber-600' : 'bg-blue-600'} text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-50 flex items-center space-x-1`;
-            badge.textContent = `${obj.locked ? '🔒 ' : ''}${obj.w} × ${obj.h} mm  (X:${obj.x}, Y:${obj.y})`;
+            badge.className = `absolute -top-5 left-0 ${obj.locked ? 'bg-amber-600' : 'bg-blue-600'} text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50 flex items-center space-x-1.5`;
+            const coordSpan = document.createElement('span');
+            coordSpan.className = 'pointer-events-none';
+            coordSpan.textContent = `${obj.locked ? '🔒 ' : ''}${obj.w} × ${obj.h} mm  (X:${obj.x}, Y:${obj.y})`;
+            badge.appendChild(coordSpan);
+
+            if (isTextEditableType && !obj.locked) {
+                const editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.className = 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-sans font-bold px-1.5 py-0 rounded text-[8.5px] pointer-events-auto cursor-pointer flex items-center space-x-1 shadow-sm';
+                editBtn.title = 'Modifier le texte directement sur le canevas (ou double-cliquez sur un texte)';
+                editBtn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i><span>Éditer TXT</span>';
+                editBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+                editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const firstEditable = content.querySelector('[data-edit-cat-title], [data-edit-dish-field="name"], [data-logo-field="title"], span') || content;
+                    firstEditable.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+                });
+                badge.appendChild(editBtn);
+            }
+
             wrapper.appendChild(badge);
         }
 
         return wrapper;
+    },
+
+    /**
+     * Active l'édition directe du texte sur le canevas par double-clic (type Adobe InDesign / Canva)
+     */
+    attachInlineTextEditing(targetEl, obj, onSave, options = {}) {
+        if (!targetEl) return;
+        targetEl.addEventListener('dblclick', (e) => {
+            if (this.previewMode) return;
+            e.stopPropagation();
+            e.preventDefault();
+            if (obj.locked) {
+                this.showToast('Ce bloc est verrouillé. Déverrouillez-le pour modifier son texte.');
+                return;
+            }
+            if (targetEl.isContentEditable) return;
+
+            if (this.selectedObjectId !== obj.id) {
+                this.selectedObjectId = obj.id;
+                this.renderInspector();
+            }
+
+            // Si c'est un placeholder de description vide, on vide le texte avant édition
+            if (targetEl.dataset.emptyDesc === 'true') {
+                targetEl.textContent = '';
+                delete targetEl.dataset.emptyDesc;
+                targetEl.classList.remove('opacity-0', 'group-hover:opacity-60', 'italic');
+            }
+
+            const initialText = targetEl.innerText;
+            targetEl.contentEditable = 'true';
+            targetEl.spellcheck = false;
+            targetEl.style.outline = '2px solid #10b981';
+            targetEl.style.outlineOffset = '2px';
+            targetEl.style.backgroundColor = 'rgba(16, 185, 129, 0.12)';
+            targetEl.style.borderRadius = '3px';
+            targetEl.style.cursor = 'text';
+            targetEl.style.userSelect = 'text';
+            targetEl.style.minWidth = '16px';
+
+            targetEl.focus();
+            try {
+                const range = document.createRange();
+                range.selectNodeContents(targetEl);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } catch (_) {}
+
+            const handleLiveInput = () => {
+                const raw = options.singleLine
+                    ? targetEl.innerText.replace(/[\r\n]+/g, ' ')
+                    : targetEl.innerText;
+                onSave(raw, true);
+                this.commitStateDebounced();
+            };
+
+            const handleInlineKey = (ke) => {
+                ke.stopPropagation();
+                if (ke.key === 'Escape') {
+                    ke.preventDefault();
+                    targetEl.innerText = initialText;
+                    onSave(initialText, false);
+                    targetEl.blur();
+                } else if ((options.singleLine && ke.key === 'Enter') || ((ke.ctrlKey || ke.metaKey) && ke.key === 'Enter')) {
+                    ke.preventDefault();
+                    targetEl.blur();
+                }
+            };
+
+            const handleInlineBlur = () => {
+                targetEl.removeEventListener('input', handleLiveInput);
+                targetEl.removeEventListener('keydown', handleInlineKey);
+                targetEl.removeEventListener('blur', handleInlineBlur);
+                targetEl.contentEditable = 'false';
+                targetEl.style.outline = '';
+                targetEl.style.outlineOffset = '';
+                targetEl.style.backgroundColor = '';
+                targetEl.style.borderRadius = '';
+                targetEl.style.cursor = '';
+                targetEl.style.userSelect = '';
+
+                const finalVal = (options.singleLine
+                    ? targetEl.innerText.replace(/[\r\n]+/g, ' ')
+                    : targetEl.innerText).trim();
+                onSave(finalVal, false);
+                this.commitState(false);
+                this.renderInspector();
+            };
+
+            targetEl.addEventListener('input', handleLiveInput);
+            targetEl.addEventListener('keydown', handleInlineKey);
+            targetEl.addEventListener('blur', handleInlineBlur);
+        });
+    },
+
+    /**
+     * Active l'édition directe par double-clic sur le nom, le prix ou la description
+     * de chaque plat dans un bloc dish_item ou category_list
+     */
+    attachDishInlineEditing(containerEl, obj) {
+        if (!containerEl) return;
+        const rows = containerEl.querySelectorAll('[data-dish-row]');
+        rows.forEach(rowEl => {
+            const dishId = rowEl.dataset.dishId || '';
+            const fields = rowEl.querySelectorAll('[data-edit-dish-field]');
+            fields.forEach(fieldEl => {
+                const field = fieldEl.dataset.editDishField; // 'name' | 'price' | 'desc'
+                this.attachInlineTextEditing(fieldEl, obj, (val) => {
+                    if (dishId) {
+                        const dbDish = this.engine.getDishById(dishId);
+                        if (dbDish) {
+                            dbDish[field] = val;
+                        }
+                    } else if (obj.type === 'dish_item') {
+                        if (field === 'name') obj.customName = val;
+                        else if (field === 'price') obj.customPrice = val;
+                        else if (field === 'desc') obj.customDesc = val;
+                    }
+                }, { singleLine: field !== 'desc' });
+            });
+        });
     },
 
     buildDishRowHTML(dish, style) {
@@ -474,15 +656,17 @@ Object.assign(InMenuStudioApp.prototype, {
         const descSizePx = Math.max(7, titleSizePx * 0.82);
         const cleanDesc = (dish.desc || '').trim();
         const descHTML = cleanDesc
-            ? `<div class="font-sans leading-snug pr-4" style="color:${escapeHTML(style.descColor)}; font-size:${descSizePx}px; margin-top:${this.mmToPx(0.8)}px;">${escapeHTML(cleanDesc)}</div>`
-            : '';
+            ? `<div data-edit-dish-field="desc" title="Double-cliquez pour modifier la description" class="font-sans leading-snug pr-4" style="color:${escapeHTML(style.descColor)}; font-size:${descSizePx}px; margin-top:${this.mmToPx(0.8)}px;">${escapeHTML(cleanDesc)}</div>`
+            : (!this.previewMode
+                ? `<div data-edit-dish-field="desc" data-empty-desc="true" title="Double-cliquez pour ajouter une description" class="font-sans leading-snug pr-4 opacity-0 group-hover:opacity-60 italic" style="color:${escapeHTML(style.descColor)}; font-size:${descSizePx}px; margin-top:${this.mmToPx(0.5)}px;">+ Ajouter une description (double-clic)</div>`
+                : '');
 
         return `
-            <div class="w-full leading-tight">
+            <div data-dish-row="true" data-dish-id="${escapeHTML(dish.id || '')}" class="w-full leading-tight">
                 <div class="flex items-baseline justify-between font-serif font-bold" style="color:${escapeHTML(style.nameColor)}; font-size:${titleSizePx}px;">
-                    <span class="flex items-center flex-wrap">${escapeHTML(dish.name)}${badgeHTML}</span>
+                    <span class="flex items-center flex-wrap"><span data-edit-dish-field="name" title="Double-cliquez pour modifier l'intitulé du plat">${escapeHTML(dish.name)}</span>${badgeHTML}</span>
                     <span class="menu-dots"></span>
-                    <span class="font-montserrat font-bold shrink-0" style="color:${escapeHTML(style.priceColor)};">${escapeHTML(dish.price)}</span>
+                    <span data-edit-dish-field="price" title="Double-cliquez pour modifier le prix" class="font-montserrat font-bold shrink-0" style="color:${escapeHTML(style.priceColor)};">${escapeHTML(dish.price)}</span>
                 </div>
                 ${descHTML}
             </div>

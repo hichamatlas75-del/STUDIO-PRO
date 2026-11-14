@@ -815,11 +815,11 @@ Object.assign(InMenuStudioApp.prototype, {
                 </div>
         `;
 
-        if (obj.type === 'text') {
+        if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header') {
             html += `
                 <div>
                     <label class="text-gray-400 text-[11px] block mb-1">Contenu texte :</label>
-                    <textarea data-input="mobile-selected-prop" data-prop="text" class="w-full bg-idInput border border-idBorder rounded p-2 text-white text-xs">${escapeHTML(obj.text ?? obj.content ?? '')}</textarea>
+                    <textarea rows="3" data-input="mobile-selected-prop" data-prop="text" class="w-full bg-idInput border border-idBorder rounded p-2 text-white text-xs">${escapeHTML(obj.text ?? obj.customName ?? obj.content ?? '')}</textarea>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
@@ -828,24 +828,57 @@ Object.assign(InMenuStudioApp.prototype, {
                     </div>
                     <div>
                         <label class="text-gray-400 text-[11px] block mb-1">Couleur :</label>
-                        <input type="color" value="${obj.color || '#ffffff'}" data-change="mobile-selected-prop" data-prop="color" class="w-full h-8 bg-idInput border border-idBorder rounded cursor-pointer">
+                        <input type="color" value="${safeHex(obj.color, '#ffffff')}" data-change="mobile-selected-prop" data-prop="color" class="w-full h-8 bg-idInput border border-idBorder rounded cursor-pointer">
                     </div>
                 </div>
             `;
-        } else if (obj.type === 'dish_row') {
+        } else if (obj.type === 'dish_item') {
+            const linkedDish = obj.dishId ? this.engine.getDishById(obj.dishId) : null;
+            const currentName = linkedDish ? linkedDish.name : (obj.customName || '');
+            const currentDesc = linkedDish ? (linkedDish.desc || '') : (obj.customDesc || '');
+            const currentPrice = linkedDish ? (linkedDish.price || '') : (obj.customPrice || '');
             html += `
                 <div class="space-y-2">
                     <div>
                         <label class="text-gray-400 text-[11px] block mb-1">Nom du plat :</label>
-                        <input type="text" value="${escapeHTML(obj.dishName || '')}" data-input="mobile-selected-prop" data-prop="dishName" class="w-full bg-idInput border border-idBorder rounded p-2 text-white font-bold">
+                        <input type="text" value="${escapeHTML(currentName)}" data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(obj.dishId || '')}" data-field="name" class="w-full bg-idInput border border-idBorder rounded p-2 text-white font-bold">
                     </div>
                     <div>
                         <label class="text-gray-400 text-[11px] block mb-1">Prix affiché :</label>
-                        <input type="text" value="${escapeHTML(obj.priceText || '')}" data-input="mobile-selected-prop" data-prop="priceText" class="w-full bg-idInput border border-idBorder rounded p-2 text-emerald-400 font-mono font-bold">
+                        <input type="text" value="${escapeHTML(currentPrice)}" data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(obj.dishId || '')}" data-field="price" class="w-full bg-idInput border border-idBorder rounded p-2 text-emerald-400 font-mono font-bold">
                     </div>
                     <div>
                         <label class="text-gray-400 text-[11px] block mb-1">Description / Ingrédients :</label>
-                        <input type="text" value="${escapeHTML(obj.descText || '')}" data-input="mobile-selected-prop" data-prop="descText" class="w-full bg-idInput border border-idBorder rounded p-2 text-gray-300">
+                        <input type="text" value="${escapeHTML(currentDesc)}" data-input="inline-dish-field" data-change="inline-dish-field" data-dish-id="${escapeHTML(obj.dishId || '')}" data-field="desc" class="w-full bg-idInput border border-idBorder rounded p-2 text-gray-300">
+                    </div>
+                </div>
+            `;
+        } else if (obj.type === 'category_list') {
+            html += `
+                <div class="space-y-2">
+                    <div>
+                        <label class="text-gray-400 text-[11px] block mb-1">Titre de la section :</label>
+                        <input type="text" value="${escapeHTML(obj.title || '')}" data-input="mobile-selected-prop" data-prop="title" class="w-full bg-idInput border border-idBorder rounded p-2 text-white font-bold">
+                    </div>
+                </div>
+            `;
+        } else if (obj.type === 'vertical_banner' || obj.type === 'badge_new') {
+            html += `
+                <div>
+                    <label class="text-gray-400 text-[11px] block mb-1">Texte :</label>
+                    <input type="text" value="${escapeHTML(obj.text || '')}" data-input="mobile-selected-prop" data-prop="text" class="w-full bg-idInput border border-idBorder rounded p-2 text-white font-bold">
+                </div>
+            `;
+        } else if (obj.type === 'logo') {
+            html += `
+                <div class="space-y-2">
+                    <div>
+                        <label class="text-gray-400 text-[11px] block mb-1">Nom de l'établissement :</label>
+                        <input type="text" value="${escapeHTML(obj.title || '')}" data-input="mobile-selected-prop" data-prop="title" class="w-full bg-idInput border border-idBorder rounded p-2 text-white font-bold">
+                    </div>
+                    <div>
+                        <label class="text-gray-400 text-[11px] block mb-1">Sous-titre :</label>
+                        <input type="text" value="${escapeHTML(obj.subtitle || '')}" data-input="mobile-selected-prop" data-prop="subtitle" class="w-full bg-idInput border border-idBorder rounded p-2 text-gray-300">
                     </div>
                 </div>
             `;
@@ -853,7 +886,7 @@ Object.assign(InMenuStudioApp.prototype, {
             html += `
                 <div>
                     <label class="text-gray-400 text-[11px] block mb-1">Teinte de l'illustration :</label>
-                    <input type="color" value="${obj.color || '#c8a96a'}" data-change="mobile-selected-prop" data-prop="color" class="w-full h-9 bg-idInput border border-idBorder rounded cursor-pointer">
+                    <input type="color" value="${safeHex(obj.color, '#c8a96a')}" data-change="mobile-selected-prop" data-prop="color" class="w-full h-9 bg-idInput border border-idBorder rounded cursor-pointer">
                 </div>
             `;
         }
