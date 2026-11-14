@@ -1,22 +1,129 @@
 /**
+ * ============================================================================
  * MODULE 1: DocumentEngine (engine.js)
+ * Gère la géométrie physique (340x300mm, Flyer A4, A5, Dépliant), la base centrale
+ * de plats/prix, les planches (faces), l'historique undo/redo et la numérotation.
+ * ============================================================================
  */
+
+const FORMAT_PRESETS = {
+    'menu_34x30': {
+        id: 'menu_34x30',
+        name: 'Menu Livret 34 × 30 cm (2 Volets)',
+        badge: 'Restaurant Signature',
+        sub: 'Format ouvert 340 × 300 mm • Pli central 170 mm • 10 Faces (5 feuilles)',
+        category: 'menu',
+        widthMm: 340,
+        heightMm: 300,
+        hasFold: true,
+        foldXMm: 170,
+        foldMarks: [170],
+        bleedMm: 3,
+        safeOuterMm: 10,
+        safeFoldHalfMm: 10,
+        defaultFaces: 10,
+        orientation: 'landscape',
+        defaultBgColor: '#fdfbf7'
+    },
+    'flyer_a4_portrait': {
+        id: 'flyer_a4_portrait',
+        name: 'Flyer A4 Portrait (210 × 297 mm)',
+        badge: 'Flyer A4 Standard',
+        sub: 'Standard International A4 • 1 ou 2 Faces (Sans pli) • Idéal Flyer, Affiche & Carte 1 Page',
+        category: 'flyer',
+        widthMm: 210,
+        heightMm: 297,
+        hasFold: false,
+        foldXMm: null,
+        foldMarks: [],
+        bleedMm: 3,
+        safeOuterMm: 8,
+        safeFoldHalfMm: 0,
+        defaultFaces: 2,
+        orientation: 'portrait',
+        defaultBgColor: '#ffffff'
+    },
+    'flyer_a4_landscape': {
+        id: 'flyer_a4_landscape',
+        name: 'Flyer / Set de Table A4 Paysage (297 × 210 mm)',
+        badge: 'A4 Paysage',
+        sub: 'Format horizontal 297 × 210 mm • Set de table ou flyer panoramique (Sans pli)',
+        category: 'flyer',
+        widthMm: 297,
+        heightMm: 210,
+        hasFold: false,
+        foldXMm: null,
+        foldMarks: [],
+        bleedMm: 3,
+        safeOuterMm: 8,
+        safeFoldHalfMm: 0,
+        defaultFaces: 1,
+        orientation: 'landscape',
+        defaultBgColor: '#ffffff'
+    },
+    'flyer_a5_portrait': {
+        id: 'flyer_a5_portrait',
+        name: 'Flyer A5 Portrait (148 × 210 mm)',
+        badge: 'Flyer A5 Poche',
+        sub: 'Demi-A4 de poche 148 × 210 mm • Street marketing & distribution rapide (Sans pli)',
+        category: 'flyer',
+        widthMm: 148,
+        heightMm: 210,
+        hasFold: false,
+        foldXMm: null,
+        foldMarks: [],
+        bleedMm: 3,
+        safeOuterMm: 6,
+        safeFoldHalfMm: 0,
+        defaultFaces: 2,
+        orientation: 'portrait',
+        defaultBgColor: '#ffffff'
+    },
+    'depliant_a4_3volets': {
+        id: 'depliant_a4_3volets',
+        name: 'Dépliant A4 3 Volets / 2 Plis (297 × 210 mm)',
+        badge: 'Menu Triptyque',
+        sub: 'Triptyque plié (3 volets de 99 × 210 mm) • Plis à 99 mm et 198 mm',
+        category: 'depliant',
+        widthMm: 297,
+        heightMm: 210,
+        hasFold: true,
+        foldXMm: 99,
+        foldMarks: [99, 198],
+        bleedMm: 3,
+        safeOuterMm: 8,
+        safeFoldHalfMm: 5,
+        defaultFaces: 2,
+        orientation: 'landscape',
+        defaultBgColor: '#fdfbf7'
+    }
+};
+
 class DocumentEngine {
     constructor() {
-        // Strict Physical Geometry in Millimeters (Cahier des charges)
-        this.specs = {
-            widthMm: 340,          // 34 cm open width
-            heightMm: 300,         // 30 cm open height
-            foldXMm: 170,          // Central fold line at 17 cm (2 panels of 17 × 30 cm)
-            bleedMm: 3,            // 3 mm bleed all around
-            safeOuterMm: 10,       // 10 mm outer margin
-            safeFoldHalfMm: 10     // 10 mm safety zone on each side of the fold (160mm to 180mm)
-        };
+        // Format & Physical Geometry (Default: Menu 34x30cm)
+        this.currentFormat = 'menu_34x30';
+        this.specs = Object.assign({}, FORMAT_PRESETS['menu_34x30']);
 
         // Centralized Dish & Price Database (Single source of truth)
         this.dishesDB = this.getDefaultDishesDatabase();
 
-        // 5 Sheets × 2 Sides (Recto / Verso) = 10 Faces
+        // Automated Page Numbering Configuration
+        this.pageNumbering = {
+            enabled: false,           // Activer / désactiver la numérotation
+            format: 'page_n',         // 'page_n' ("Page 2"), 'n_slash_total' ("2 / 10"), 'simple' ("2"), 'dash' ("— 2 —"), 'dot' ("• 2 •"), 'roman' ("II")
+            position: 'bottom_center',// 'bottom_center', 'bottom_outer', 'bottom_right', 'bottom_left', 'top_center', 'top_outer'
+            startNumber: 1,
+            skipCover: true,          // Ne pas afficher sur la couverture (Face 1)
+            skipBack: false,          // Option dos de couverture
+            fontFamily: 'Montserrat',
+            fontSizePt: 8.5,
+            color: '#64748b',
+            marginMm: 8,
+            perPanelForSpreads: true  // Pour les planches ouvertes à 2 volets: 1 numéro à gauche et 1 numéro à droite
+        };
+
+        // Faces (Pages/Planches)
         this.faces = this.createInitialFaces();
 
         // Undo / Redo Stacks
@@ -28,41 +135,236 @@ class DocumentEngine {
     }
 
     getDefaultDishesDatabase() {
-        return JSON.parse(JSON.stringify(GREY_CORNER_DEFAULT_DB));
+        if (typeof GREY_CORNER_DEFAULT_DB !== 'undefined') {
+            return JSON.parse(JSON.stringify(GREY_CORNER_DEFAULT_DB));
+        }
+        return [];
     }
 
     createInitialFaces() {
+        const preset = FORMAT_PRESETS[this.currentFormat] || FORMAT_PRESETS['menu_34x30'];
         const faces = [];
-        for (let sheet = 1; sheet <= 5; sheet++) {
-            faces.push({
-                id: `sheet_${sheet}_recto`,
-                sheetNumber: sheet,
-                side: 'Recto',
-                name: `Feuille ${sheet} — Recto`,
-                bgColor: '#fdfbf7',
-                objects: []
-            });
-            faces.push({
-                id: `sheet_${sheet}_verso`,
-                sheetNumber: sheet,
-                side: 'Verso',
-                name: `Feuille ${sheet} — Verso`,
-                bgColor: '#fdfbf7',
-                objects: []
-            });
+
+        if (this.currentFormat === 'menu_34x30') {
+            for (let sheet = 1; sheet <= 5; sheet++) {
+                faces.push({
+                    id: `sheet_${sheet}_recto`,
+                    sheetNumber: sheet,
+                    side: 'Recto',
+                    name: `Feuille ${sheet} — Recto`,
+                    bgColor: preset.defaultBgColor || '#fdfbf7',
+                    objects: []
+                });
+                faces.push({
+                    id: `sheet_${sheet}_verso`,
+                    sheetNumber: sheet,
+                    side: 'Verso',
+                    name: `Feuille ${sheet} — Verso`,
+                    bgColor: preset.defaultBgColor || '#fdfbf7',
+                    objects: []
+                });
+            }
+
+            // Auto-populate with complete Grey Corner Menu
+            this.faces = faces;
+            if (typeof WordMenuImporter !== 'undefined') {
+                WordMenuImporter.autoLayoutAcrossSpreads(this, this.dishesDB, {
+                    mode: 'full_auto_spreads',
+                    theme: 'bistro_warm',
+                    brandTitle: typeof GREY_CORNER_BRAND !== 'undefined' ? GREY_CORNER_BRAND.title : 'GREY CORNER',
+                    brandSub: typeof GREY_CORNER_BRAND !== 'undefined' ? GREY_CORNER_BRAND.subtitle : 'café • SINCE 2024'
+                });
+            }
+            return faces;
+        } else if (this.currentFormat.startsWith('flyer_') || this.currentFormat.startsWith('depliant_')) {
+            const count = preset.defaultFaces || 2;
+            for (let i = 1; i <= count; i++) {
+                const sideName = i === 1 ? 'Recto' : (i === 2 ? 'Verso' : `Page ${i}`);
+                faces.push({
+                    id: `page_${i}`,
+                    sheetNumber: i,
+                    side: sideName,
+                    name: `${preset.badge} — ${sideName}`,
+                    bgColor: preset.defaultBgColor || '#ffffff',
+                    objects: []
+                });
+            }
+            this.faces = faces;
+            return faces;
         }
 
-        // Auto-populate all 10 faces with the complete Grey Corner 2026 Menu
-        this.faces = faces;
-        if (typeof WordMenuImporter !== 'undefined') {
-            WordMenuImporter.autoLayoutAcrossSpreads(this, this.dishesDB, {
-                mode: 'full_auto_spreads',
-                theme: 'bistro_warm',
-                brandTitle: GREY_CORNER_BRAND.title,
-                brandSub: GREY_CORNER_BRAND.subtitle
-            });
-        }
         return faces;
+    }
+
+    /**
+     * Switch format (e.g. 'flyer_a4_portrait', 'menu_34x30', etc.)
+     */
+    setFormat(formatKey, resetPages = false) {
+        if (!FORMAT_PRESETS[formatKey]) {
+            console.warn(`Format preset "${formatKey}" non reconnu.`);
+            return false;
+        }
+        this.currentFormat = formatKey;
+        this.specs = Object.assign({}, FORMAT_PRESETS[formatKey]);
+
+        if (resetPages) {
+            this.faces = this.createInitialFaces();
+        }
+        this.saveState();
+        return true;
+    }
+
+    /**
+     * Update page numbering settings
+     */
+    setPageNumbering(options = {}) {
+        this.pageNumbering = Object.assign({}, this.pageNumbering, options);
+        this.saveState();
+    }
+
+    /**
+     * Format a page number string according to current settings
+     */
+    formatPageNumberString(pageNumber, totalPages = null) {
+        const fmt = this.pageNumbering.format || 'page_n';
+        const total = totalPages || (this.specs.hasFold ? this.faces.length * 2 : this.faces.length);
+
+        switch (fmt) {
+            case 'page_n':
+                return `Page ${pageNumber}`;
+            case 'n_slash_total':
+                return `${pageNumber} / ${total}`;
+            case 'dash':
+                return `— ${pageNumber} —`;
+            case 'dot':
+                return `• ${pageNumber} •`;
+            case 'simple':
+                return `${pageNumber}`;
+            case 'roman': {
+                const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
+                return romans[pageNumber - 1] || `${pageNumber}`;
+            }
+            default:
+                return `Page ${pageNumber}`;
+        }
+    }
+
+    /**
+     * Computes the display page number for a given face and panel side ('left', 'right', 'single')
+     * Returns null if page number is skipped (e.g. cover).
+     */
+    getPageNumberInfo(faceIndex, panelSide = 'single') {
+        if (!this.pageNumbering.enabled) return null;
+
+        const totalFaces = this.faces.length;
+        const isSpread = Boolean(this.specs.hasFold);
+
+        if (!isSpread) {
+            const pageNum = faceIndex + 1;
+            if (this.pageNumbering.skipCover && pageNum === 1) return null;
+            if (this.pageNumbering.skipBack && pageNum === totalFaces) return null;
+
+            return {
+                number: pageNum,
+                text: this.formatPageNumberString(pageNum, totalFaces),
+                xMm: this.specs.widthMm / 2,
+                yMm: this.pageNumbering.position.startsWith('top') ? this.pageNumbering.marginMm : (this.specs.heightMm - this.pageNumbering.marginMm),
+                align: 'center'
+            };
+        }
+
+        // Spread with 2 panels (e.g. 340 x 300 mm)
+        // Face 0: Recto = Back Cover (left 0..170) & Front Cover (right 170..340)
+        let leftPageNum = null;
+        let rightPageNum = null;
+
+        if (faceIndex === 0) {
+            rightPageNum = 1; // Cover
+            leftPageNum = totalFaces * 2; // Back Cover
+        } else {
+            leftPageNum = faceIndex * 2;
+            rightPageNum = faceIndex * 2 + 1;
+        }
+
+        if (panelSide === 'left') {
+            if (leftPageNum === 1 && this.pageNumbering.skipCover) return null;
+            if (leftPageNum === totalFaces * 2 && this.pageNumbering.skipBack) return null;
+            const panelW = (this.specs.foldXMm || (this.specs.widthMm / 2));
+            return {
+                number: leftPageNum,
+                text: this.formatPageNumberString(leftPageNum, totalFaces * 2),
+                xMm: panelW / 2,
+                yMm: this.pageNumbering.position.startsWith('top') ? this.pageNumbering.marginMm : (this.specs.heightMm - this.pageNumbering.marginMm),
+                align: 'center'
+            };
+        } else if (panelSide === 'right') {
+            if (rightPageNum === 1 && this.pageNumbering.skipCover) return null;
+            if (rightPageNum === totalFaces * 2 && this.pageNumbering.skipBack) return null;
+            const foldX = (this.specs.foldXMm || (this.specs.widthMm / 2));
+            const panelW = this.specs.widthMm - foldX;
+            return {
+                number: rightPageNum,
+                text: this.formatPageNumberString(rightPageNum, totalFaces * 2),
+                xMm: foldX + (panelW / 2),
+                yMm: this.pageNumbering.position.startsWith('top') ? this.pageNumbering.marginMm : (this.specs.heightMm - this.pageNumbering.marginMm),
+                align: 'center'
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * Add a new page / face
+     */
+    addPage(name = null, bgColor = '#ffffff') {
+        const nextIdx = this.faces.length + 1;
+        const isFlyer = this.currentFormat.startsWith('flyer_');
+        const defaultName = isFlyer ? `Flyer — Page ${nextIdx}` : `Planche ${nextIdx}`;
+
+        const newFace = {
+            id: `face_${Date.now().toString(36)}_${nextIdx}`,
+            sheetNumber: Math.ceil(nextIdx / 2),
+            side: nextIdx % 2 === 1 ? 'Recto' : 'Verso',
+            name: name || defaultName,
+            bgColor: bgColor || (this.specs.defaultBgColor || '#ffffff'),
+            objects: []
+        };
+        this.faces.push(newFace);
+        this.saveState(this.faces.length - 1);
+        return newFace;
+    }
+
+    /**
+     * Duplicate a page / face
+     */
+    duplicatePage(faceIndex) {
+        if (faceIndex < 0 || faceIndex >= this.faces.length) return null;
+        const src = this.faces[faceIndex];
+        const copy = JSON.parse(JSON.stringify(src));
+        copy.id = `face_${Date.now().toString(36)}_copy`;
+        copy.name = `${src.name} (Copie)`;
+        copy.objects.forEach((o, idx) => {
+            o.id = generateUniqueId(`obj_dup_${idx}`);
+        });
+
+        this.faces.splice(faceIndex + 1, 0, copy);
+        this.saveState(faceIndex + 1);
+        return copy;
+    }
+
+    /**
+     * Remove a page / face (with min 1 safeguard)
+     */
+    removePage(faceIndex) {
+        if (this.faces.length <= 1) {
+            throw new Error('Le document doit comporter au moins une page.');
+        }
+        if (faceIndex < 0 || faceIndex >= this.faces.length) return false;
+        this.faces.splice(faceIndex, 1);
+        const targetFace = Math.min(faceIndex, this.faces.length - 1);
+        this.saveState(targetFace);
+        return true;
     }
 
     // Applies Cover + Back spread ONLY on the specified face (without touching the other 9 faces)
@@ -70,8 +372,8 @@ class DocumentEngine {
         if (typeof WordMenuImporter !== 'undefined') {
             WordMenuImporter.buildCoverSpread(face, this, {
                 theme: 'bistro_warm',
-                brandTitle: GREY_CORNER_BRAND.title,
-                brandSub: GREY_CORNER_BRAND.subtitle
+                brandTitle: typeof GREY_CORNER_BRAND !== 'undefined' ? GREY_CORNER_BRAND.title : 'GREY CORNER',
+                brandSub: typeof GREY_CORNER_BRAND !== 'undefined' ? GREY_CORNER_BRAND.subtitle : 'café • SINCE 2024'
             });
         }
     }
@@ -85,8 +387,8 @@ class DocumentEngine {
                 mode: 'active_spread_only',
                 updateDB: false,
                 theme: 'bistro_warm',
-                brandTitle: GREY_CORNER_BRAND.title,
-                brandSub: GREY_CORNER_BRAND.subtitle,
+                brandTitle: typeof GREY_CORNER_BRAND !== 'undefined' ? GREY_CORNER_BRAND.title : 'GREY CORNER',
+                brandSub: typeof GREY_CORNER_BRAND !== 'undefined' ? GREY_CORNER_BRAND.subtitle : 'café • SINCE 2024',
                 activeFaceIndex: targetFaceIdx
             });
         }
@@ -101,8 +403,8 @@ class DocumentEngine {
                 mode: 'active_spread_only',
                 updateDB: false,
                 theme: 'bistro_warm',
-                brandTitle: GREY_CORNER_BRAND.title,
-                brandSub: GREY_CORNER_BRAND.subtitle,
+                brandTitle: typeof GREY_CORNER_BRAND !== 'undefined' ? GREY_CORNER_BRAND.title : 'GREY CORNER',
+                brandSub: typeof GREY_CORNER_BRAND !== 'undefined' ? GREY_CORNER_BRAND.subtitle : 'café • SINCE 2024',
                 activeFaceIndex: targetFaceIdx
             });
         }
@@ -112,6 +414,9 @@ class DocumentEngine {
     saveState(activeFaceIndex = 0) {
         const snapshot = JSON.stringify({
             activeFaceIndex,
+            currentFormat: this.currentFormat,
+            specs: this.specs,
+            pageNumbering: this.pageNumbering,
             dishesDB: this.dishesDB,
             faces: this.faces
         });
@@ -123,41 +428,51 @@ class DocumentEngine {
             this.history.shift();
         }
         this.redoStack = [];
-        return this.persistToLocalStorage();
+        this.lastSaveSuccess = this.persistToLocalStorage();
+        return this.lastSaveSuccess;
     }
 
     undo() {
-        if (this.history.length <= 1) return false;
+        if (this.history.length <= 1) return null;
         const current = this.history.pop();
         this.redoStack.push(current);
         const prev = JSON.parse(this.history[this.history.length - 1]);
+        if (prev.currentFormat && FORMAT_PRESETS[prev.currentFormat]) {
+            this.currentFormat = prev.currentFormat;
+            this.specs = prev.specs || Object.assign({}, FORMAT_PRESETS[prev.currentFormat]);
+        }
+        if (prev.pageNumbering) {
+            this.pageNumbering = Object.assign({}, this.pageNumbering, prev.pageNumbering);
+        }
         this.dishesDB = prev.dishesDB;
         this.faces = prev.faces;
-        this.activeFaceIndex = Number.isInteger(prev.activeFaceIndex) ? prev.activeFaceIndex : null;
-        this.lastRestoredFaceIndex = this.activeFaceIndex;
+        this.lastRestoredFaceIndex = typeof prev.activeFaceIndex === 'number' ? prev.activeFaceIndex : 0;
         this.persistToLocalStorage();
-        return true;
+        return this.lastRestoredFaceIndex;
     }
 
     redo() {
-        if (this.redoStack.length === 0) return false;
-        const nextStr = this.redoStack.pop();
-        this.history.push(nextStr);
-        const next = JSON.parse(nextStr);
+        if (this.redoStack.length === 0) return null;
+        const nextSnap = this.redoStack.pop();
+        this.history.push(nextSnap);
+        const next = JSON.parse(nextSnap);
+        if (next.currentFormat && FORMAT_PRESETS[next.currentFormat]) {
+            this.currentFormat = next.currentFormat;
+            this.specs = next.specs || Object.assign({}, FORMAT_PRESETS[next.currentFormat]);
+        }
+        if (next.pageNumbering) {
+            this.pageNumbering = Object.assign({}, this.pageNumbering, next.pageNumbering);
+        }
         this.dishesDB = next.dishesDB;
         this.faces = next.faces;
-        this.activeFaceIndex = Number.isInteger(next.activeFaceIndex) ? next.activeFaceIndex : null;
-        this.lastRestoredFaceIndex = this.activeFaceIndex;
+        this.lastRestoredFaceIndex = typeof next.activeFaceIndex === 'number' ? next.activeFaceIndex : 0;
         this.persistToLocalStorage();
-        return true;
+        return this.lastRestoredFaceIndex;
     }
 
     persistToLocalStorage() {
-        const jsonPayload = this.toJSON(false);
-
-        // 1. High-capacity IndexedDB persistence (asynchronous, up to hundreds of MBs)
         if (typeof InMenuStorage !== 'undefined' && InMenuStorage.setItem) {
-            InMenuStorage.setItem('inmenu_studio_v3_greycorner_split', jsonPayload)
+            InMenuStorage.setItem('inmenu_studio_v3_greycorner_split', this.toJSON(false))
                 .then(ok => {
                     this.lastSaveSuccess = ok;
                     if (typeof app !== 'undefined' && app.updateAutoSaveUI) {
@@ -166,18 +481,19 @@ class DocumentEngine {
                 })
                 .catch(() => {
                     this.lastSaveSuccess = false;
+                    if (typeof app !== 'undefined' && app.updateAutoSaveUI) {
+                        app.updateAutoSaveUI(false);
+                    }
                 });
+            return true;
         }
 
-        // 2. LocalStorage attempt (holds up to ~5 MB)
         try {
-            localStorage.setItem('inmenu_studio_v3_greycorner_split', jsonPayload);
-            this.lastSaveSuccess = true;
+            localStorage.setItem('inmenu_studio_v3_greycorner_split', this.toJSON(false));
             return true;
         } catch (e) {
-            // LocalStorage quota reached, but IndexedDB safely persists
-            this.lastSaveSuccess = true;
-            return true;
+            console.warn('LocalStorage full, large images in project:', e);
+            return false;
         }
     }
 
@@ -185,6 +501,35 @@ class DocumentEngine {
         if (!data || !Array.isArray(data.faces) || !Array.isArray(data.dishesDB)) {
             throw new Error('Format JSON InMenu invalide.');
         }
+
+        // Format & Specs recovery
+        let currentFormat = data.currentFormat || 'menu_34x30';
+        let specs = Object.assign({}, FORMAT_PRESETS[currentFormat] || FORMAT_PRESETS['menu_34x30']);
+        if (data.specs && typeof data.specs === 'object') {
+            specs = Object.assign({}, specs, data.specs);
+            if (specs.id && FORMAT_PRESETS[specs.id]) {
+                currentFormat = specs.id;
+            }
+        }
+
+        // Page Numbering recovery
+        let pageNumbering = {
+            enabled: false,
+            format: 'page_n',
+            position: 'bottom_center',
+            startNumber: 1,
+            skipCover: true,
+            skipBack: false,
+            fontFamily: 'Montserrat',
+            fontSizePt: 8.5,
+            color: '#64748b',
+            marginMm: 8,
+            perPanelForSpreads: true
+        };
+        if (data.pageNumbering && typeof data.pageNumbering === 'object') {
+            pageNumbering = Object.assign({}, pageNumbering, data.pageNumbering);
+        }
+
         const seenDishIds = new Set();
         const dishesDB = data.dishesDB
             .filter(d => d && typeof d === 'object')
@@ -202,7 +547,7 @@ class DocumentEngine {
                 };
             });
 
-        const optionalNumericProps = ['fontSize', 'radius', 'borderWidth', 'opacity', 'sliceStart', 'sliceEnd'];
+        const optionalNumericProps = ['fontSize', 'radius', 'borderWidth', 'opacity', 'sliceStart', 'sliceEnd', 'rotate'];
         const sanitizeObject = (o) => {
             optionalNumericProps.forEach(prop => {
                 if (o[prop] === undefined || o[prop] === null) {
@@ -215,17 +560,21 @@ class DocumentEngine {
             });
             if (o.opacity !== undefined) o.opacity = Math.max(0.05, Math.min(1, o.opacity));
             if (o.locked !== undefined) o.locked = Boolean(o.locked);
+            if (o.flipH !== undefined) o.flipH = Boolean(o.flipH);
+            if (o.flipV !== undefined) o.flipV = Boolean(o.flipV);
+
             ['type', 'name', 'text', 'title', 'subtitle', 'caption', 'category', 'dishId', 'fontFamily', 'fontWeight', 'align',
              'bgColor', 'borderColor', 'color', 'textColor', 'titleColor', 'descColor', 'priceColor', 'imageUrl',
-             'customName', 'customDesc', 'customPrice']
+             'customName', 'customDesc', 'customPrice', 'svgKey', 'illustrationId']
                 .forEach(prop => {
                     if (o[prop] !== undefined && o[prop] !== null && typeof o[prop] !== 'string') o[prop] = String(o[prop]);
                 });
             return o;
         };
 
+        const targetCount = Math.max(1, data.faces.length);
         const faces = [];
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < targetCount; i++) {
             const sheet = Math.floor(i / 2) + 1;
             const side = i % 2 === 0 ? 'Recto' : 'Verso';
             const src = data.faces[i];
@@ -249,16 +598,16 @@ class DocumentEngine {
                 : [];
 
             faces.push({
-                id: (src && src.id) ? String(src.id) : `sheet_${sheet}_${side.toLowerCase()}`,
+                id: (src && src.id) ? String(src.id) : `page_${i + 1}`,
                 sheetNumber: sheet,
                 side,
-                name: (src && src.name) ? String(src.name) : `Feuille ${sheet} — ${side}`,
-                bgColor: (src && src.bgColor) ? String(src.bgColor) : '#fdfbf7',
+                name: (src && src.name) ? String(src.name) : `Page ${i + 1}`,
+                bgColor: (src && src.bgColor) ? String(src.bgColor) : (specs.defaultBgColor || '#fdfbf7'),
                 objects
             });
         }
 
-        return { dishesDB, faces };
+        return { dishesDB, faces, currentFormat, specs, pageNumbering };
     }
 
     loadFromLocalStorage() {
@@ -269,6 +618,9 @@ class DocumentEngine {
                 const normalized = this.normalizeImportedData(data);
                 this.dishesDB = normalized.dishesDB;
                 this.faces = normalized.faces;
+                if (normalized.currentFormat) this.currentFormat = normalized.currentFormat;
+                if (normalized.specs) this.specs = normalized.specs;
+                if (normalized.pageNumbering) this.pageNumbering = normalized.pageNumbering;
                 return true;
             }
         } catch (e) {
@@ -286,6 +638,9 @@ class DocumentEngine {
                     const normalized = this.normalizeImportedData(data);
                     this.dishesDB = normalized.dishesDB;
                     this.faces = normalized.faces;
+                    if (normalized.currentFormat) this.currentFormat = normalized.currentFormat;
+                    if (normalized.specs) this.specs = normalized.specs;
+                    if (normalized.pageNumbering) this.pageNumbering = normalized.pageNumbering;
                     return true;
                 }
             } catch (err) {
@@ -298,8 +653,10 @@ class DocumentEngine {
     toJSON(pretty = true) {
         const payload = {
             app: 'InMenu Studio Pro',
-            version: '1.0',
+            version: '2.0',
+            currentFormat: this.currentFormat,
             specs: this.specs,
+            pageNumbering: this.pageNumbering,
             dishesDB: this.dishesDB,
             faces: this.faces
         };
@@ -311,6 +668,9 @@ class DocumentEngine {
         const normalized = this.normalizeImportedData(data);
         this.dishesDB = normalized.dishesDB;
         this.faces = normalized.faces;
+        if (normalized.currentFormat) this.currentFormat = normalized.currentFormat;
+        if (normalized.specs) this.specs = normalized.specs;
+        if (normalized.pageNumbering) this.pageNumbering = normalized.pageNumbering;
         this.saveState();
     }
 
@@ -336,4 +696,9 @@ class DocumentEngine {
         while (existing.has(`${prefix}${seq}`)) seq++;
         return `${prefix}${seq}`;
     }
+}
+
+if (typeof window !== 'undefined') {
+    window.FORMAT_PRESETS = FORMAT_PRESETS;
+    window.DocumentEngine = DocumentEngine;
 }

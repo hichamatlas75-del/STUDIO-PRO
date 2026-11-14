@@ -79,6 +79,14 @@
                     <i class="fa-solid fa-code"></i>
                     <span>Moteur (engine.js)</span>
                 </button>
+                <button onclick="app.openFormatModal()" class="flex items-center space-x-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 px-2.5 py-1 rounded font-medium transition" title="Changer le format du document (Menu 34×30, Flyer A4, A5...)">
+                    <i class="fa-solid fa-expand text-cyan-400"></i>
+                    <span id="header-format-label">34×30 cm</span>
+                </button>
+                <button onclick="app.openPageNumberingModal()" class="flex items-center space-x-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 px-2.5 py-1 rounded font-medium transition" title="Configurer la numérotation automatique des pages">
+                    <i class="fa-solid fa-hashtag text-purple-400"></i>
+                    <span id="header-page-num-label">Numérotation</span>
+                </button>
             </div>
         </div>
 
@@ -144,17 +152,20 @@
             <!-- Left Dock Tabs -->
             <div class="flex border-b border-idBorder bg-idHeader text-[11px] font-semibold">
                 <button onclick="app.switchLeftTab('blocks')" id="tab-btn-blocks" class="flex-1 py-2 text-center border-b-2 border-blue-500 text-white bg-idPanel">
-                    <i class="fa-solid fa-shapes mr-1"></i> Blocs Menu
+                    <i class="fa-solid fa-shapes mr-1"></i> Blocs
+                </button>
+                <button onclick="app.switchLeftTab('illustrations')" id="tab-btn-illustrations" class="flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1 text-amber-400"></i> Pack Canva
                 </button>
                 <button onclick="app.switchLeftTab('pages')" id="tab-btn-pages" class="flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200">
-                    <i class="fa-solid fa-copy mr-1"></i> 5 Planches (10 Faces)
+                    <i class="fa-solid fa-copy mr-1"></i> Pages (<span id="tab-pages-count">10</span>)
                 </button>
             </div>
 
             <!-- TAB 1: MENU BUILDING BLOCKS (Blocs de base du cahier des charges) -->
             <div id="left-tab-blocks" class="flex-1 overflow-y-auto p-3 space-y-4">
                 <!-- Specs Banner -->
-                <div class="bg-idInput border border-idBorder rounded p-2.5 text-[11px] space-y-1">
+                <div id="left-specs-banner" class="bg-idInput border border-idBorder rounded p-2.5 text-[11px] space-y-1">
                     <div class="flex items-center justify-between font-semibold text-gray-200">
                         <span><i class="fa-solid fa-ruler-combined text-cyan-400 mr-1"></i> Format Ouvert</span>
                         <span class="font-mono text-cyan-300">340 × 300 mm</span>
@@ -247,6 +258,24 @@
                             <span class="font-semibold text-gray-200 text-[11px]">Cadre / Fond</span>
                             <span class="text-[9px] text-gray-400">Fond ou filet doré</span>
                         </button>
+
+                        <!-- 9. Numéro de Page -->
+                        <button onclick="app.addMenuBlock('page_number')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-purple-600/20 border border-idBorder hover:border-purple-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-hashtag text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Numéro de Page</span>
+                            <span class="text-[9px] text-purple-300">Bloc manuel</span>
+                        </button>
+
+                        <!-- 10. Pack Illustrations Canva -->
+                        <button onclick="app.switchLeftTab('illustrations')" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-amber-600/20 border border-idBorder hover:border-amber-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-amber-500/20 text-amber-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Pack Illustrations</span>
+                            <span class="text-[9px] text-amber-400">+50 Vecteurs Canva</span>
+                        </button>
                     </div>
                 </div>
 
@@ -285,11 +314,20 @@
                             <span><i class="fa-solid fa-plate-wheat text-blue-400 mr-1.5"></i> Double Page Plats, Pâtes & Crêpes</span>
                             <span class="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">Intérieur</span>
                         </button>
+                        <button onclick="app.applySpreadTemplate('flyer_promo_a4')" class="w-full text-left px-2.5 py-1.5 rounded bg-idInput hover:bg-cyan-500/10 border border-idBorder hover:border-cyan-500/40 flex items-center justify-between transition">
+                            <span><i class="fa-solid fa-file-invoice text-cyan-400 mr-1.5"></i> Gabarit Flyer Promotionnel A4</span>
+                            <span class="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded">Flyer A4</span>
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB 2: 5 SHEETS / 10 FACES NAVIGATOR (Panneau Pages InDesign) -->
+            <!-- TAB 2: PACK DES ILLUSTRATIONS STYLE CANVA -->
+            <div id="left-tab-illustrations" class="hidden flex-1 overflow-y-auto p-3 space-y-3">
+                <!-- Populated dynamically by app.renderIllustrationsTab() -->
+            </div>
+
+            <!-- TAB 3: PAGES & PLANCHES NAVIGATOR -->
             <div id="left-tab-pages" class="hidden flex-1 overflow-y-auto p-3 space-y-3">
                 <div class="text-[11px] text-gray-400 bg-idInput p-2 rounded border border-idBorder">
                     Le menu comporte <strong>5 feuilles 34×30 cm</strong> (pli central à 17 cm), soit <strong>10 faces</strong> au total (Recto & Verso).
@@ -843,6 +881,150 @@
         </div>
     </div>
 
+    
+    <!-- ==================== MODAL 4: FORMAT DU DOCUMENT ==================== -->
+    <div id="modal-format" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div class="bg-idPanel border border-idBorder rounded-lg shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden">
+            <div class="bg-idHeader px-5 py-3.5 border-b border-idBorder flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-expand"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white">Format & Géométrie d'Impression</h2>
+                        <p class="text-[11px] text-gray-400">Choisissez le gabarit de votre document (Menu restaurant, Flyer A4, A5, Dépliant triptyque).</p>
+                    </div>
+                </div>
+                <button onclick="app.closeFormatModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <div class="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
+                <div class="text-[11px] text-gray-300">
+                    Sélectionnez un format pour adapter automatiquement le canevas, les repères de fond perdu (+3mm), la zone de sécurité et les traits de coupe :
+                </div>
+
+                <!-- Format Cards Grid -->
+                <div id="format-modal-cards" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <!-- Populated dynamically by app.renderFormatModalCards() -->
+                </div>
+
+                <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded text-[11px] text-amber-200 flex items-start space-x-2">
+                    <i class="fa-solid fa-circle-info text-amber-400 mt-0.5 shrink-0"></i>
+                    <span><strong>Astuce Flyer A4 :</strong> En mode Flyer A4, la ligne de pli central est automatiquement masquée et les pages s'affichent en page simple (210 × 297 mm) avec repères de fond perdu et traits de coupe d'impression.</span>
+                </div>
+            </div>
+
+            <div class="bg-idHeader px-5 py-3 border-t border-idBorder flex justify-end">
+                <button onclick="app.closeFormatModal()" class="px-4 py-1.5 bg-idInput hover:bg-white/10 text-white rounded text-xs font-semibold">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL 5: NUMÉROTATION DES PAGES ==================== -->
+    <div id="modal-page-numbering" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div class="bg-idPanel border border-idBorder rounded-lg shadow-2xl w-full max-w-xl flex flex-col overflow-hidden">
+            <div class="bg-idHeader px-5 py-3.5 border-b border-idBorder flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-hashtag"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white">Numérotation Automatique des Pages</h2>
+                        <p class="text-[11px] text-gray-400">Insère et synchronise automatiquement les folios / numéros sur toutes vos pages et exports.</p>
+                    </div>
+                </div>
+                <button onclick="app.closePageNumberingModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <!-- Enable Toggle -->
+                <label class="flex items-center space-x-3 p-3 bg-idInput rounded-lg border border-idBorder cursor-pointer hover:border-purple-500/60 transition">
+                    <input type="checkbox" id="pgnum-enabled" class="accent-purple-500 w-5 h-5">
+                    <div>
+                        <div class="text-xs font-bold text-white">Activer la numérotation automatique des pages</div>
+                        <div class="text-[10px] text-gray-400">Affiche le numéro de page sur le canevas et l'intègre dans les exports PDF/PNG haute résolution.</div>
+                    </div>
+                </label>
+
+                <!-- Settings Grid -->
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <label class="text-gray-300 text-[11px] font-semibold block mb-1">Style de numérotation :</label>
+                        <select id="pgnum-format" onchange="app.updatePageNumberingPreview()" class="w-full bg-idInput border border-idBorder rounded p-2 text-white text-xs">
+                            <option value="page_n">Page 2 (Standard)</option>
+                            <option value="n_slash_total">2 / 10 (Numéro / Total)</option>
+                            <option value="dash">— 2 — (Tirets bistrot)</option>
+                            <option value="dot">• 2 • (Puces élégantes)</option>
+                            <option value="simple">2 (Chiffre simple)</option>
+                            <option value="roman">II (Chiffres romains)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="text-gray-300 text-[11px] font-semibold block mb-1">Position sur la page :</label>
+                        <select id="pgnum-position" class="w-full bg-idInput border border-idBorder rounded p-2 text-white text-xs">
+                            <option value="bottom_center">Bas Centré (Recommandé)</option>
+                            <option value="bottom_outer">Bas Extérieur (Standard PAO)</option>
+                            <option value="bottom_right">Bas Droit</option>
+                            <option value="top_center">Haut Centré</option>
+                            <option value="top_outer">Haut Extérieur</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="text-gray-300 text-[11px] font-semibold block mb-1">Police typographique :</label>
+                        <select id="pgnum-font" class="w-full bg-idInput border border-idBorder rounded p-2 text-white text-xs">
+                            <option value="Montserrat">Montserrat (Moderne)</option>
+                            <option value="Playfair Display">Playfair Display (Prestige Serif)</option>
+                            <option value="Cinzel">Cinzel (Élégant / Luxe)</option>
+                            <option value="Inter">Inter (Sans-serif sobre)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="text-gray-300 text-[11px] font-semibold block mb-1">Taille du texte (pt) :</label>
+                        <input type="number" id="pgnum-size" min="6" max="18" step="0.5" value="8.5" class="w-full bg-idInput border border-idBorder rounded p-2 text-white text-xs">
+                    </div>
+
+                    <div>
+                        <label class="text-gray-300 text-[11px] font-semibold block mb-1">Couleur du numéro :</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="color" id="pgnum-color" value="#64748b" class="w-8 h-8 rounded bg-idInput border border-idBorder cursor-pointer">
+                            <span class="text-gray-400 font-mono text-[11px]">Or, gris ou ardoise</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-gray-300 text-[11px] font-semibold block mb-1">Marge du bord (mm) :</label>
+                        <input type="number" id="pgnum-margin" min="4" max="25" step="1" value="8" class="w-full bg-idInput border border-idBorder rounded p-2 text-white text-xs">
+                    </div>
+                </div>
+
+                <!-- Exclusion options -->
+                <div class="pt-2 border-t border-idBorder space-y-1.5">
+                    <label class="flex items-center space-x-2 text-[11px] text-gray-300 cursor-pointer">
+                        <input type="checkbox" id="pgnum-skip-cover" checked class="accent-purple-500">
+                        <span>Ne pas afficher le numéro sur la <strong>Couverture (Page 1)</strong></span>
+                    </label>
+                </div>
+
+                <!-- Live Preview Box -->
+                <div class="bg-black/40 border border-idBorder rounded p-3 flex items-center justify-between">
+                    <span class="text-[11px] text-gray-400">Aperçu du numéro :</span>
+                    <span id="pgnum-preview-text" class="font-mono text-purple-300 font-bold text-sm bg-purple-500/15 px-3 py-1 rounded border border-purple-500/30">Page 2</span>
+                </div>
+            </div>
+
+            <div class="bg-idHeader px-5 py-3 border-t border-idBorder flex items-center justify-between">
+                <button onclick="app.closePageNumberingModal()" class="px-3 py-1.5 text-gray-400 hover:text-white text-xs">Annuler</button>
+                <button onclick="app.savePageNumberingFromModal()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded font-bold text-xs shadow flex items-center space-x-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Enregistrer & Appliquer</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-14 right-6 bg-gray-900 border border-blue-500/50 text-white px-4 py-2.5 rounded-lg shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center space-x-2 pointer-events-none">
         <i class="fa-solid fa-circle-check text-blue-400"></i>
@@ -854,6 +1036,7 @@
     <script src="js/utils.js"></script>
     <script src="js/grey-corner-data.js"></script>
     <script src="js/word-importer.js"></script>
+    <script src="js/illustrations-pack.js"></script>
     <script src="js/engine.js"></script>
     <script src="js/print-exporter.js"></script>
     <script src="js/app.js"></script>

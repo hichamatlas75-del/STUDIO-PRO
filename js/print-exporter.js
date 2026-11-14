@@ -62,6 +62,11 @@ class PrintExporter {
                     await this.drawObjectOnCanvas(ctx, obj, trimOriginX, trimOriginY, pxPerMm, failedImages);
                 }
 
+                // 3B. Draw Automated Page Numbering (if enabled)
+                if (this.engine.pageNumbering && this.engine.pageNumbering.enabled) {
+                    this.drawAutomaticPageNumbersOnFace(ctx, face, trimOriginX, trimOriginY, pxPerMm);
+                }
+
                 ctx.restore();
 
                 // 4. Draw Printer Marks (Traits de coupe, Traits de pli à 170mm, Hirondelles)
@@ -86,9 +91,9 @@ class PrintExporter {
                     try { await document.fonts.ready; } catch (_) {}
                 }
 
-                const panelWidthMm = 170;
-                const panelHeightMm = 300;
                 const specs = this.engine.specs;
+                const panelWidthMm = specs.hasFold ? (specs.foldXMm || (specs.widthMm / 2)) : specs.widthMm;
+                const panelHeightMm = specs.heightMm;
                 const includeBleed = options.includeBleed !== false;
                 const includeCropMarks = options.includeCropMarks !== false;
                 const pxPerMm = options.scalePxPerMm || 4;
@@ -106,14 +111,14 @@ class PrintExporter {
 
                 const trimOriginX = (slugMargin + bleed) * pxPerMm;
                 const trimOriginY = (slugMargin + bleed) * pxPerMm;
-                const offsetXMm = side === 'right' ? 170 : 0;
+                const offsetXMm = (specs.hasFold && side === 'right') ? (specs.foldXMm || (specs.widthMm / 2)) : 0;
                 const failedImages = [];
 
                 // 1. Fill Slug background white
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // 2. Clip to 170x300mm (+3mm bleed) box
+                // 2. Clip to panel (+3mm bleed) box
                 ctx.save();
                 const clipX = slugMargin * pxPerMm;
                 const clipY = slugMargin * pxPerMm;
@@ -127,10 +132,28 @@ class PrintExporter {
                 ctx.fillStyle = face.bgColor || '#fdfbf7';
                 ctx.fillRect(clipX, clipY, clipW, clipH);
 
-                // 3. Shift origin by -170mm when rendering right panel so objects in [170..340] map to [0..170]
+                // 3. Shift origin by offsetXMm when rendering right panel
                 const shiftedOriginX = trimOriginX - (offsetXMm * pxPerMm);
                 for (const obj of face.objects) {
                     await this.drawObjectOnCanvas(ctx, obj, shiftedOriginX, trimOriginY, pxPerMm, failedImages);
+                }
+
+                // 3B. Draw Automated Page Numbering on single panel
+                if (this.engine.pageNumbering && this.engine.pageNumbering.enabled) {
+                    const faceIndex = this.engine.faces.indexOf(face);
+                    const info = this.engine.getPageNumberInfo(faceIndex, specs.hasFold ? side : 'single');
+                    if (info) {
+                        ctx.save();
+                        const fontPt = this.engine.pageNumbering.fontSizePt || 8.5;
+                        const fontPx = Math.max(2, fontPt * PT_TO_MM * pxPerMm);
+                        const family = this.engine.pageNumbering.fontFamily || 'Montserrat';
+                        ctx.font = `600 ${fontPx}px "${family}", sans-serif`;
+                        ctx.fillStyle = this.engine.pageNumbering.color || '#64748b';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(info.text, trimOriginX + (panelWidthMm * pxPerMm / 2), trimOriginY + (info.yMm * pxPerMm));
+                        ctx.restore();
+                    }
                 }
 
                 ctx.restore();
@@ -455,6 +478,44 @@ class PrintExporter {
                     }
                     ctx.restore();
                 }
+                else if (obj.type === 'illustration') {
+                    const item = typeof CanvaIllustrationsPack !== 'undefined'
+                        ? (CanvaIllustrationsPack.getById(obj.svgKey || obj.illustrationId) || CanvaIllustrationsPack.getById('cutlery_crossed'))
+                        : null;
+                    if (item) {
+                        const svgString = CanvaIllustrationsPack.buildSVGString(item, {
+                            color: obj.color || item.defaultColor || '#c8a96a',
+                            opacity: obj.opacity !== undefined ? obj.opacity : 1,
+                            flipH: obj.flipH,
+                            flipV: obj.flipV,
+                            rotate: obj.rotate || 0
+                        });
+                        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        try {
+                            const img = await this.loadImage(blobUrl, 6000);
+                            ctx.save();
+                            ctx.drawImage(img, x, y, w, h);
+                            ctx.restore();
+                        } catch (err) {
+                            console.warn('Erreur rendu illustration:', err);
+                        } finally {
+                            URL.revokeObjectURL(blobUrl);
+                        }
+                    }
+                }
+                else if (obj.type === 'page_number') {
+                    ctx.save();
+                    const fontPt = obj.fontSize || 8.5;
+                    const fontPx = Math.max(2, fontPt * PT_TO_MM * pxPerMm);
+                    const family = obj.fontFamily || 'Montserrat';
+                    ctx.font = `600 ${fontPx}px "${family}", sans-serif`;
+                    ctx.fillStyle = obj.color || '#64748b';
+                    ctx.textAlign = obj.align || 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(obj.text || 'Page 1', x + w / 2, y + h / 2);
+                    ctx.restore();
+                }
 
                 ctx.restore();
             }
@@ -604,18 +665,33 @@ class PrintExporter {
                 ctx.moveTo(trimX + trimW, trimY + trimH + offset); ctx.lineTo(trimX + trimW, trimY + trimH + offset + len);
                 ctx.stroke();
 
-                // Central Fold Line Marks (Traits de pli en pointillés) — position issue des specs
-                const foldMm = this.engine.specs.foldXMm;
-                const foldX = trimX + (foldMm * pxPerMm);
-                ctx.save();
-                ctx.setLineDash([1 * pxPerMm, 1 * pxPerMm]);
-                ctx.beginPath();
-                ctx.moveTo(foldX, trimY - offset - len);
-                ctx.lineTo(foldX, trimY - offset);
-                ctx.moveTo(foldX, trimY + trimH + offset);
-                ctx.lineTo(foldX, trimY + trimH + offset + len);
-                ctx.stroke();
-                ctx.restore();
+                // Central Fold Line Marks (only if document has fold)
+                if (this.engine.specs.hasFold && this.engine.specs.foldXMm) {
+                    const foldMarks = this.engine.specs.foldMarks && this.engine.specs.foldMarks.length > 0
+                        ? this.engine.specs.foldMarks
+                        : [this.engine.specs.foldXMm];
+
+                    foldMarks.forEach(foldMm => {
+                        const foldX = trimX + (foldMm * pxPerMm);
+                        ctx.save();
+                        ctx.setLineDash([1 * pxPerMm, 1 * pxPerMm]);
+                        ctx.beginPath();
+                        ctx.moveTo(foldX, trimY - offset - len);
+                        ctx.lineTo(foldX, trimY - offset);
+                        ctx.moveTo(foldX, trimY + trimH + offset);
+                        ctx.lineTo(foldX, trimY + trimH + offset + len);
+                        ctx.stroke();
+                        ctx.restore();
+
+                        ctx.save();
+                        ctx.fillStyle = '#000000';
+                        ctx.font = `500 ${2.4 * pxPerMm}px "JetBrains Mono", monospace`;
+                        ctx.textBaseline = 'bottom';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`▼ PLI ${foldMm}mm ▼`, foldX, slugY);
+                        ctx.restore();
+                    });
+                }
 
                 // Technical Slug Label cleanly placed ABOVE the crop & fold marks (no line intersection)
                 const slugY = trimY - offset - len - (2.0 * pxPerMm);
@@ -623,17 +699,13 @@ class PrintExporter {
                 ctx.font = `500 ${2.4 * pxPerMm}px "JetBrains Mono", monospace`;
                 ctx.textBaseline = 'bottom';
 
-                ctx.textAlign = 'center';
-                ctx.fillText(`▼ PLI ${foldMm}mm ▼`, foldX, slugY);
-
                 ctx.textAlign = 'left';
-                const leftMaxW = (foldX - trimX) - (20 * pxPerMm);
                 const specs = this.engine.specs;
                 ctx.fillText(
                     `INMENU STUDIO PRO | ${String(face.name || '').toUpperCase()} | ${specs.widthMm}×${specs.heightMm}mm (+${specs.bleedMm}mm)`,
                     trimX + (2 * pxPerMm),
                     slugY,
-                    Math.max(40 * pxPerMm, leftMaxW)
+                    trimW * 0.65
                 );
 
                 ctx.textAlign = 'right';
@@ -641,6 +713,37 @@ class PrintExporter {
                 ctx.fillText(`PRÉ-PRESSE • ${dateStr}`, trimX + trimW - (2 * pxPerMm), slugY);
 
                 ctx.restore();
+            }
+
+            /**
+             * Renders automated page numbers directly on the printed canvas face
+             */
+            drawAutomaticPageNumbersOnFace(ctx, face, trimOriginX, trimOriginY, pxPerMm) {
+                const faceIndex = this.engine.faces.indexOf(face);
+                if (faceIndex < 0) return;
+
+                const isSpread = Boolean(this.engine.specs.hasFold);
+                const sides = isSpread ? ['left', 'right'] : ['single'];
+
+                sides.forEach(side => {
+                    const info = this.engine.getPageNumberInfo(faceIndex, side);
+                    if (!info) return;
+
+                    ctx.save();
+                    const fontPt = this.engine.pageNumbering.fontSizePt || 8.5;
+                    const fontPx = Math.max(2, fontPt * PT_TO_MM * pxPerMm);
+                    const family = this.engine.pageNumbering.fontFamily || 'Montserrat';
+                    ctx.font = `600 ${fontPx}px "${family}", sans-serif`;
+                    ctx.fillStyle = this.engine.pageNumbering.color || '#64748b';
+                    ctx.textAlign = info.align || 'center';
+                    ctx.textBaseline = 'middle';
+
+                    const posX = trimOriginX + (info.xMm * pxPerMm);
+                    const posY = trimOriginY + (info.yMm * pxPerMm);
+
+                    ctx.fillText(info.text, posX, posY);
+                    ctx.restore();
+                });
             }
 
             roundRect(ctx, x, y, w, h, r) {

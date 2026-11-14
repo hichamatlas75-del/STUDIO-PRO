@@ -21,6 +21,8 @@ class InMenuStudioApp {
                 // Drag / Resize Interaction State & Timers
                 this.interaction = null;
                 this.debounceSaveTimer = null;
+                this.activeIllustrationCategory = 'all';
+                this.illustrationsSearchQuery = '';
 
                 this.init();
             }
@@ -37,6 +39,8 @@ class InMenuStudioApp {
                 this.updateAutoSaveUI(this.engine.lastSaveSuccess);
                 this.bindGlobalShortcuts();
                 this.initModalBackdrops();
+                this.renderIllustrationsTab();
+                this.updateFormatHeaderUI();
 
                 // Asynchronously verify if larger project exists in IndexedDB
                 if (this.engine.loadFromAsyncStorage) {
@@ -56,7 +60,7 @@ class InMenuStudioApp {
             }
 
             initModalBackdrops() {
-                const modalIds = ['modal-database', 'modal-export', 'modal-3d', 'modal-engine', 'modal-word-import'];
+                const modalIds = ['modal-database', 'modal-export', 'modal-3d', 'modal-engine', 'modal-word-import', 'modal-format', 'modal-page-numbering'];
                 modalIds.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) {
@@ -207,12 +211,20 @@ class InMenuStudioApp {
                 marginEl.style.right = `${marginPx}px`;
                 marginEl.style.bottom = `${marginPx}px`;
 
-                // Fold Safety Zone (160mm to 180mm -> 20mm wide centered at 170mm)
-                foldZoneEl.style.left = `${this.mmToPx(specs.foldXMm - specs.safeFoldHalfMm)}px`;
-                foldZoneEl.style.width = `${this.mmToPx(specs.safeFoldHalfMm * 2)}px`;
-
-                // Central Fold Line at 170mm
-                foldLineEl.style.left = `${this.mmToPx(specs.foldXMm)}px`;
+                // Fold Safety Zone & Central Fold Line
+                if (foldZoneEl && foldLineEl) {
+                    if (specs.hasFold && specs.foldXMm) {
+                        foldZoneEl.style.display = '';
+                        foldLineEl.style.display = '';
+                        foldZoneEl.style.left = `${this.mmToPx(specs.foldXMm - specs.safeFoldHalfMm)}px`;
+                        foldZoneEl.style.width = `${this.mmToPx(specs.safeFoldHalfMm * 2)}px`;
+                        foldLineEl.style.left = `${this.mmToPx(specs.foldXMm)}px`;
+                    } else {
+                        foldZoneEl.style.display = 'none';
+                        foldLineEl.style.display = 'none';
+                    }
+                }
+                this.updateFormatHeaderUI();
 
                 this.applyZoomTransform();
             }
@@ -278,22 +290,26 @@ class InMenuStudioApp {
                 topRuler.innerHTML = '';
                 leftRuler.innerHTML = '';
 
-                // Horizontal 0 to 34 cm
-                for (let cm = 0; cm <= 34; cm++) {
+                const maxCmX = Math.ceil(this.engine.specs.widthMm / 10);
+                const maxCmY = Math.ceil(this.engine.specs.heightMm / 10);
+                const foldCm = (this.engine.specs.hasFold && this.engine.specs.foldXMm) ? Math.round(this.engine.specs.foldXMm / 10) : null;
+
+                // Horizontal
+                for (let cm = 0; cm <= maxCmX; cm++) {
                     const mark = document.createElement('div');
                     mark.className = 'absolute top-0 bottom-0 border-l border-gray-600 pl-1 flex items-end pb-0.5 select-none whitespace-nowrap';
                     mark.style.left = `${originX + cm * stepCmPx}px`;
-                    if (cm === 17) {
+                    if (cm === foldCm) {
                         mark.className += ' text-cyan-400 font-bold border-cyan-400';
-                        mark.textContent = '17 (Pli)';
+                        mark.textContent = `${cm} (Pli)`;
                     } else {
                         mark.textContent = String(cm);
                     }
                     topRuler.appendChild(mark);
                 }
 
-                // Vertical 0 to 30 cm
-                for (let cm = 0; cm <= 30; cm++) {
+                // Vertical
+                for (let cm = 0; cm <= maxCmY; cm++) {
                     const mark = document.createElement('div');
                     mark.className = 'absolute left-0 right-0 border-t border-gray-600 pt-0.5 text-center select-none text-[8px]';
                     mark.style.top = `${originY + cm * stepCmPx}px`;
@@ -320,9 +336,13 @@ class InMenuStudioApp {
                 });
 
                 // Update Footer & Badges
+                const specs = this.engine.specs;
                 document.getElementById('footer-face-title').textContent = face.name;
-                document.getElementById('footer-face-sub').textContent = `Face ${this.currentFaceIndex + 1} / 10 • 340×300 mm (Pli 170 mm)`;
+                const foldTxt = specs.hasFold ? ` (Pli ${specs.foldXMm} mm)` : '';
+                document.getElementById('footer-face-sub').textContent = `Face ${this.currentFaceIndex + 1} / ${this.engine.faces.length} • ${specs.widthMm}×${specs.heightMm} mm${foldTxt}`;
                 document.getElementById('db-count-badge').textContent = this.engine.dishesDB.length;
+
+                this.renderCanvasPageNumberOverlay();
 
                 this.renderLayersList();
                 this.renderSpreadsNavigator();
@@ -511,6 +531,31 @@ class InMenuStudioApp {
                     content.style.fontWeight = obj.fontWeight || '500';
                     content.className += ' whitespace-pre-line';
                     content.textContent = obj.text || '';
+                }
+                else if (obj.type === 'illustration') {
+                    const item = typeof CanvaIllustrationsPack !== 'undefined'
+                        ? (CanvaIllustrationsPack.getById(obj.svgKey || obj.illustrationId) || CanvaIllustrationsPack.getById('cutlery_crossed'))
+                        : null;
+                    content.className += ' flex items-center justify-center pointer-events-none select-none';
+                    if (item) {
+                        content.innerHTML = CanvaIllustrationsPack.buildSVGString(item, {
+                            color: obj.color || item.defaultColor || '#c8a96a',
+                            opacity: obj.opacity !== undefined ? obj.opacity : 1,
+                            flipH: obj.flipH,
+                            flipV: obj.flipV,
+                            rotate: obj.rotate || 0
+                        });
+                    } else {
+                        content.innerHTML = '<div class="w-full h-full border border-dashed border-amber-400/50 flex items-center justify-center text-[10px] text-amber-400 font-mono">Illustration</div>';
+                    }
+                }
+                else if (obj.type === 'page_number') {
+                    content.className += ' flex items-center justify-center select-none font-mono';
+                    content.style.fontFamily = obj.fontFamily || 'Montserrat';
+                    content.style.fontSize = `${this.mmToPx((obj.fontSize || 8.5) * PT_TO_MM)}px`;
+                    content.style.color = obj.color || '#64748b';
+                    content.style.fontWeight = '600';
+                    content.textContent = obj.text || `— ${this.currentFaceIndex + 1} —`;
                 }
 
                 wrapper.appendChild(content);
@@ -840,6 +885,15 @@ class InMenuStudioApp {
                         id, type: 'shape', name: 'Cadre Décoratif',
                         x: 12, y: 12, w: 146, h: 276,
                         bgColor: 'transparent', borderColor: '#c8a96a', borderWidth: 1.5, radius: 4, opacity: 1
+                    };
+                } else if (type === 'page_number') {
+                    newObj = {
+                        id, type: 'page_number', name: 'Numéro de Page',
+                        x: Math.round((this.engine.specs.widthMm - 30) / 2),
+                        y: this.engine.specs.heightMm - 14,
+                        w: 30, h: 8,
+                        text: this.engine.formatPageNumberString(this.currentFaceIndex + 1),
+                        fontSize: 9, fontFamily: 'Montserrat', color: '#64748b', align: 'center'
                     };
                 }
 
@@ -1280,6 +1334,95 @@ class InMenuStudioApp {
                         </div>
                     `;
                 }
+                else if (obj.type === 'illustration') {
+                    const item = typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack.getById(obj.svgKey || obj.illustrationId) : null;
+                    const illuColor = safeHex(obj.color, item ? (item.defaultColor || '#c8a96a') : '#c8a96a');
+                    const quickColors = ['#c8a96a', '#9a3412', '#1e293b', '#e11d48', '#059669', '#2563eb', '#ffffff', '#000000'];
+
+                    html += `
+                        <div class="space-y-3 border-t border-idBorder pt-3">
+                            <div class="bg-idInput p-2.5 rounded border border-idBorder flex items-center space-x-2.5">
+                                <div class="w-10 h-10 rounded bg-black/40 border border-idBorder p-1 flex items-center justify-center shrink-0">
+                                    ${item ? CanvaIllustrationsPack.buildSVGString(item, { color: illuColor }) : '<i class="fa-solid fa-shapes text-amber-400"></i>'}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-bold text-white text-xs truncate">${escapeHTML(item ? item.name : (obj.name || 'Illustration Canva'))}</div>
+                                    <div class="text-[10px] text-amber-400 font-mono">Pack Vectoriel Canva</div>
+                                </div>
+                            </div>
+
+                            <!-- Color Palette -->
+                            <div>
+                                <label class="text-gray-400 text-[10px] block mb-1">Couleur Principale :</label>
+                                <div class="flex items-center space-x-1.5 mb-2">
+                                    <input type="color" value="${illuColor}" oninput="app.updateObjProp('color', this.value, true)" onchange="app.updateObjProp('color', this.value, false); app.renderInspector()" class="w-8 h-8 rounded bg-idInput border border-idBorder cursor-pointer">
+                                    <input type="text" value="${escapeHTML(obj.color || illuColor)}" onchange="app.updateObjProp('color', this.value, false); app.renderInspector()" class="flex-1 bg-idInput border border-idBorder rounded px-2 py-1 font-mono text-xs text-white">
+                                </div>
+                                <div class="flex items-center space-x-1">
+                                    ${quickColors.map(c => `
+                                        <button onclick="app.updateObjProp('color', '${c}', false); app.renderInspector()" style="background-color: ${c};" class="w-5 h-5 rounded-full border border-gray-600 hover:scale-125 transition shrink-0" title="${c}"></button>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- Flip & Rotate -->
+                            <div>
+                                <label class="text-gray-400 text-[10px] block mb-1">Orientation & Miroir :</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button onclick="app.updateObjProp('flipH', !app.selectedObject.flipH, false); app.renderInspector()" class="px-2 py-1.5 bg-idInput hover:bg-white/10 rounded border border-idBorder text-[11px] text-gray-200 flex items-center justify-center space-x-1.5 ${obj.flipH ? 'border-blue-500 bg-blue-500/20 text-blue-300' : ''}">
+                                        <i class="fa-solid fa-arrows-left-right"></i>
+                                        <span>Miroir Horiz.</span>
+                                    </button>
+                                    <button onclick="app.updateObjProp('flipV', !app.selectedObject.flipV, false); app.renderInspector()" class="px-2 py-1.5 bg-idInput hover:bg-white/10 rounded border border-idBorder text-[11px] text-gray-200 flex items-center justify-center space-x-1.5 ${obj.flipV ? 'border-blue-500 bg-blue-500/20 text-blue-300' : ''}">
+                                        <i class="fa-solid fa-arrows-up-down"></i>
+                                        <span>Miroir Vert.</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Opacity -->
+                            <div>
+                                <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                    <span>Transparence / Opacité :</span>
+                                    <span class="font-mono text-white">${Math.round((obj.opacity ?? 1) * 100)}%</span>
+                                </div>
+                                <input type="range" min="10" max="100" step="5" value="${Math.round((obj.opacity ?? 1) * 100)}" oninput="app.updateObjProp('opacity', parseFloat(this.value) / 100, true)" onchange="app.updateObjProp('opacity', parseFloat(this.value) / 100, false); app.renderInspector()" class="w-full accent-amber-500">
+                            </div>
+                        </div>
+                    `;
+                }
+                else if (obj.type === 'page_number') {
+                    html += `
+                        <div class="space-y-3 border-t border-idBorder pt-3">
+                            <div>
+                                <label class="text-gray-400 text-[10px] block mb-1">Texte du numéro :</label>
+                                <input type="text" value="${escapeHTML(obj.text || 'Page 1')}" onchange="app.updateObjProp('text', this.value, false)" class="w-full bg-idInput border border-idBorder rounded px-2.5 py-1.5 text-xs text-white font-mono">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-gray-400 text-[10px] block mb-1">Police</label>
+                                    <select onchange="app.updateObjProp('fontFamily', this.value, false)" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-xs text-white">
+                                        <option value="Montserrat" ${obj.fontFamily === 'Montserrat' ? 'selected' : ''}>Montserrat</option>
+                                        <option value="Playfair Display" ${obj.fontFamily === 'Playfair Display' ? 'selected' : ''}>Playfair Display</option>
+                                        <option value="Cinzel" ${obj.fontFamily === 'Cinzel' ? 'selected' : ''}>Cinzel</option>
+                                        <option value="Inter" ${obj.fontFamily === 'Inter' ? 'selected' : ''}>Inter</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-gray-400 text-[10px] block mb-1">Taille (pt)</label>
+                                    <input type="number" min="6" max="24" step="0.5" value="${obj.fontSize || 8.5}" onchange="app.updateObjProp('fontSize', parseFloat(this.value), false)" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-xs text-white">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-gray-400 text-[10px] block mb-1">Couleur</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="color" value="${safeHex(obj.color, '#64748b')}" oninput="app.updateObjProp('color', this.value, true)" onchange="app.updateObjProp('color', this.value, false); app.renderInspector()" class="w-8 h-8 rounded bg-idInput border border-idBorder cursor-pointer">
+                                    <input type="text" value="${escapeHTML(obj.color || '#64748b')}" onchange="app.updateObjProp('color', this.value, false)" class="flex-1 bg-idInput border border-idBorder rounded px-2 py-1 font-mono text-xs text-white">
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
 
                 // Duplicate, Lock & Delete Actions
                 html += `
@@ -1303,14 +1446,17 @@ class InMenuStudioApp {
                 const obj = this.selectedObject;
                 if (!obj) return;
 
-                const numericProps = ['x', 'y', 'w', 'h', 'fontSize', 'radius', 'borderWidth', 'opacity'];
+                const numericProps = ['x', 'y', 'w', 'h', 'fontSize', 'radius', 'borderWidth', 'opacity', 'rotate'];
                 if (numericProps.includes(prop)) {
                     if (typeof val !== 'number' || !Number.isFinite(val)) return;
-                    if (prop === 'w') val = Math.max(8, val);
-                    else if (prop === 'h') val = Math.max(6, val);
+                    if (prop === 'w') val = Math.max(4, val);
+                    else if (prop === 'h') val = Math.max(4, val);
                     else if (prop === 'fontSize') val = Math.max(5, val);
                     else if (prop === 'radius' || prop === 'borderWidth') val = Math.max(0, val);
                     else if (prop === 'opacity') val = Math.max(0.05, Math.min(1, val));
+                }
+                if (prop === 'flipH' || prop === 'flipV') {
+                    val = Boolean(val);
                 }
 
                 if (prop === 'imageUrl') {
@@ -1580,84 +1726,181 @@ class InMenuStudioApp {
                 const container = document.getElementById('spreads-navigator-list');
                 if (!container) return;
 
+                const specs = this.engine.specs;
                 let html = '';
-                for (let sheet = 1; sheet <= 5; sheet++) {
-                    const rectoIdx = (sheet - 1) * 2;
-                    const versoIdx = rectoIdx + 1;
-                    const recto = this.engine.faces[rectoIdx];
-                    const verso = this.engine.faces[versoIdx];
 
+                if (specs.hasFold) {
+                    const sheetCount = Math.ceil(this.engine.faces.length / 2);
+                    for (let sheet = 1; sheet <= sheetCount; sheet++) {
+                        const rectoIdx = (sheet - 1) * 2;
+                        const versoIdx = rectoIdx + 1;
+                        const recto = this.engine.faces[rectoIdx];
+                        const verso = this.engine.faces[versoIdx];
+
+                        html += `
+                            <div class="bg-idInput border border-idBorder rounded p-2 space-y-2">
+                                <div class="flex items-center justify-between text-[11px] font-bold text-gray-200 border-b border-idBorder pb-1">
+                                    <span><i class="fa-solid fa-scroll text-amber-400 mr-1"></i> Feuille ${sheet} (${specs.widthMm} × ${specs.heightMm} mm)</span>
+                                    <span class="font-mono text-[9px] text-gray-400">Pli ${specs.foldXMm || 170}mm</span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <!-- Recto Miniature -->
+                                    ${recto ? `
+                                    <div onclick="app.goToFace(${rectoIdx})" class="cursor-pointer p-1.5 rounded border transition ${
+                                        this.currentFaceIndex === rectoIdx ? 'border-blue-500 bg-blue-500/15' : 'border-idBorder hover:border-gray-500 bg-idPanel'
+                                    }">
+                                        <div class="h-14 w-full rounded-sm relative flex border border-black/40 overflow-hidden mb-1" style="background:${escapeHTML(recto.bgColor || '#fdfbf7')}">
+                                            <div class="w-1/2 h-full border-r border-dashed border-cyan-500/70 flex items-center justify-center text-[8px] font-mono text-gray-500">Gauche</div>
+                                            <div class="w-1/2 h-full flex items-center justify-center text-[8px] font-mono text-gray-500">Droite</div>
+                                        </div>
+                                        <div class="flex items-center justify-between text-[10px]">
+                                            <span class="font-semibold text-white truncate">${escapeHTML(recto.name || 'Recto')}</span>
+                                            <span class="text-gray-400 font-mono">${recto.objects.length} blocs</span>
+                                        </div>
+                                    </div>` : ''}
+
+                                    <!-- Verso Miniature -->
+                                    ${verso ? `
+                                    <div onclick="app.goToFace(${versoIdx})" class="cursor-pointer p-1.5 rounded border transition ${
+                                        this.currentFaceIndex === versoIdx ? 'border-blue-500 bg-blue-500/15' : 'border-idBorder hover:border-gray-500 bg-idPanel'
+                                    }">
+                                        <div class="h-14 w-full rounded-sm relative flex border border-black/40 overflow-hidden mb-1" style="background:${escapeHTML(verso.bgColor || '#fdfbf7')}">
+                                            <div class="w-1/2 h-full border-r border-dashed border-cyan-500/70 flex items-center justify-center text-[8px] font-mono text-gray-500">Gauche</div>
+                                            <div class="w-1/2 h-full flex items-center justify-center text-[8px] font-mono text-gray-500">Droite</div>
+                                        </div>
+                                        <div class="flex items-center justify-between text-[10px]">
+                                            <span class="font-semibold text-white truncate">${escapeHTML(verso.name || 'Verso')}</span>
+                                            <span class="text-gray-400 font-mono">${verso.objects.length} blocs</span>
+                                        </div>
+                                    </div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // Single Page Format (e.g. Flyer A4, Flyer A5)
                     html += `
-                        <div class="bg-idInput border border-idBorder rounded p-2 space-y-2">
-                            <div class="flex items-center justify-between text-[11px] font-bold text-gray-200 border-b border-idBorder pb-1">
-                                <span><i class="fa-solid fa-scroll text-amber-400 mr-1"></i> Feuille ${sheet} (34 × 30 cm)</span>
-                                <span class="font-mono text-[9px] text-gray-400">Pli 17cm</span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <!-- Recto Miniature -->
-                                <div onclick="app.goToFace(${rectoIdx})" class="cursor-pointer p-1.5 rounded border transition ${
-                                    this.currentFaceIndex === rectoIdx ? 'border-blue-500 bg-blue-500/15' : 'border-idBorder hover:border-gray-500 bg-idPanel'
-                                }">
-                                    <div class="h-14 w-full rounded-sm relative flex border border-black/40 overflow-hidden mb-1" style="background:${escapeHTML(recto.bgColor || '#fdfbf7')}">
-                                        <div class="w-1/2 h-full border-r border-dashed border-cyan-500/70 flex items-center justify-center text-[8px] font-mono text-gray-500">17cm G</div>
-                                        <div class="w-1/2 h-full flex items-center justify-center text-[8px] font-mono text-gray-500">17cm D</div>
-                                    </div>
-                                    <div class="flex items-center justify-between text-[10px]">
-                                        <span class="font-semibold text-white">Recto</span>
-                                        <span class="text-gray-400 font-mono">${recto.objects.length} blocs</span>
-                                    </div>
-                                </div>
-                                <!-- Verso Miniature -->
-                                <div onclick="app.goToFace(${versoIdx})" class="cursor-pointer p-1.5 rounded border transition ${
-                                    this.currentFaceIndex === versoIdx ? 'border-blue-500 bg-blue-500/15' : 'border-idBorder hover:border-gray-500 bg-idPanel'
-                                }">
-                                    <div class="h-14 w-full rounded-sm relative flex border border-black/40 overflow-hidden mb-1" style="background:${escapeHTML(verso.bgColor || '#fdfbf7')}">
-                                        <div class="w-1/2 h-full border-r border-dashed border-cyan-500/70 flex items-center justify-center text-[8px] font-mono text-gray-500">17cm G</div>
-                                        <div class="w-1/2 h-full flex items-center justify-center text-[8px] font-mono text-gray-500">17cm D</div>
-                                    </div>
-                                    <div class="flex items-center justify-between text-[10px]">
-                                        <span class="font-semibold text-white">Verso</span>
-                                        <span class="text-gray-400 font-mono">${verso.objects.length} blocs</span>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="flex items-center justify-between pb-1 mb-2">
+                            <span class="text-[11px] font-bold text-cyan-300 uppercase tracking-wider">Pages du Flyer (${this.engine.faces.length})</span>
+                            <button onclick="app.addNewPage()" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[10px] flex items-center space-x-1 shadow">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>+ Page</span>
+                            </button>
                         </div>
+                        <div class="space-y-2">
                     `;
+                    this.engine.faces.forEach((face, idx) => {
+                        const isCurrent = this.currentFaceIndex === idx;
+                        html += `
+                            <div onclick="app.goToFace(${idx})" class="p-2 rounded-lg border cursor-pointer transition flex items-center justify-between ${
+                                isCurrent ? 'border-cyan-400 bg-cyan-500/15 ring-1 ring-cyan-400' : 'border-idBorder bg-idInput hover:border-gray-500'
+                            }">
+                                <div class="flex items-center space-x-2.5 min-w-0">
+                                    <div class="w-8 h-11 rounded border border-black/40 shrink-0 shadow-sm flex items-center justify-center text-[9px] font-bold font-mono text-gray-600" style="background:${escapeHTML(face.bgColor || '#ffffff')}">
+                                        ${idx + 1}
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-white text-xs truncate">${escapeHTML(face.name)}</div>
+                                        <div class="text-[10px] text-gray-400 font-mono">${face.objects.length} éléments • ${specs.widthMm}×${specs.heightMm}mm</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-1 shrink-0" onclick="event.stopPropagation()">
+                                    <button onclick="app.duplicatePage(${idx})" class="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white text-[10px]" title="Dupliquer cette page">
+                                        <i class="fa-regular fa-clone"></i>
+                                    </button>
+                                    ${this.engine.faces.length > 1 ? `
+                                    <button onclick="app.removePage(${idx})" class="p-1 hover:bg-rose-500/20 rounded text-gray-400 hover:text-rose-400 text-[10px]" title="Supprimer cette page">
+                                        <i class="fa-regular fa-trash-can"></i>
+                                    </button>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
                 }
+
                 container.innerHTML = html;
             }
 
+            addNewPage() {
+                const newFace = this.engine.addPage();
+                this.currentFaceIndex = this.engine.faces.length - 1;
+                this.renderCurrentFace();
+                this.renderInspector();
+                this.renderSpreadsNavigator();
+                this.showToast(`Nouvelle page ajoutée (${newFace.name}) !`);
+            }
+
+            duplicatePage(idx) {
+                const dup = this.engine.duplicatePage(idx);
+                if (dup) {
+                    this.currentFaceIndex = idx + 1;
+                    this.renderCurrentFace();
+                    this.renderInspector();
+                    this.renderSpreadsNavigator();
+                    this.showToast(`Page dupliquée avec succès !`);
+                }
+            }
+
+            removePage(idx) {
+                try {
+                    const ok = this.engine.removePage(idx);
+                    if (ok) {
+                        this.currentFaceIndex = Math.min(idx, this.engine.faces.length - 1);
+                        this.renderCurrentFace();
+                        this.renderInspector();
+                        this.renderSpreadsNavigator();
+                        this.showToast(`Page supprimée.`);
+                    }
+                } catch (e) {
+                    this.showToast(e.message || 'Erreur lors de la suppression.');
+                }
+            }
+
             goToFace(index) {
-                this.currentFaceIndex = Math.max(0, Math.min(9, index));
+                this.currentFaceIndex = Math.max(0, Math.min(this.engine.faces.length - 1, index));
                 this.selectedObjectId = null;
                 this.renderCurrentFace();
                 this.renderInspector();
             }
 
             prevFace() {
-                this.goToFace((this.currentFaceIndex + 9) % 10);
+                this.goToFace((this.currentFaceIndex + this.engine.faces.length - 1) % this.engine.faces.length);
             }
 
             nextFace() {
-                this.goToFace((this.currentFaceIndex + 1) % 10);
+                this.goToFace((this.currentFaceIndex + 1) % this.engine.faces.length);
             }
 
             switchLeftTab(tab) {
                 const blocksTab = document.getElementById('left-tab-blocks');
+                const illuTab = document.getElementById('left-tab-illustrations');
                 const pagesTab = document.getElementById('left-tab-pages');
                 const btnBlocks = document.getElementById('tab-btn-blocks');
+                const btnIllu = document.getElementById('tab-btn-illustrations');
                 const btnPages = document.getElementById('tab-btn-pages');
 
+                const inactiveBtn = 'flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200';
+                const activeBtn = 'flex-1 py-2 text-center border-b-2 border-blue-500 text-white bg-idPanel';
+
+                if (blocksTab) blocksTab.classList.add('hidden');
+                if (illuTab) illuTab.classList.add('hidden');
+                if (pagesTab) pagesTab.classList.add('hidden');
+
+                if (btnBlocks) btnBlocks.className = inactiveBtn;
+                if (btnIllu) btnIllu.className = inactiveBtn;
+                if (btnPages) btnPages.className = inactiveBtn;
+
                 if (tab === 'blocks') {
-                    blocksTab.classList.remove('hidden');
-                    pagesTab.classList.add('hidden');
-                    btnBlocks.className = 'flex-1 py-2 text-center border-b-2 border-blue-500 text-white bg-idPanel';
-                    btnPages.className = 'flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200';
-                } else {
-                    blocksTab.classList.add('hidden');
-                    pagesTab.classList.remove('hidden');
-                    btnPages.className = 'flex-1 py-2 text-center border-b-2 border-blue-500 text-white bg-idPanel';
-                    btnBlocks.className = 'flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-200';
+                    if (blocksTab) blocksTab.classList.remove('hidden');
+                    if (btnBlocks) btnBlocks.className = activeBtn;
+                } else if (tab === 'illustrations') {
+                    if (illuTab) illuTab.classList.remove('hidden');
+                    if (btnIllu) btnIllu.className = activeBtn;
+                    this.renderIllustrationsTab();
+                } else if (tab === 'pages') {
+                    if (pagesTab) pagesTab.classList.remove('hidden');
+                    if (btnPages) btnPages.className = activeBtn;
                     this.renderSpreadsNavigator();
                 }
             }
@@ -1835,6 +2078,9 @@ class InMenuStudioApp {
                     this.engine.populateSampleSpread1Verso(this.currentFace);
                 } else if (tplName === 'bistro_spread') {
                     this.engine.populateSampleSpread2Recto(this.currentFace);
+                } else if (tplName === 'flyer_promo_a4') {
+                    this.buildFlyerPromoA4Template(this.currentFace);
+                    return;
                 } else {
                     return;
                 }
