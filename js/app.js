@@ -3,6 +3,9 @@
  */
 class InMenuStudioApp {
             constructor() {
+                if (typeof window !== 'undefined') {
+                    window.app = this;
+                }
                 this.engine = new DocumentEngine();
                 this.engine.loadFromLocalStorage();
                 this.engine.saveState();
@@ -2792,6 +2795,16 @@ class InMenuStudioApp {
             }
 
             closeTopModal() {
+                const modalFormat = document.getElementById('modal-format');
+                if (modalFormat && !modalFormat.classList.contains('hidden')) {
+                    this.closeFormatModal();
+                    return true;
+                }
+                const modalPageNum = document.getElementById('modal-page-numbering');
+                if (modalPageNum && !modalPageNum.classList.contains('hidden')) {
+                    this.closePageNumberingModal();
+                    return true;
+                }
                 if (!document.getElementById('modal-word-import').classList.contains('hidden')) {
                     this.closeWordImportModal();
                     return true;
@@ -2870,22 +2883,499 @@ class InMenuStudioApp {
 
             showToast(msg) {
                 const toast = document.getElementById('toast');
-                document.getElementById('toast-msg').textContent = msg;
-                toast.classList.remove('translate-y-20', 'opacity-0');
-                clearTimeout(this.toastTimer);
-                this.toastTimer = setTimeout(() => {
-                    toast.classList.add('translate-y-20', 'opacity-0');
-                }, 2600);
+                const toastMsg = document.getElementById('toast-msg');
+                if (toastMsg) toastMsg.textContent = msg;
+                if (toast) {
+                    toast.classList.remove('translate-y-20', 'opacity-0');
+                    clearTimeout(this.toastTimer);
+                    this.toastTimer = setTimeout(() => {
+                        toast.classList.add('translate-y-20', 'opacity-0');
+                    }, 2600);
+                }
+            }
+
+            // ==========================================
+            // FORMAT & GEOMETRY METHODS
+            // ==========================================
+            updateFormatHeaderUI() {
+                const specs = this.engine.specs;
+                const formatLabel = document.getElementById('header-format-label');
+                if (formatLabel) {
+                    formatLabel.textContent = specs.name || `${specs.widthMm}×${specs.heightMm} mm`;
+                }
+                const specsBanner = document.getElementById('left-specs-banner');
+                if (specsBanner) {
+                    const foldText = specs.hasFold ? ` • Pli à ${specs.foldXMm} mm` : ' • Sans pli';
+                    specsBanner.textContent = `${specs.name} (${specs.widthMm}×${specs.heightMm} mm${foldText})`;
+                }
+                const pagesCount = document.getElementById('tab-pages-count');
+                if (pagesCount) {
+                    pagesCount.textContent = this.engine.faces.length;
+                }
+                const pageNumLabel = document.getElementById('header-page-num-label');
+                if (pageNumLabel) {
+                    pageNumLabel.textContent = this.engine.pageNumbering && this.engine.pageNumbering.enabled ? 'Folios: Actif' : 'Numérotation';
+                }
+            }
+
+            openFormatModal() {
+                const modal = document.getElementById('modal-format');
+                if (modal) {
+                    this.renderFormatModalCards();
+                    modal.classList.remove('hidden');
+                }
+            }
+
+            closeFormatModal() {
+                const modal = document.getElementById('modal-format');
+                if (modal) modal.classList.add('hidden');
+            }
+
+            renderFormatModalCards() {
+                const container = document.getElementById('format-modal-cards');
+                if (!container) return;
+                const presets = window.FORMAT_PRESETS || (typeof FORMAT_PRESETS !== 'undefined' ? FORMAT_PRESETS : {});
+                const currentId = this.engine.specs.id || this.engine.currentFormat;
+
+                container.innerHTML = Object.keys(presets).map(key => {
+                    const p = presets[key];
+                    const isCurrent = (p.id === currentId || key === currentId);
+                    return `
+                        <div onclick="app.changeActiveFormat('${key}')" class="p-3.5 rounded-lg border cursor-pointer transition ${
+                            isCurrent 
+                                ? 'border-cyan-400 bg-cyan-500/15 ring-2 ring-cyan-400/50 shadow-lg' 
+                                : 'border-idBorder bg-idInput hover:border-gray-500 hover:bg-white/5'
+                        }">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-white text-xs flex items-center space-x-1.5">
+                                    <i class="fa-solid ${p.category === 'flyer' ? 'fa-file-lines text-amber-400' : 'fa-book-open text-cyan-400'}"></i>
+                                    <span>${escapeHTML(p.name)}</span>
+                                </span>
+                                <span class="text-[9px] px-1.5 py-0.5 rounded font-mono ${
+                                    isCurrent ? 'bg-cyan-500 text-black font-bold' : 'bg-white/10 text-gray-300'
+                                }">${escapeHTML(p.badge || 'Format')}</span>
+                            </div>
+                            <p class="text-[11px] text-gray-400 mb-2 leading-relaxed">${escapeHTML(p.sub || '')}</p>
+                            <div class="flex items-center justify-between text-[10px] font-mono text-gray-400 pt-1.5 border-t border-white/5">
+                                <span>${p.widthMm} × ${p.heightMm} mm</span>
+                                <span>${p.hasFold ? `Pli à ${p.foldXMm} mm` : 'Page simple'}</span>
+                                <span>Fond perdu +${p.bleedMm} mm</span>
+                            </div>
+                            ${isCurrent ? `
+                                <div class="mt-2 text-center py-1 bg-cyan-500/20 text-cyan-300 text-[10px] font-bold rounded">
+                                    <i class="fa-solid fa-check mr-1"></i>Format Actif
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            changeActiveFormat(formatKey) {
+                if (this.engine.currentFormat === formatKey && this.engine.specs.id === formatKey) {
+                    this.closeFormatModal();
+                    return;
+                }
+                const ok = this.engine.setFormat(formatKey, false);
+                if (ok) {
+                    this.setupGeometryDOM();
+                    this.renderCurrentFace();
+                    this.renderInspector();
+                    this.renderSpreadsNavigator();
+                    this.updateFormatHeaderUI();
+                    this.closeFormatModal();
+                    this.showToast(`Format basculé sur : ${this.engine.specs.name}`);
+                }
+            }
+
+            // ==========================================
+            // AUTOMATED PAGE NUMBERING METHODS
+            // ==========================================
+            openPageNumberingModal() {
+                const modal = document.getElementById('modal-page-numbering');
+                if (!modal) return;
+                const pn = this.engine.pageNumbering || {};
+
+                const elEnabled = document.getElementById('pgnum-enabled');
+                const elFormat = document.getElementById('pgnum-format');
+                const elPos = document.getElementById('pgnum-position');
+                const elFont = document.getElementById('pgnum-font');
+                const elSize = document.getElementById('pgnum-size');
+                const elColor = document.getElementById('pgnum-color');
+                const elMargin = document.getElementById('pgnum-margin');
+                const elSkipCover = document.getElementById('pgnum-skip-cover');
+
+                if (elEnabled) elEnabled.checked = !!pn.enabled;
+                if (elFormat) elFormat.value = pn.format || 'page_n';
+                if (elPos) elPos.value = pn.position || 'bottom_center';
+                if (elFont) elFont.value = pn.fontFamily || 'Montserrat';
+                if (elSize) elSize.value = pn.fontSizePt || 8.5;
+                if (elColor) elColor.value = pn.color || '#64748b';
+                if (elMargin) elMargin.value = pn.marginMm || 8;
+                if (elSkipCover) elSkipCover.checked = pn.skipCover !== false;
+
+                this.updatePageNumberingPreview();
+                modal.classList.remove('hidden');
+            }
+
+            closePageNumberingModal() {
+                const modal = document.getElementById('modal-page-numbering');
+                if (modal) modal.classList.add('hidden');
+            }
+
+            updatePageNumberingPreview() {
+                const elFormat = document.getElementById('pgnum-format');
+                const previewEl = document.getElementById('pgnum-preview-text');
+                if (!previewEl) return;
+                const fmt = elFormat ? elFormat.value : 'page_n';
+                let sample = 'Page 2';
+                if (fmt === 'n_slash_total') sample = '2 / 10';
+                else if (fmt === 'dash') sample = '— 2 —';
+                else if (fmt === 'dot') sample = '• 2 •';
+                else if (fmt === 'simple') sample = '2';
+                else if (fmt === 'roman') sample = 'II';
+                previewEl.textContent = sample;
+            }
+
+            savePageNumberingFromModal() {
+                const elEnabled = document.getElementById('pgnum-enabled');
+                const elFormat = document.getElementById('pgnum-format');
+                const elPos = document.getElementById('pgnum-position');
+                const elFont = document.getElementById('pgnum-font');
+                const elSize = document.getElementById('pgnum-size');
+                const elColor = document.getElementById('pgnum-color');
+                const elMargin = document.getElementById('pgnum-margin');
+                const elSkipCover = document.getElementById('pgnum-skip-cover');
+
+                const opts = {
+                    enabled: elEnabled ? elEnabled.checked : false,
+                    format: elFormat ? elFormat.value : 'page_n',
+                    position: elPos ? elPos.value : 'bottom_center',
+                    fontFamily: elFont ? elFont.value : 'Montserrat',
+                    fontSizePt: elSize ? parseFloat(elSize.value) || 8.5 : 8.5,
+                    color: elColor ? elColor.value : '#64748b',
+                    marginMm: elMargin ? parseFloat(elMargin.value) || 8 : 8,
+                    skipCover: elSkipCover ? elSkipCover.checked : true
+                };
+
+                this.engine.setPageNumbering(opts);
+                this.renderCanvasPageNumberOverlay();
+                this.updateFormatHeaderUI();
+                this.closePageNumberingModal();
+                this.showToast(opts.enabled ? 'Numérotation automatique activée !' : 'Numérotation désactivée.');
+            }
+
+            renderCanvasPageNumberOverlay() {
+                const pageEl = document.getElementById('spread-page');
+                if (!pageEl) return;
+
+                const oldOverlay = document.getElementById('canvas-page-number-overlay');
+                if (oldOverlay) oldOverlay.remove();
+
+                if (!this.engine.pageNumbering || !this.engine.pageNumbering.enabled) return;
+
+                const overlay = document.createElement('div');
+                overlay.id = 'canvas-page-number-overlay';
+                overlay.className = 'absolute inset-0 pointer-events-none select-none z-20';
+
+                const pn = this.engine.pageNumbering;
+                const isSpread = Boolean(this.engine.specs.hasFold);
+
+                const makeFolioSpan = (info) => {
+                    if (!info) return '';
+                    const xPx = this.mmToPx(info.xMm);
+                    const yPx = this.mmToPx(info.yMm);
+                    const fontSizePx = Math.max(9, (pn.fontSizePt * 1.333) * (this.zoom || 0.8));
+                    return `
+                        <div style="position:absolute; left:${xPx}px; top:${yPx}px; transform:translate(-50%, -50%); 
+                                    font-family:'${pn.fontFamily}', sans-serif; font-size:${fontSizePx}px; 
+                                    color:${pn.color}; font-weight:600; letter-spacing:0.05em; opacity:0.9;" 
+                             class="px-2 py-0.5 rounded backdrop-blur-sm bg-black/10">
+                            ${escapeHTML(info.text)}
+                        </div>
+                    `;
+                };
+
+                let innerHTML = '';
+                if (!isSpread) {
+                    const info = this.engine.getPageNumberInfo(this.currentFaceIndex, 'single');
+                    if (info) innerHTML += makeFolioSpan(info);
+                } else {
+                    const leftInfo = this.engine.getPageNumberInfo(this.currentFaceIndex, 'left');
+                    const rightInfo = this.engine.getPageNumberInfo(this.currentFaceIndex, 'right');
+                    if (leftInfo) innerHTML += makeFolioSpan(leftInfo);
+                    if (rightInfo) innerHTML += makeFolioSpan(rightInfo);
+                }
+
+                if (innerHTML) {
+                    overlay.innerHTML = innerHTML;
+                    pageEl.appendChild(overlay);
+                }
+            }
+
+            // ==========================================
+            // CANVA-STYLE ILLUSTRATIONS PACK METHODS
+            // ==========================================
+            renderIllustrationsTab() {
+                const tabEl = document.getElementById('left-tab-illustrations');
+                if (!tabEl) return;
+
+                const pack = window.CanvaIllustrationsPack || (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null);
+                if (!pack || !pack.items) {
+                    tabEl.innerHTML = '<div class="p-4 text-center text-gray-400">Pack d\'illustrations en cours de chargement...</div>';
+                    return;
+                }
+
+                const categories = pack.categories || [];
+                const activeCat = this.activeIllustrationCategory || 'all';
+                const query = (this.illustrationsSearchQuery || '').toLowerCase().trim();
+
+                let filtered = pack.items;
+                if (activeCat !== 'all') {
+                    filtered = filtered.filter(i => i.category === activeCat);
+                }
+                if (query) {
+                    filtered = filtered.filter(i => 
+                        i.name.toLowerCase().includes(query) || 
+                        (i.tags && i.tags.some(t => t.toLowerCase().includes(query)))
+                    );
+                }
+
+                let html = `
+                    <div class="space-y-3">
+                        <div class="relative">
+                            <input type="text" 
+                                   value="${escapeHTML(this.illustrationsSearchQuery || '')}" 
+                                   oninput="app.searchIllustrations(this.value)"
+                                   placeholder="Rechercher (café, burger, ornement...)" 
+                                   class="w-full bg-idInput border border-idBorder rounded-lg px-3 py-2 pl-8 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400">
+                            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
+                            ${query ? `
+                                <button onclick="app.searchIllustrations('')" class="absolute right-2.5 top-2 text-gray-400 hover:text-white">
+                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+
+                        <div class="flex items-center space-x-1 overflow-x-auto pb-1 scrollbar-thin">
+                            ${categories.map(c => `
+                                <button onclick="app.filterIllustrations('${c.id}')" class="px-2 py-1 rounded text-[10px] whitespace-nowrap font-medium transition flex items-center space-x-1 ${
+                                    activeCat === c.id 
+                                        ? 'bg-cyan-500 text-black font-bold shadow' 
+                                        : 'bg-idInput text-gray-300 hover:bg-white/10 hover:text-white'
+                                }">
+                                    <i class="fa-solid ${c.icon} text-[9px]"></i>
+                                    <span>${escapeHTML(c.name.split(' ')[0])}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+
+                        <div class="text-[10px] text-gray-400 flex items-center justify-between px-0.5">
+                            <span>${filtered.length} illustrations trouvées</span>
+                            <span class="text-cyan-400 font-semibold">Clic pour insérer</span>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 max-h-[calc(100vh-270px)] overflow-y-auto pr-1">
+                            ${filtered.map(item => `
+                                <div onclick="app.addIllustrationObject('${item.id}')" 
+                                     title="${escapeHTML(item.name)} (Cliquer pour ajouter au menu)"
+                                     class="group aspect-square p-2 rounded-lg bg-idInput/80 border border-idBorder hover:border-cyan-400 hover:bg-cyan-500/10 cursor-pointer flex flex-col items-center justify-between transition transform hover:scale-105 shadow-sm">
+                                    <div class="w-full h-12 flex items-center justify-center p-1">
+                                        ${pack.buildSVGString(item, { color: item.defaultColor || '#c8a96a' })}
+                                    </div>
+                                    <span class="text-[9px] text-gray-400 group-hover:text-cyan-300 font-medium text-center truncate w-full mt-1">
+                                        ${escapeHTML(item.name)}
+                                    </span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                tabEl.innerHTML = html;
+            }
+
+            filterIllustrations(cat) {
+                this.activeIllustrationCategory = cat;
+                this.renderIllustrationsTab();
+            }
+
+            searchIllustrations(query) {
+                this.illustrationsSearchQuery = query;
+                this.renderIllustrationsTab();
+            }
+
+            addIllustrationObject(id) {
+                const pack = window.CanvaIllustrationsPack || (typeof CanvaIllustrationsPack !== 'undefined' ? CanvaIllustrationsPack : null);
+                if (!pack) return;
+                const item = pack.getItem ? pack.getItem(id) : pack.getById(id);
+                if (!item) return;
+
+                const wMm = item.category === 'ornements' ? 80 : 35;
+                const hMm = item.category === 'ornements' ? 12 : 35;
+                const xMm = Math.max(10, Math.round((this.engine.specs.widthMm - wMm) / 2));
+                const yMm = Math.max(10, Math.round((this.engine.specs.heightMm - hMm) / 2));
+
+                const newObj = {
+                    id: `illu_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                    type: 'illustration',
+                    title: item.name,
+                    illustrationId: item.id,
+                    x: xMm,
+                    y: yMm,
+                    w: wMm,
+                    h: hMm,
+                    color: item.defaultColor || '#c8a96a',
+                    opacity: 1,
+                    locked: false,
+                    visible: true,
+                    flipH: false,
+                    flipV: false,
+                    rotation: 0
+                };
+
+                this.currentFace.objects.push(newObj);
+                this.selectedObjectId = newObj.id;
+                this.commitState();
+                this.renderCurrentFace();
+                this.renderInspector();
+                this.showToast(`Illustration « ${item.name} » ajoutée !`);
+            }
+
+            buildFlyerPromoA4Template(face) {
+                if (!face) return;
+                face.bgColor = '#0f172a';
+                face.objects = [
+                    {
+                        id: 'flyer_bg_accent',
+                        type: 'shape',
+                        shapeType: 'rectangle',
+                        x: 0,
+                        y: 0,
+                        w: 210,
+                        h: 85,
+                        bgColor: '#1e293b',
+                        borderColor: '#f59e0b',
+                        borderWidth: 0,
+                        locked: true
+                    },
+                    {
+                        id: 'flyer_badge',
+                        type: 'text',
+                        content: '★ OFFRE SPÉCIALE RESTAURANT ★',
+                        x: 35,
+                        y: 18,
+                        w: 140,
+                        h: 10,
+                        fontFamily: 'Montserrat',
+                        fontSizePt: 10,
+                        fontWeight: '700',
+                        fontStyle: 'normal',
+                        textAlign: 'center',
+                        color: '#f59e0b',
+                        locked: false
+                    },
+                    {
+                        id: 'flyer_title',
+                        type: 'text',
+                        content: 'LE MENU DÉCOUVERTE',
+                        x: 20,
+                        y: 30,
+                        w: 170,
+                        h: 22,
+                        fontFamily: 'Cinzel',
+                        fontSizePt: 26,
+                        fontWeight: '800',
+                        fontStyle: 'normal',
+                        textAlign: 'center',
+                        color: '#ffffff',
+                        locked: false
+                    },
+                    {
+                        id: 'flyer_subtitle',
+                        type: 'text',
+                        content: 'Une expérience gastronomique inoubliable au cœur de la ville',
+                        x: 25,
+                        y: 56,
+                        w: 160,
+                        h: 12,
+                        fontFamily: 'Cormorant Garamond',
+                        fontSizePt: 13,
+                        fontWeight: '500',
+                        fontStyle: 'italic',
+                        textAlign: 'center',
+                        color: '#cbd5e1',
+                        locked: false
+                    },
+                    {
+                        id: 'flyer_separator',
+                        type: 'illustration',
+                        illustrationId: 'sep_vintage_floral',
+                        title: 'Séparateur Floral',
+                        x: 65,
+                        y: 72,
+                        w: 80,
+                        h: 8,
+                        color: '#f59e0b',
+                        opacity: 1,
+                        locked: false
+                    },
+                    {
+                        id: 'flyer_price_box',
+                        type: 'shape',
+                        shapeType: 'rounded_rect',
+                        x: 60,
+                        y: 245,
+                        w: 90,
+                        h: 30,
+                        bgColor: '#f59e0b',
+                        borderColor: '#ffffff',
+                        borderWidth: 1,
+                        locked: false
+                    },
+                    {
+                        id: 'flyer_price_text',
+                        type: 'text',
+                        content: 'FORMULE COMPLÈTE : 28 €',
+                        x: 60,
+                        y: 253,
+                        w: 90,
+                        h: 14,
+                        fontFamily: 'Montserrat',
+                        fontSizePt: 13,
+                        fontWeight: '800',
+                        textAlign: 'center',
+                        color: '#0f172a',
+                        locked: false
+                    }
+                ];
+
+                this.selectedObjectId = null;
+                this.commitState();
+                this.renderCurrentFace();
+                this.renderInspector();
+                this.showToast('Gabarit Flyer Promotionnel A4 appliqué !');
             }
         }
 
         // Launch Application on DOM ready
         let app;
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
+        function initInMenuStudioApp() {
+            try {
                 app = new InMenuStudioApp();
-            });
-        } else {
-            app = new InMenuStudioApp();
+                if (typeof window !== 'undefined') {
+                    window.app = app;
+                }
+            } catch (err) {
+                console.error("Critical error starting InMenuStudioApp:", err);
+            }
+        }
+
+        if (typeof document !== 'undefined') {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initInMenuStudioApp);
+            } else {
+                initInMenuStudioApp();
+            }
         }
     

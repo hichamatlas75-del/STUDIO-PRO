@@ -910,6 +910,9 @@ const CanvaIllustrationsPack = {
     getById(id) {
         return this.items.find(item => item.id === id) || null;
     },
+    getItem(id) {
+        return this.getById(id);
+    },
 
     filter(categoryId = 'all', searchQuery = '') {
         let results = this.items;

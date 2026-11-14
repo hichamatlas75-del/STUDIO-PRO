@@ -791,6 +791,10 @@ class PrintExporter {
             }
         }
 
+        if (typeof window !== 'undefined') {
+            window.PrintExporter = PrintExporter;
+        }
+
         /**
          * ============================================================================
          * MODULE 2: VisualCanvasEditor & Application Controller
