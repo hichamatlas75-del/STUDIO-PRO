@@ -6,6 +6,8 @@
 Ouvrir `index.html` directement dans un navigateur récent (aucune connexion Internet requise : Tailwind CSS compilé, Google Fonts, Font Awesome, jsPDF et Mammoth.js sont embarqués localement dans `css/` et `vendor/`).
 
 ## Structure
+- `samples/` : projet d'exemple (`.inmenu.json`), données et `.docx` de démonstration (hors application)
+- Sécurité : CSP stricte dans `index.html` (`script-src 'self'`), import JSON assaini (`normalizeImportedData`)
 - `css/tailwind.min.css` & `tailwind.config.js` : feuille de style Tailwind CSS v3 compilée pour la production
 - `vendor/` : bibliothèques embarquées en local (`jspdf.umd.min.js`, `mammoth.browser.min.js`, `fontawesome/`, `fonts/`)
 - `js/utils.js` : helpers (échappement HTML, ids, stockage IndexedDB + localStorage)

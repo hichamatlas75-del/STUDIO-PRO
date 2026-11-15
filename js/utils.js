@@ -79,8 +79,10 @@ const InMenuStorage = {
                 req.onerror = () => reject(req.error);
             });
             idbSuccess = true;
-        } catch (_) {
-            // Fallback transparent vers localStorage si IndexedDB n'est pas disponible dans l'environnement
+        } catch (err) {
+            // Fallback vers localStorage si IndexedDB est indisponible ; l'erreur est conservée pour diagnostic.
+            this.lastError = err;
+            console.warn('IndexedDB: écriture impossible', err);
         }
 
         // Try localStorage as mirror (si la taille le permet)
@@ -91,7 +93,7 @@ const InMenuStorage = {
         } catch (_) {
             // normal si le projet dépasse 5 Mo avec photos.
             // On supprime l'ancienne copie pour ne jamais relire une version périmée.
-            try { localStorage.removeItem(key); } catch (__) {}
+            try { localStorage.removeItem(key); } catch (__) { /* ignore */ }
         }
 
         return idbSuccess || lsSuccess;
@@ -109,7 +111,7 @@ const InMenuStorage = {
                 req.onerror = () => reject(req.error);
             });
             if (val !== undefined && val !== null) return val;
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
 
         // 2. Fallback to localStorage
         try {

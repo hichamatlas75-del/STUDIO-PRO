@@ -566,7 +566,7 @@ Object.assign(InMenuStudioApp.prototype, {
                 const sel = window.getSelection();
                 sel.removeAllRanges();
                 sel.addRange(range);
-            } catch (_) {}
+            } catch (_) { /* ignore selection error */ }
 
             const handleLiveInput = () => {
                 const raw = options.singleLine

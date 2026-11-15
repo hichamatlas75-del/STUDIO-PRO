@@ -36,7 +36,7 @@ class PrintExporter {
              */
             async renderFaceToCanvas(face, options = {}) {
                 if (document.fonts && document.fonts.ready) {
-                    try { await document.fonts.ready; } catch (_) {}
+                    try { await document.fonts.ready; } catch (_) { /* ignore */ }
                 }
 
                 const specs = this.engine.specs;
@@ -117,7 +117,7 @@ class PrintExporter {
              */
             async renderSinglePanelToCanvas(face, side, pageNumber, options = {}) {
                 if (document.fonts && document.fonts.ready) {
-                    try { await document.fonts.ready; } catch (_) {}
+                    try { await document.fonts.ready; } catch (_) { /* ignore */ }
                 }
 
                 const specs = this.engine.specs;

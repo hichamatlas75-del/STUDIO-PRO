@@ -11,7 +11,7 @@ Object.assign(InMenuStudioApp.prototype, {
         const fmtSelect = document.getElementById('exp-target-format');
         if (fmtSelect) {
             let savedFmt = null;
-            try { savedFmt = localStorage.getItem('inmenu_export_target_format'); } catch (_) {}
+            try { savedFmt = localStorage.getItem('inmenu_export_target_format'); } catch (_) { /* ignore */ }
             if (savedFmt && Array.from(fmtSelect.options).some(o => o.value === savedFmt)) {
                 fmtSelect.value = savedFmt;
             } else {
@@ -40,7 +40,7 @@ Object.assign(InMenuStudioApp.prototype, {
         const fmtSelect = document.getElementById('exp-target-format');
         if (fmtSelect && formatKey) {
             fmtSelect.value = formatKey;
-            try { localStorage.setItem('inmenu_export_target_format', formatKey); } catch (_) {}
+            try { localStorage.setItem('inmenu_export_target_format', formatKey); } catch (_) { /* ignore */ }
         }
         this.updateExportModalUI();
     },
@@ -50,7 +50,7 @@ Object.assign(InMenuStudioApp.prototype, {
         const key = fmtSelect ? fmtSelect.value : 'a4_portrait';
         const specs = (this.engine && this.engine.specs) ? this.engine.specs : { widthMm: 340, heightMm: 300, bleedMm: 3 };
 
-        try { localStorage.setItem('inmenu_export_target_format', key); } catch (_) {}
+        try { localStorage.setItem('inmenu_export_target_format', key); } catch (_) { /* ignore */ }
 
         switch (key) {
             case 'a4_portrait':
@@ -386,6 +386,13 @@ Object.assign(InMenuStudioApp.prototype, {
             return;
         }
 
+        const preflightIssues = this.engine.preflight();
+        if (preflightIssues.length) {
+            const first = preflightIssues[0].msg;
+            this.showToast(`Pré-presse : ${preflightIssues.length} point(s) à vérifier (ex. ${first})`);
+            console.warn('Contrôle pré-presse :', preflightIssues);
+        }
+
         const includeCropMarks = document.getElementById('exp-cropmarks').checked;
         const includeBleed = document.getElementById('exp-bleed').checked;
         const scope = document.getElementById('exp-scope').value;
@@ -562,7 +569,7 @@ Object.assign(InMenuStudioApp.prototype, {
                     this.activeFileName = handle.name;
                     try {
                         localStorage.setItem('inmenu_last_synced_filename', handle.name);
-                    } catch (_) {}
+                    } catch (_) { /* ignore */ }
                 }
 
                 const json = this.engine.toJSON(true);
@@ -606,7 +613,7 @@ Object.assign(InMenuStudioApp.prototype, {
                 this.activeFileName = handle.name;
                 try {
                     localStorage.setItem('inmenu_last_synced_filename', handle.name);
-                } catch (_) {}
+                } catch (_) { /* ignore */ }
 
                 this.currentFaceIndex = 0;
                 this.selectedObjectId = null;
@@ -704,7 +711,7 @@ Object.assign(InMenuStudioApp.prototype, {
                 this.activeFileName = file.name;
                 try {
                     localStorage.setItem('inmenu_last_synced_filename', file.name);
-                } catch (_) {}
+                } catch (_) { /* ignore */ }
                 this.setupGeometryDOM();
                 this.populateQuickDishSelect();
                 this.renderCurrentFace();

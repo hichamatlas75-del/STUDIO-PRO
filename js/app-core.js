@@ -613,9 +613,10 @@ class InMenuStudioApp {
 
     undo() {
         this.flushPendingSave();
-        if (this.engine.undo()) {
-            if (typeof this.engine.activeFaceIndex === 'number' && this.engine.activeFaceIndex >= 0 && this.engine.activeFaceIndex < this.engine.faces.length) {
-                this.currentFaceIndex = this.engine.activeFaceIndex;
+        const restoredIdx = this.engine.undo();
+        if (restoredIdx !== null && restoredIdx !== false) {
+            if (typeof restoredIdx === 'number' && restoredIdx >= 0 && restoredIdx < this.engine.faces.length) {
+                this.currentFaceIndex = restoredIdx;
             }
             this.selectedObjectId = null;
             this.populateQuickDishSelect();
@@ -629,9 +630,10 @@ class InMenuStudioApp {
 
     redo() {
         this.flushPendingSave();
-        if (this.engine.redo()) {
-            if (typeof this.engine.activeFaceIndex === 'number' && this.engine.activeFaceIndex >= 0 && this.engine.activeFaceIndex < this.engine.faces.length) {
-                this.currentFaceIndex = this.engine.activeFaceIndex;
+        const restoredIdx = this.engine.redo();
+        if (restoredIdx !== null && restoredIdx !== false) {
+            if (typeof restoredIdx === 'number' && restoredIdx >= 0 && restoredIdx < this.engine.faces.length) {
+                this.currentFaceIndex = restoredIdx;
             }
             this.selectedObjectId = null;
             this.populateQuickDishSelect();

@@ -34,9 +34,9 @@ test('undo / redo', () => {
     const e = flyer();
     const n = e.faces.length;
     e.addPage();
-    e.undo();
+    assert.strictEqual(e.undo(), 0);
     assert.strictEqual(e.faces.length, n);
-    e.redo();
+    assert.strictEqual(e.redo(), 2);
     assert.strictEqual(e.faces.length, n + 1);
 });
 
@@ -293,3 +293,46 @@ test('PrintExporter : mise à l’échelle vers Format A4 (210 × 297 mm) et 170
 
 
 
+
+test('import : couleurs, polices et URLs d\'image sont assainies', () => {
+    const e = flyer();
+    const data = JSON.parse(e.toJSON(false));
+    data.faces = [{ id: 'a', objects: [{
+        type: 'text', x: 1e9, y: 0, w: 10, h: 10,
+        color: 'red;} body{display:none', bgColor: '#fff', fontFamily: "Inter'; background:url(x)",
+        imageUrl: 'javascript:alert(1)', align: 'evil'
+    }] }];
+    const o = e.normalizeImportedData(data).faces[0].objects[0];
+    assert.strictEqual(o.color, undefined);
+    assert.strictEqual(o.bgColor, '#fff');
+    assert.ok(!/['";:()]/.test(o.fontFamily));
+    assert.strictEqual(o.imageUrl, '');
+    assert.strictEqual(o.align, undefined);
+    assert.strictEqual(o.x, 5000);
+});
+
+test('historique : les grosses images sont dédupliquées et restaurées par undo', () => {
+    const e = flyer();
+    const big = 'data:image/png;base64,' + 'A'.repeat(50000);
+    e.faces[0].objects.push({ id: 'img1', type: 'image', x: 0, y: 0, w: 10, h: 10, imageUrl: big });
+    e.saveState(0);
+    e.faces[0].objects[0].x = 5;
+    e.saveState(0);
+    assert.ok(e.history[e.history.length - 1].length < 5000, 'snapshot léger');
+    e.undo();
+    assert.strictEqual(e.faces[0].objects[0].imageUrl, big);
+    assert.strictEqual(e.faces[0].objects[0].x, 0);
+});
+
+test('preflight : détecte hors-page, texte minuscule et image sans source', () => {
+    const e = flyer();
+    const { widthMm: W } = e.specs;
+    e.faces[0].objects = [
+        { id: 'a', type: 'text', x: W + 10, y: 0, w: 10, h: 10 },
+        { id: 'b', type: 'text', x: 20, y: 20, w: 10, h: 10, fontSize: 3 },
+        { id: 'c', type: 'image', x: 20, y: 40, w: 10, h: 10, imageUrl: '' },
+        { id: 'd', type: 'text', x: 20, y: 60, w: 10, h: 10, fontSize: 12 }
+    ];
+    const ids = e.preflight().map(i => i.id);
+    assert.strictEqual(JSON.stringify(ids.sort()), JSON.stringify(['a', 'b', 'c']));
+});

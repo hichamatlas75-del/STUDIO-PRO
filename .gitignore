@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
+*.inmenu.json
+!samples/*.inmenu.json
+test-results/
+playwright-report/
+e2e-out.txt

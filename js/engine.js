@@ -421,8 +421,55 @@ class DocumentEngine {
     }
 
     // Save Snapshot for Undo/Redo (records active face index so undo restores view)
+    // --- Historique léger : les grosses images (data:) sont stockées une seule fois
+    // dans un registre et référencées par "@img:<clé>" dans les snapshots. ---
+    _hashString(str) {
+        let h = 0x811c9dc5;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 0x01000193);
+        }
+        return (h >>> 0).toString(36);
+    }
+
+    _packSnapshot(state) {
+        if (!this._imgStore) this._imgStore = new Map();
+        return JSON.stringify(state, (key, value) => {
+            if (typeof value === 'string' && value.length > 2000 && value.startsWith('data:')) {
+                const ref = `${value.length.toString(36)}_${this._hashString(value)}`;
+                if (!this._imgStore.has(ref)) this._imgStore.set(ref, value);
+                return `@img:${ref}`;
+            }
+            return value;
+        });
+    }
+
+    _unpackSnapshot(snapshot) {
+        const store = this._imgStore;
+        return JSON.parse(snapshot, (key, value) => {
+            if (typeof value === 'string' && value.startsWith('@img:') && store) {
+                const real = store.get(value.slice(5));
+                if (real !== undefined) return real;
+            }
+            return value;
+        });
+    }
+
+    _pruneImageStore() {
+        if (!this._imgStore || this._imgStore.size <= 20) return;
+        const used = new Set();
+        const re = /@img:([a-z0-9_]+)/g;
+        [...this.history, ...this.redoStack].forEach(s => {
+            let m;
+            while ((m = re.exec(s)) !== null) used.add(m[1]);
+        });
+        for (const key of [...this._imgStore.keys()]) {
+            if (!used.has(key)) this._imgStore.delete(key);
+        }
+    }
+
     saveState(activeFaceIndex = 0) {
-        const snapshot = JSON.stringify({
+        const snapshot = this._packSnapshot({
             activeFaceIndex,
             currentFormat: this.currentFormat,
             specs: this.specs,
@@ -438,6 +485,7 @@ class DocumentEngine {
             this.history.shift();
         }
         this.redoStack = [];
+        this._pruneImageStore();
         this.lastSaveSuccess = this.persistToLocalStorage();
         return this.lastSaveSuccess;
     }
@@ -446,7 +494,7 @@ class DocumentEngine {
         if (this.history.length <= 1) return null;
         const current = this.history.pop();
         this.redoStack.push(current);
-        const prev = JSON.parse(this.history[this.history.length - 1]);
+        const prev = this._unpackSnapshot(this.history[this.history.length - 1]);
         if (prev.currentFormat && FORMAT_PRESETS[prev.currentFormat]) {
             this.currentFormat = prev.currentFormat;
             this.specs = prev.specs || Object.assign({}, FORMAT_PRESETS[prev.currentFormat]);
@@ -465,7 +513,7 @@ class DocumentEngine {
         if (this.redoStack.length === 0) return null;
         const nextSnap = this.redoStack.pop();
         this.history.push(nextSnap);
-        const next = JSON.parse(nextSnap);
+        const next = this._unpackSnapshot(nextSnap);
         if (next.currentFormat && FORMAT_PRESETS[next.currentFormat]) {
             this.currentFormat = next.currentFormat;
             this.specs = next.specs || Object.assign({}, FORMAT_PRESETS[next.currentFormat]);
@@ -483,19 +531,23 @@ class DocumentEngine {
     persistToLocalStorage() {
         if (!this.persistReady) return true;
         if (typeof InMenuStorage !== 'undefined' && InMenuStorage.setItem) {
+            const report = (ok, err) => {
+                const wasOk = this.lastSaveSuccess;
+                this.lastSaveSuccess = ok;
+                if (!ok) {
+                    console.error('Sauvegarde automatique impossible :', err || InMenuStorage.lastError);
+                }
+                if (typeof app !== 'undefined' && app.updateAutoSaveUI) {
+                    app.updateAutoSaveUI(ok);
+                }
+                // Alerte visible une seule fois lors du passage OK → échec
+                if (!ok && wasOk && typeof app !== 'undefined' && app.showToast) {
+                    app.showToast('⚠ Sauvegarde automatique impossible (stockage plein ou bloqué). Faites Ctrl+S pour exporter votre projet.');
+                }
+            };
             InMenuStorage.setItem('inmenu_studio_v3_greycorner_split', this.toJSON(false))
-                .then(ok => {
-                    this.lastSaveSuccess = ok;
-                    if (typeof app !== 'undefined' && app.updateAutoSaveUI) {
-                        app.updateAutoSaveUI(ok);
-                    }
-                })
-                .catch(() => {
-                    this.lastSaveSuccess = false;
-                    if (typeof app !== 'undefined' && app.updateAutoSaveUI) {
-                        app.updateAutoSaveUI(false);
-                    }
-                });
+                .then(ok => report(ok))
+                .catch(err => report(false, err));
             return true;
         }
 
@@ -558,6 +610,27 @@ class DocumentEngine {
                 };
             });
 
+        const COLOR_PROPS = ['bgColor', 'borderColor', 'color', 'textColor', 'titleColor', 'descColor', 'priceColor', 'defaultBgColor'];
+        const sanitizeColor = (v) => {
+            const s = String(v ?? '').trim();
+            if (/^#[0-9a-f]{3,8}$/i.test(s)) return s;
+            if (/^(rgba?|hsla?)\(\s*[\d.\s,%\/-]+\)$/i.test(s)) return s;
+            if (/^[a-z]{3,20}$/i.test(s)) return s; // transparent, white, ...
+            return null;
+        };
+        const sanitizeFont = (v) => String(v ?? '').replace(/[^\w \-]/g, '').trim().slice(0, 60);
+        const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+        // Les valeurs de couleur de specs / numérotation finissent dans du CSS : on les valide aussi.
+        COLOR_PROPS.forEach(p => {
+            if (specs[p] !== undefined) {
+                const c = sanitizeColor(specs[p]);
+                if (c) specs[p] = c; else delete specs[p];
+            }
+        });
+        if (pageNumbering.color !== undefined) pageNumbering.color = sanitizeColor(pageNumbering.color) || '#64748b';
+        pageNumbering.fontFamily = sanitizeFont(pageNumbering.fontFamily) || 'Montserrat';
+
         const optionalNumericProps = ['fontSize', 'radius', 'borderWidth', 'opacity', 'sliceStart', 'sliceEnd', 'rotate'];
         const sanitizeObject = (o) => {
             optionalNumericProps.forEach(prop => {
@@ -570,6 +643,9 @@ class DocumentEngine {
                 else delete o[prop];
             });
             if (o.opacity !== undefined) o.opacity = Math.max(0.05, Math.min(1, o.opacity));
+            if (o.fontSize !== undefined) o.fontSize = clamp(o.fontSize, 1, 500);
+            if (o.borderWidth !== undefined) o.borderWidth = clamp(o.borderWidth, 0, 100);
+            if (o.radius !== undefined) o.radius = clamp(o.radius, 0, 1000);
             if (o.locked !== undefined) o.locked = Boolean(o.locked);
             if (o.flipH !== undefined) o.flipH = Boolean(o.flipH);
             if (o.flipV !== undefined) o.flipV = Boolean(o.flipV);
@@ -580,6 +656,17 @@ class DocumentEngine {
                 .forEach(prop => {
                     if (o[prop] !== undefined && o[prop] !== null && typeof o[prop] !== 'string') o[prop] = String(o[prop]);
                 });
+
+            // Valeurs injectées dans le CSS / les URLs : liste blanche stricte
+            COLOR_PROPS.forEach(prop => {
+                if (o[prop] !== undefined) {
+                    const c = sanitizeColor(o[prop]);
+                    if (c) o[prop] = c; else delete o[prop];
+                }
+            });
+            if (o.fontFamily !== undefined) o.fontFamily = sanitizeFont(o.fontFamily);
+            if (o.align !== undefined && !['left', 'center', 'right', 'justify'].includes(o.align)) delete o.align;
+            if (o.imageUrl !== undefined) o.imageUrl = sanitizeUrl(o.imageUrl);
             return o;
         };
 
@@ -601,10 +688,10 @@ class DocumentEngine {
                         return sanitizeObject({
                             ...o,
                             id,
-                            x: Number.isFinite(Number(o.x)) ? Number(o.x) : 0,
-                            y: Number.isFinite(Number(o.y)) ? Number(o.y) : 0,
-                            w: Math.max(2, Number.isFinite(Number(o.w)) ? Number(o.w) : 40),
-                            h: Math.max(2, Number.isFinite(Number(o.h)) ? Number(o.h) : 20)
+                            x: clamp(Number.isFinite(Number(o.x)) ? Number(o.x) : 0, -5000, 5000),
+                            y: clamp(Number.isFinite(Number(o.y)) ? Number(o.y) : 0, -5000, 5000),
+                            w: clamp(Number.isFinite(Number(o.w)) ? Number(o.w) : 40, 2, 5000),
+                            h: clamp(Number.isFinite(Number(o.h)) ? Number(o.h) : 20, 2, 5000)
                         });
                     })
                 : [];
@@ -675,6 +762,39 @@ class DocumentEngine {
             }
         }
         return loaded;
+    }
+
+    /**
+     * Contrôle pré-presse simple : renvoie une liste d'avertissements (non bloquants).
+     * Marge de sécurité = 3 mm (zone de coupe), taille de texte minimale = 5 pt.
+     */
+    preflight(safeMarginMm = 3, minFontPt = 5) {
+        const W = Number(this.specs && this.specs.widthMm) || 0;
+        const H = Number(this.specs && this.specs.heightMm) || 0;
+        const issues = [];
+        if (!W || !H) return issues;
+        this.faces.forEach((face, fi) => {
+            (face.objects || []).forEach(o => {
+                const label = `${face.name || 'Page ' + (fi + 1)} — ${o.name || o.type}`;
+                const outside = o.x + o.w <= 0 || o.y + o.h <= 0 || o.x >= W || o.y >= H;
+                if (outside) {
+                    issues.push({ face: fi, id: o.id, level: 'warn', msg: `${label} : hors de la page` });
+                    return;
+                }
+                if (o.type === 'text' && o.fontSize !== undefined && o.fontSize < minFontPt) {
+                    issues.push({ face: fi, id: o.id, level: 'warn', msg: `${label} : texte trop petit (${o.fontSize} pt)` });
+                }
+                if (o.type === 'image' && !o.imageUrl) {
+                    issues.push({ face: fi, id: o.id, level: 'warn', msg: `${label} : image sans source` });
+                }
+                const inSafe = o.x >= safeMarginMm && o.y >= safeMarginMm &&
+                    o.x + o.w <= W - safeMarginMm && o.y + o.h <= H - safeMarginMm;
+                if (!inSafe && o.type === 'text') {
+                    issues.push({ face: fi, id: o.id, level: 'info', msg: `${label} : texte trop près du bord (< ${safeMarginMm} mm)` });
+                }
+            });
+        });
+        return issues;
     }
 
     toJSON(pretty = true) {
