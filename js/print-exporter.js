@@ -8,9 +8,31 @@ class PrintExporter {
             }
 
             /**
+             * Remappe un objet (x, y, w, h, taille de police) lorsque le format d'export cible
+             * diffère du panneau source (ex: panneau 170×300 mm exporté en A4 210×297 mm)
+             */
+            scaleObjectForTarget(obj, offsetXMm = 0, scaleX = 1, scaleY = 1) {
+                if (offsetXMm === 0 && Math.abs(scaleX - 1) < 0.001 && Math.abs(scaleY - 1) < 0.001) {
+                    return obj;
+                }
+                const fontScale = Math.min(scaleX, scaleY);
+                const scaled = Object.assign({}, obj, {
+                    x: (obj.x - offsetXMm) * scaleX,
+                    y: obj.y * scaleY,
+                    w: obj.w * scaleX,
+                    h: obj.h * scaleY
+                });
+                if (obj.fontSize !== undefined) scaled.fontSize = obj.fontSize * fontScale;
+                if (obj.fontSizePt !== undefined) scaled.fontSizePt = obj.fontSizePt * fontScale;
+                if (obj.radius !== undefined) scaled.radius = obj.radius * fontScale;
+                if (obj.borderRadius !== undefined) scaled.borderRadius = obj.borderRadius * fontScale;
+                return scaled;
+            }
+
+            /**
              * Renders any face onto a high-DPI HTML5 Canvas in exact millimeters
              * @param {Object} face - The face object from DocumentEngine
-             * @param {Object} options - { includeBleed, includeCropMarks, scalePxPerMm }
+             * @param {Object} options - { includeBleed, includeCropMarks, scalePxPerMm, targetWidthMm, targetHeightMm }
              */
             async renderFaceToCanvas(face, options = {}) {
                 if (document.fonts && document.fonts.ready) {
@@ -18,6 +40,13 @@ class PrintExporter {
                 }
 
                 const specs = this.engine.specs;
+                const srcWidthMm = specs.widthMm;
+                const srcHeightMm = specs.heightMm;
+                const outWidthMm = options.targetWidthMm || srcWidthMm;
+                const outHeightMm = options.targetHeightMm || srcHeightMm;
+                const scaleX = outWidthMm / srcWidthMm;
+                const scaleY = outHeightMm / srcHeightMm;
+
                 const includeBleed = options.includeBleed !== false;
                 const includeCropMarks = options.includeCropMarks !== false;
                 const pxPerMm = options.scalePxPerMm || 4;
@@ -25,15 +54,15 @@ class PrintExporter {
                 const bleed = includeBleed ? specs.bleedMm : 0;
                 const slugMargin = includeCropMarks ? 15 : 0; // 15mm margin outside bleed for crop marks, fold marks & slug
 
-                const totalWidthMm = specs.widthMm + (bleed * 2) + (slugMargin * 2);
-                const totalHeightMm = specs.heightMm + (bleed * 2) + (slugMargin * 2);
+                const totalWidthMm = outWidthMm + (bleed * 2) + (slugMargin * 2);
+                const totalHeightMm = outHeightMm + (bleed * 2) + (slugMargin * 2);
 
                 const canvas = document.createElement('canvas');
                 canvas.width = Math.round(totalWidthMm * pxPerMm);
                 canvas.height = Math.round(totalHeightMm * pxPerMm);
                 const ctx = canvas.getContext('2d');
 
-                // Origin of Trim Box (0,0 of the 340x300mm page)
+                // Origin of Trim Box
                 const trimOriginX = (slugMargin + bleed) * pxPerMm;
                 const trimOriginY = (slugMargin + bleed) * pxPerMm;
                 const failedImages = [];
@@ -46,8 +75,8 @@ class PrintExporter {
                 ctx.save();
                 const clipX = slugMargin * pxPerMm;
                 const clipY = slugMargin * pxPerMm;
-                const clipW = (specs.widthMm + bleed * 2) * pxPerMm;
-                const clipH = (specs.heightMm + bleed * 2) * pxPerMm;
+                const clipW = (outWidthMm + bleed * 2) * pxPerMm;
+                const clipH = (outHeightMm + bleed * 2) * pxPerMm;
 
                 ctx.beginPath();
                 ctx.rect(clipX, clipY, clipW, clipH);
@@ -57,34 +86,34 @@ class PrintExporter {
                 ctx.fillStyle = face.bgColor || '#fdfbf7';
                 ctx.fillRect(clipX, clipY, clipW, clipH);
 
-                // 3. Draw every object on the face
-                for (const obj of face.objects) {
-                    await this.drawObjectOnCanvas(ctx, obj, trimOriginX, trimOriginY, pxPerMm, failedImages);
+                // 3. Draw every object on the face (remapped if target format differs)
+                for (const obj of (face.objects || [])) {
+                    const drawObj = this.scaleObjectForTarget(obj, 0, scaleX, scaleY);
+                    await this.drawObjectOnCanvas(ctx, drawObj, trimOriginX, trimOriginY, pxPerMm, failedImages);
                 }
 
                 // 3B. Draw Automated Page Numbering (if enabled)
                 if (this.engine.pageNumbering && this.engine.pageNumbering.enabled) {
-                    this.drawAutomaticPageNumbersOnFace(ctx, face, trimOriginX, trimOriginY, pxPerMm);
+                    this.drawAutomaticPageNumbersOnFace(ctx, face, trimOriginX, trimOriginY, pxPerMm, scaleX, scaleY);
                 }
 
                 ctx.restore();
 
-                // 4. Draw Printer Marks (Traits de coupe, Traits de pli à 170mm, Hirondelles)
+                // 4. Draw Printer Marks (Traits de coupe, Traits de pli, Hirondelles)
                 if (includeCropMarks) {
-                    this.drawPrinterMarks(ctx, trimOriginX, trimOriginY, specs.widthMm * pxPerMm, specs.heightMm * pxPerMm, bleed * pxPerMm, pxPerMm, face);
+                    this.drawPrinterMarks(ctx, trimOriginX, trimOriginY, outWidthMm * pxPerMm, outHeightMm * pxPerMm, bleed * pxPerMm, pxPerMm, face, outWidthMm, outHeightMm);
                 }
 
-                return { canvas, totalWidthMm, totalHeightMm, failedImages };
+                return { canvas, totalWidthMm, totalHeightMm, trimWidthMm: outWidthMm, trimHeightMm: outHeightMm, failedImages };
             }
 
-            
             /**
-             * Renders a SINGLE 170 x 300 mm Panel ('left' or 'right') from a 340 x 300 mm face
-             * for printers who impose single pages (Page 1 to Page 20) into a saddle-stitched booklet.
-             * @param {Object} face - The spread face object from DocumentEngine
-             * @param {String} side - 'left' (0..170mm) or 'right' (170..340mm)
-             * @param {Number} pageNumber - Sequential page number (1..20)
-             * @param {Object} options - { includeBleed, includeCropMarks, scalePxPerMm }
+             * Renders a SINGLE Panel ('left' or 'right') from a face into a separate page
+             * (either in Format A4 210 × 297 mm, or 170 × 300 mm, or custom target dimensions).
+             * @param {Object} face - The face object from DocumentEngine
+             * @param {String} side - 'left' or 'right'
+             * @param {Number} pageNumber - Sequential page number
+             * @param {Object} options - { includeBleed, includeCropMarks, scalePxPerMm, targetWidthMm, targetHeightMm, totalPages }
              */
             async renderSinglePanelToCanvas(face, side, pageNumber, options = {}) {
                 if (document.fonts && document.fonts.ready) {
@@ -92,8 +121,14 @@ class PrintExporter {
                 }
 
                 const specs = this.engine.specs;
-                const panelWidthMm = specs.hasFold ? (specs.foldXMm || (specs.widthMm / 2)) : specs.widthMm;
-                const panelHeightMm = specs.heightMm;
+                const srcPanelWidthMm = specs.hasFold ? (specs.foldXMm || (specs.widthMm / 2)) : (specs.widthMm / 2);
+                const srcPanelHeightMm = specs.heightMm;
+
+                const panelWidthMm = options.targetWidthMm || srcPanelWidthMm;
+                const panelHeightMm = options.targetHeightMm || srcPanelHeightMm;
+                const scaleX = panelWidthMm / srcPanelWidthMm;
+                const scaleY = panelHeightMm / srcPanelHeightMm;
+
                 const includeBleed = options.includeBleed !== false;
                 const includeCropMarks = options.includeCropMarks !== false;
                 const pxPerMm = options.scalePxPerMm || 4;
@@ -111,7 +146,7 @@ class PrintExporter {
 
                 const trimOriginX = (slugMargin + bleed) * pxPerMm;
                 const trimOriginY = (slugMargin + bleed) * pxPerMm;
-                const offsetXMm = (specs.hasFold && side === 'right') ? (specs.foldXMm || (specs.widthMm / 2)) : 0;
+                const offsetXMm = side === 'right' ? srcPanelWidthMm : 0;
                 const failedImages = [];
 
                 // 1. Fill Slug background white
@@ -132,10 +167,10 @@ class PrintExporter {
                 ctx.fillStyle = face.bgColor || '#fdfbf7';
                 ctx.fillRect(clipX, clipY, clipW, clipH);
 
-                // 3. Shift origin by offsetXMm when rendering right panel
-                const shiftedOriginX = trimOriginX - (offsetXMm * pxPerMm);
-                for (const obj of face.objects) {
-                    await this.drawObjectOnCanvas(ctx, obj, shiftedOriginX, trimOriginY, pxPerMm, failedImages);
+                // 3. Draw objects mapped onto target panel dimensions (e.g. A4 210x297mm or 170x300mm)
+                for (const obj of (face.objects || [])) {
+                    const drawObj = this.scaleObjectForTarget(obj, offsetXMm, scaleX, scaleY);
+                    await this.drawObjectOnCanvas(ctx, drawObj, trimOriginX, trimOriginY, pxPerMm, failedImages);
                 }
 
                 // 3B. Draw Automated Page Numbering on single panel
@@ -151,14 +186,14 @@ class PrintExporter {
                         ctx.fillStyle = this.engine.pageNumbering.color || '#64748b';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText(info.text, trimOriginX + (panelWidthMm * pxPerMm / 2), trimOriginY + (info.yMm * pxPerMm));
+                        ctx.fillText(info.text, trimOriginX + (panelWidthMm * pxPerMm / 2), trimOriginY + (info.yMm * scaleY * pxPerMm));
                         ctx.restore();
                     }
                 }
 
                 ctx.restore();
 
-                // 4. Draw Corner Crop Marks for this 170x300mm single page
+                // 4. Draw Corner Crop Marks for this single page
                 if (includeCropMarks) {
                     this.drawSinglePanelMarks(
                         ctx,
@@ -170,14 +205,17 @@ class PrintExporter {
                         pxPerMm,
                         pageNumber,
                         face,
-                        side
+                        side,
+                        panelWidthMm,
+                        panelHeightMm,
+                        options.totalPages || (this.engine.faces.length * 2)
                     );
                 }
 
-                return { canvas, totalWidthMm, totalHeightMm, failedImages };
+                return { canvas, totalWidthMm, totalHeightMm, trimWidthMm: panelWidthMm, trimHeightMm: panelHeightMm, failedImages };
             }
 
-            drawSinglePanelMarks(ctx, trimX, trimY, trimW, trimH, bleedPx, pxPerMm, pageNumber, face, side) {
+            drawSinglePanelMarks(ctx, trimX, trimY, trimW, trimH, bleedPx, pxPerMm, pageNumber, face, side, panelWidthMm = 170, panelHeightMm = 300, totalPages = 20) {
                 ctx.save();
                 ctx.strokeStyle = '#000000';
                 ctx.lineWidth = 0.25 * pxPerMm;
@@ -208,9 +246,11 @@ class PrintExporter {
                 ctx.textBaseline = 'bottom';
 
                 ctx.textAlign = 'left';
-                const sideLabel = side === 'left' ? 'PANNEAU GAUCHE' : 'PANNEAU DROIT';
+                const sideLabel = side === 'left' ? 'GAUCHE' : 'DROITE';
+                const isA4 = Math.round(panelWidthMm) === 210 && Math.round(panelHeightMm) === 297;
+                const fmtTag = isA4 ? 'A4 210×297mm' : `${Math.round(panelWidthMm)}×${Math.round(panelHeightMm)}mm`;
                 ctx.fillText(
-                    `GREY CORNER | PAGE ${String(pageNumber).padStart(2, '0')} / 20 (${sideLabel}) | 170×300mm (+3mm)`,
+                    `INMENU STUDIO PRO | PAGE ${String(pageNumber).padStart(2, '0')}/${totalPages} (${sideLabel}) | ${fmtTag} (+${this.engine.specs.bleedMm || 3}mm)`,
                     trimX + (1 * pxPerMm),
                     slugY,
                     Math.max(40 * pxPerMm, trimW - 4 * pxPerMm)
@@ -647,15 +687,21 @@ class PrintExporter {
 
             /**
              * Draws authentic Pre-Press Crop Marks (Traits de coupe aux 4 coins),
-             * Fold Marks (Traits de pli pointillés à X = 170 mm), and Slug Info.
+             * Fold Marks (Traits de pli pointillés), and Slug Info.
              */
-            drawPrinterMarks(ctx, trimX, trimY, trimW, trimH, bleedPx, pxPerMm, face) {
+            drawPrinterMarks(ctx, trimX, trimY, trimW, trimH, bleedPx, pxPerMm, face, outWidthMm = null, outHeightMm = null) {
+                const specs = this.engine.specs;
+                const finalW = outWidthMm || specs.widthMm;
+                const finalH = outHeightMm || specs.heightMm;
+                const scaleX = finalW / (specs.widthMm || 1);
+
                 ctx.save();
                 ctx.strokeStyle = '#000000';
                 ctx.lineWidth = 0.25 * pxPerMm;
 
                 const offset = bleedPx + (1.5 * pxPerMm);
                 const len = 6 * pxPerMm;
+                const slugY = trimY - offset - len - (2.0 * pxPerMm);
 
                 // Top-Left Corner Crop Marks
                 ctx.beginPath();
@@ -672,14 +718,16 @@ class PrintExporter {
                 ctx.moveTo(trimX + trimW, trimY + trimH + offset); ctx.lineTo(trimX + trimW, trimY + trimH + offset + len);
                 ctx.stroke();
 
-                // Central Fold Line Marks (only if document has fold)
-                if (this.engine.specs.hasFold && this.engine.specs.foldXMm) {
-                    const foldMarks = this.engine.specs.foldMarks && this.engine.specs.foldMarks.length > 0
-                        ? this.engine.specs.foldMarks
-                        : [this.engine.specs.foldXMm];
+                // Central Fold Line Marks (only if document has fold and we are not overriding to a single-page portrait A4)
+                const isOverriddenToSinglePortrait = (finalW === 210 && finalH === 297) || (finalW === 170 && finalH === 300);
+                if (specs.hasFold && specs.foldXMm && !isOverriddenToSinglePortrait) {
+                    const foldMarks = specs.foldMarks && specs.foldMarks.length > 0
+                        ? specs.foldMarks
+                        : [specs.foldXMm];
 
                     foldMarks.forEach(foldMm => {
-                        const foldX = trimX + (foldMm * pxPerMm);
+                        const scaledFoldMm = Math.round(foldMm * scaleX * 10) / 10;
+                        const foldX = trimX + (scaledFoldMm * pxPerMm);
                         ctx.save();
                         ctx.setLineDash([1 * pxPerMm, 1 * pxPerMm]);
                         ctx.beginPath();
@@ -695,21 +743,24 @@ class PrintExporter {
                         ctx.font = `500 ${2.4 * pxPerMm}px "JetBrains Mono", monospace`;
                         ctx.textBaseline = 'bottom';
                         ctx.textAlign = 'center';
-                        ctx.fillText(`▼ PLI ${foldMm}mm ▼`, foldX, slugY);
+                        ctx.fillText(`▼ PLI ${scaledFoldMm}mm ▼`, foldX, slugY);
                         ctx.restore();
                     });
                 }
 
                 // Technical Slug Label cleanly placed ABOVE the crop & fold marks (no line intersection)
-                const slugY = trimY - offset - len - (2.0 * pxPerMm);
                 ctx.fillStyle = '#000000';
                 ctx.font = `500 ${2.4 * pxPerMm}px "JetBrains Mono", monospace`;
                 ctx.textBaseline = 'bottom';
 
                 ctx.textAlign = 'left';
-                const specs = this.engine.specs;
+                const formatTag = (finalW === 210 && finalH === 297)
+                    ? `A4 210×297mm`
+                    : (finalW === 297 && finalH === 210)
+                        ? `A4 PAYSAGE 297×210mm`
+                        : `${finalW}×${finalH}mm`;
                 ctx.fillText(
-                    `INMENU STUDIO PRO | ${String(face.name || '').toUpperCase()} | ${specs.widthMm}×${specs.heightMm}mm (+${specs.bleedMm}mm)`,
+                    `INMENU STUDIO PRO | ${String(face.name || '').toUpperCase()} | ${formatTag} (+${specs.bleedMm}mm)`,
                     trimX + (2 * pxPerMm),
                     slugY,
                     trimW * 0.65
@@ -725,7 +776,7 @@ class PrintExporter {
             /**
              * Renders automated page numbers directly on the printed canvas face
              */
-            drawAutomaticPageNumbersOnFace(ctx, face, trimOriginX, trimOriginY, pxPerMm) {
+            drawAutomaticPageNumbersOnFace(ctx, face, trimOriginX, trimOriginY, pxPerMm, scaleX = 1, scaleY = 1) {
                 const faceIndex = this.engine.faces.indexOf(face);
                 if (faceIndex < 0) return;
 
@@ -738,15 +789,15 @@ class PrintExporter {
 
                     ctx.save();
                     const fontPt = this.engine.pageNumbering.fontSizePt || 8.5;
-                    const fontPx = Math.max(2, fontPt * PT_TO_MM * pxPerMm);
+                    const fontPx = Math.max(2, fontPt * PT_TO_MM * pxPerMm * ((scaleX + scaleY) / 2));
                     const family = this.engine.pageNumbering.fontFamily || 'Montserrat';
                     ctx.font = `600 ${fontPx}px "${family}", sans-serif`;
                     ctx.fillStyle = this.engine.pageNumbering.color || '#64748b';
                     ctx.textAlign = info.align || 'center';
                     ctx.textBaseline = 'middle';
 
-                    const posX = trimOriginX + (info.xMm * pxPerMm);
-                    const posY = trimOriginY + (info.yMm * pxPerMm);
+                    const posX = trimOriginX + (info.xMm * scaleX * pxPerMm);
+                    const posY = trimOriginY + (info.yMm * scaleY * pxPerMm);
 
                     ctx.fillText(info.text, posX, posY);
                     ctx.restore();

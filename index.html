@@ -628,36 +628,71 @@
                     <i class="fa-solid fa-print text-blue-400 text-lg"></i>
                     <div>
                         <h2 class="text-sm font-bold text-white">Export Pré-Presse PDF & PNG Haute Définition</h2>
-                        <p class="text-[11px] text-gray-400">Module 3 : PrintExporter — Format ouvert 340 × 300 mm + Fond perdu 3 mm</p>
+                        <p id="exp-modal-subtitle" class="text-[11px] text-gray-400">Module 3 : PrintExporter — Format A4 (210 × 297 mm) & Format Livret (170 × 300 mm) + Fond perdu 3 mm</p>
                     </div>
                 </div>
                 <button type="button" data-action="close-export-modal" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
 
-            <div class="p-5 space-y-4">
+            <div class="p-5 space-y-3.5">
+                <!-- Quick Output Format Selector (A4 210x297 vs 170x300 vs Full Spread) -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-bold text-cyan-300 flex items-center justify-between">
+                        <span><i class="fa-solid fa-ruler-combined mr-1.5"></i>Format d'Export (Dimensions du Menu Séparé / Page) :</span>
+                        <span id="exp-active-format-badge" class="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded">A4 • 210 × 297 mm</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="btn-exp-fmt-a4" data-action="select-export-format" data-format="a4_portrait" class="flex items-center space-x-2.5 p-2.5 rounded-lg border-2 border-emerald-500 bg-emerald-500/15 text-left transition hover:bg-emerald-500/25">
+                            <div class="w-8 h-8 rounded bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0">
+                                <i class="fa-solid fa-file-lines text-sm"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold text-white leading-tight">Format A4 (210 × 297 mm)</div>
+                                <div class="text-[10px] text-emerald-300 truncate">Menu Séparé Standard (21 × 29,7 cm)</div>
+                            </div>
+                        </button>
+                        <button type="button" id="btn-exp-fmt-170" data-action="select-export-format" data-format="panel_170x300" class="flex items-center space-x-2.5 p-2.5 rounded-lg border border-idBorder bg-idInput text-left transition hover:border-blue-500/60">
+                            <div class="w-8 h-8 rounded bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0">
+                                <i class="fa-solid fa-scissors text-sm"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold text-white leading-tight">Format 170 × 300 mm</div>
+                                <div class="text-[10px] text-gray-400 truncate">Menu Livret Séparé (17 × 30 cm)</div>
+                            </div>
+                        </button>
+                    </div>
+                    <select id="exp-target-format" data-change="exp-format-change" class="w-full bg-idInput border border-idBorder rounded px-3 py-1.5 text-white text-[11px] font-medium">
+                        <option value="a4_portrait" selected>📄 Format A4 Portrait (210 × 297 mm) — Menu Séparé Standard</option>
+                        <option value="panel_170x300">✂️ Format 170 × 300 mm (17 × 30 cm) — Page Menu / Livret Séparée</option>
+                        <option value="a4_landscape">📐 Format A4 Paysage (297 × 210 mm) — Set de Table / Double Page</option>
+                        <option value="spread_340x300">📖 Format Planche Ouverte (340 × 300 mm — 34 × 30 cm)</option>
+                        <option value="native">🎯 Format Natif du Projet Actif</option>
+                    </select>
+                </div>
+
                 <!-- Specs Summary -->
-                <div class="bg-idInput border border-idBorder rounded p-3 grid grid-cols-2 gap-2 text-[11px]">
-                    <div><span class="text-gray-400">Format fini (Trim) :</span> <strong class="text-white font-mono">340 × 300 mm</strong></div>
-                    <div><span class="text-gray-400">Panneau plié :</span> <strong class="text-white font-mono">170 × 300 mm</strong></div>
-                    <div><span class="text-gray-400">Fond perdu (Bleed) :</span> <strong class="text-red-400 font-mono">+3 mm (346 × 306 mm)</strong></div>
-                    <div><span class="text-gray-400">Pli central :</span> <strong class="text-cyan-400 font-mono">X = 170 mm</strong></div>
+                <div class="bg-idInput border border-idBorder rounded p-2.5 grid grid-cols-2 gap-2 text-[11px]">
+                    <div><span class="text-gray-400">Format d'export (Trim) :</span> <strong id="exp-spec-trim" class="text-emerald-400 font-mono">210 × 297 mm (A4)</strong></div>
+                    <div><span class="text-gray-400">Source du projet :</span> <strong id="exp-spec-panel" class="text-white font-mono">210 × 297 mm</strong></div>
+                    <div><span class="text-gray-400">Fond perdu (Bleed) :</span> <strong id="exp-spec-bleed" class="text-red-400 font-mono">+3 mm (216 × 303 mm)</strong></div>
+                    <div><span class="text-gray-400">Pages à exporter :</span> <strong id="exp-spec-pages" class="text-cyan-400 font-mono">Menu Séparé</strong></div>
                 </div>
 
                 <!-- Printer Marks Checkboxes -->
                 <div class="space-y-2">
-                    <label class="text-xs font-semibold text-gray-200 block">Repères d'impression (Traits de coupe & pli) :</label>
-                    <label class="flex items-center space-x-2.5 bg-idInput p-2.5 rounded border border-idBorder cursor-pointer">
-                        <input type="checkbox" id="exp-cropmarks" checked class="accent-blue-500 w-4 h-4">
+                    <label class="text-xs font-semibold text-gray-200 block">Repères d'impression (Traits de coupe & fond perdu) :</label>
+                    <label class="flex items-center space-x-2.5 bg-idInput p-2 rounded border border-idBorder cursor-pointer">
+                        <input type="checkbox" id="exp-cropmarks" data-change="exp-format-change" checked class="accent-blue-500 w-4 h-4">
                         <div>
-                            <div class="font-semibold text-white">Inclure les traits de coupe (Crop Marks) et traits de pli</div>
-                            <div class="text-[10px] text-gray-400">Ajoute une marge technique autour du fond perdu de 3 mm avec traits de coupe aux 4 coins et repères de rainage à 170 mm.</div>
+                            <div class="font-semibold text-white text-[11px]">Inclure les traits de coupe (Crop Marks) aux 4 coins</div>
+                            <div id="exp-cropmarks-desc" class="text-[10px] text-gray-400">Ajoute une marge technique autour du fond perdu de 3 mm avec traits de coupe pour le format A4 (210 × 297 mm).</div>
                         </div>
                     </label>
-                    <label class="flex items-center space-x-2.5 bg-idInput p-2.5 rounded border border-idBorder cursor-pointer">
-                        <input type="checkbox" id="exp-bleed" checked class="accent-blue-500 w-4 h-4">
+                    <label class="flex items-center space-x-2.5 bg-idInput p-2 rounded border border-idBorder cursor-pointer">
+                        <input type="checkbox" id="exp-bleed" data-change="exp-format-change" checked class="accent-blue-500 w-4 h-4">
                         <div>
-                            <div class="font-semibold text-white">Utiliser les paramètres de fond perdu du document (3 mm)</div>
-                            <div class="text-[10px] text-gray-400">Étend les éléments de fond de 3 mm au-delà du bord de coupe de 34 × 30 cm.</div>
+                            <div class="font-semibold text-white text-[11px]">Utiliser les paramètres de fond perdu du document (3 mm)</div>
+                            <div id="exp-bleed-desc" class="text-[10px] text-gray-400">Étend les éléments de fond de 3 mm au-delà du bord de coupe (210 × 297 mm → 216 × 303 mm).</div>
                         </div>
                     </label>
                 </div>
@@ -665,17 +700,17 @@
                 <!-- Export Scope & Resolution -->
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1.5">
-                        <label class="text-xs font-semibold text-gray-200 block">Étendue de l'export PDF :</label>
-                        <select id="exp-scope" class="w-full bg-idInput border border-idBorder rounded px-3 py-2 text-white text-[11px]">
-                            <option value="single_pages_20" selected>✂️ 20 Pages Séparées 17×30 cm (Page 1 à 20 — Spécial Imprimeur)</option>
-                            <option value="current_2_panels">✂️ Feuille active séparée en 2 pages 17×30 cm (Gauche + Droite)</option>
-                            <option value="all">📐 10 Planches Ouvertes 34×30 cm (5 Feuilles R/V)</option>
-                            <option value="current">📐 Planche Ouverte Active 34×30 cm</option>
+                        <label class="text-xs font-semibold text-gray-200 block">Mode / Étendue de l'export PDF :</label>
+                        <select id="exp-scope" data-change="exp-format-change" class="w-full bg-idInput border border-idBorder rounded px-3 py-2 text-white text-[11px]">
+                            <option value="single_pages_20" selected>✂️ Menu Séparé (Gauche/Droite) : Pages séparées A4 (210 × 297 mm)</option>
+                            <option value="current_2_panels">✂️ Feuille active séparée en 2 pages A4 (Gauche + Droite)</option>
+                            <option value="all">📄 Toutes les pages du projet séparément (A4 210 × 297 mm)</option>
+                            <option value="current">📄 Page / Planche active uniquement (A4 210 × 297 mm)</option>
                         </select>
                     </div>
                     <div class="space-y-1.5">
                         <label class="text-xs font-semibold text-gray-200 block">Résolution Pré-Presse :</label>
-                        <select id="exp-dpi" class="w-full bg-idInput border border-idBorder rounded px-3 py-2 text-white">
+                        <select id="exp-dpi" class="w-full bg-idInput border border-idBorder rounded px-3 py-2 text-white text-[11px]">
                             <option value="11.81" selected>300 DPI — Imprimerie HD (Recommandé)</option>
                             <option value="7.87">200 DPI — Équilibré</option>
                             <option value="5.91">150 DPI — Rapide / Web</option>
@@ -692,18 +727,18 @@
 
             <div class="bg-idHeader px-5 py-3 border-t border-idBorder flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center space-x-2">
-                    <button type="button" data-action="export-separate-png" class="bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-2 rounded font-semibold flex items-center space-x-1.5 shadow" title="Coupe la planche 34×30 cm en 2 fichiers PNG 17×30 cm distincts (Panneau Gauche + Panneau Droit)">
+                    <button type="button" data-action="export-separate-png" class="bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-2 rounded font-semibold flex items-center space-x-1.5 shadow text-xs" title="Télécharger les pages du menu séparément en fichiers PNG haute définition">
                         <i class="fa-solid fa-scissors"></i>
-                        <span>Télécharger les 2 Pages (17×30 cm) Séparément en PNG</span>
+                        <span id="btn-exp-separate-png-label">Télécharger les Pages Séparément en PNG (A4 210×297)</span>
                     </button>
-                    <button type="button" data-action="export-face-png" class="bg-idInput hover:bg-white/10 text-gray-200 border border-idBorder px-3 py-2 rounded font-medium flex items-center space-x-1.5" title="Télécharger la planche complète 34×30 cm en un seul PNG">
+                    <button type="button" data-action="export-face-png" class="bg-idInput hover:bg-white/10 text-gray-200 border border-idBorder px-3 py-2 rounded font-medium flex items-center space-x-1.5 text-xs" title="Télécharger la page / planche complète active en un seul PNG">
                         <i class="fa-solid fa-image text-emerald-400"></i>
-                        <span>PNG 34×30</span>
+                        <span id="btn-exp-face-png-label">PNG Page Active (A4)</span>
                     </button>
                 </div>
-                <button type="button" data-action="export-pdf" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-semibold flex items-center space-x-2 shadow-lg">
+                <button type="button" data-action="export-pdf" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-semibold flex items-center space-x-2 shadow-lg text-xs">
                     <i class="fa-solid fa-file-pdf"></i>
-                    <span>Générer le PDF Imprimeur</span>
+                    <span id="btn-exp-pdf-label">Générer le PDF Imprimeur (A4)</span>
                 </button>
             </div>
         </div>

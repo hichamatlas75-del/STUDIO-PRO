@@ -107,12 +107,15 @@ Object.assign(InMenuStudioApp.prototype, {
             </div>
         ` : '';
 
-        // Warning if object crosses the central fold safety zone (160mm to 180mm) and isn't a full background
-        const crossesFold = (obj.x < 180 && (obj.x + obj.w) > 160 && obj.w < 300);
+        // Warning if object crosses the central fold safety zone (only when document has a fold)
+        const specs = this.engine.specs || { widthMm: 340, heightMm: 300, hasFold: true, foldXMm: 170 };
+        const foldX = specs.foldXMm || 170;
+        const safeHalf = specs.safeFoldHalfMm || 10;
+        const crossesFold = Boolean(specs.hasFold) && (obj.x < (foldX + safeHalf) && (obj.x + obj.w) > (foldX - safeHalf) && obj.w < (specs.widthMm - 40));
         const foldWarningHTML = crossesFold ? `
             <div class="bg-amber-500/15 border border-amber-500/40 text-amber-300 p-2 rounded text-[10px] flex items-start space-x-2">
                 <i class="fa-solid fa-triangle-exclamation mt-0.5 text-amber-400"></i>
-                <span>Attention : Ce bloc chevauche la <strong>zone de sécurité du pli central (160–180 mm)</strong>.</span>
+                <span>Attention : Ce bloc chevauche la <strong>zone de sécurité du pli central (${foldX - safeHalf}–${foldX + safeHalf} mm)</strong>.</span>
             </div>
         ` : '';
 
@@ -122,15 +125,15 @@ Object.assign(InMenuStudioApp.prototype, {
             ${foldWarningHTML}
             <!-- Quick Panel Alignment -->
             <div>
-                <label class="text-[10px] font-bold uppercase text-gray-400 block mb-1.5">Alignement Rapide Panneau (17×30 cm)</label>
+                <label class="text-[10px] font-bold uppercase text-gray-400 block mb-1.5">Alignement Rapide (${specs.widthMm}×${specs.heightMm} mm)</label>
                 <div class="grid grid-cols-3 gap-1.5">
-                    <button type="button" data-action="align-selected" data-mode="center_left_panel" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Centrer sur le panneau gauche (X=85mm)">
+                    <button type="button" data-action="align-selected" data-mode="center_left_panel" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Centrer sur la moitié gauche">
                         <i class="fa-solid fa-align-center mr-1 text-cyan-400"></i>Centre G.
                     </button>
-                    <button type="button" data-action="align-selected" data-mode="center_right_panel" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Centrer sur le panneau droit (X=255mm)">
+                    <button type="button" data-action="align-selected" data-mode="center_right_panel" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Centrer sur la moitié droite">
                         <i class="fa-solid fa-align-center mr-1 text-cyan-400"></i>Centre D.
                     </button>
-                    <button type="button" data-action="align-selected" data-mode="full_bleed" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-red-300" title="Étendre au fond perdu (-3mm à 343mm)">
+                    <button type="button" data-action="align-selected" data-mode="full_bleed" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-red-300" title="Étendre au fond perdu">
                         Fond Perdu
                     </button>
                 </div>

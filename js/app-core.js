@@ -409,6 +409,9 @@ class InMenuStudioApp {
             case 'text-transform-case':
                 this.transformSelectedTextCase(el.dataset.case);
                 break;
+            case 'select-export-format':
+                this.selectExportFormat(el.dataset.format);
+                break;
         }
     }
 
@@ -507,6 +510,9 @@ class InMenuStudioApp {
                 this.updateSelectedProp(el.dataset.prop, val, false);
                 break;
             }
+            case 'exp-format-change':
+                this.updateExportModalUI();
+                break;
         }
     }
 

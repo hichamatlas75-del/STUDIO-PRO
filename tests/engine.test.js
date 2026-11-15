@@ -117,7 +117,9 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         'openMobileSheet', 'closeMobileSheets', 'toggleMobileToolsMenu', 'closeMobileToolsMenu',
         'renderMobilePagesList', 'renderMobileCanvaSheet', 'renderMobileInspector',
         // app-io.js
-        'openExportModal', 'closeExportModal', 'getSelectedExportScale', 'getReadingPageNumber',
+        'openExportModal', 'closeExportModal', 'selectExportFormat',
+        'getSelectedExportFormatSpecs', 'updateExportModalUI',
+        'getSelectedExportScale', 'getReadingPageNumber',
         'exportCurrentFacePNG', 'exportSeparatePanelsPNG', 'exportPDF',
         'saveProjectToDisk', 'openProjectFromDisk', 'updateDiskSyncUI',
         'exportProjectJSON', 'importProjectJSON'
@@ -257,6 +259,37 @@ test('Banque de gabarits InDesign : 29 modèles valides, constructibles et norma
         assert.ok(Array.isArray(engSingle.currentFace.objects));
     }
 });
+
+test('PrintExporter : mise à l’échelle vers Format A4 (210 × 297 mm) et 170 × 300 mm pour Menu Séparé', () => {
+    const rootDir = path.join(__dirname, '..');
+    const expCode = fs.readFileSync(path.join(rootDir, 'js', 'print-exporter.js'), 'utf8');
+    vm.runInContext(expCode + '\n;this.__exp.PrintExporter = PrintExporter;', ctx);
+
+    const { PrintExporter } = ctx.__exp;
+    assert.ok(PrintExporter, 'PrintExporter doit être défini');
+
+    const eng = new DocumentEngine();
+    eng.persistReady = false;
+    const exporter = new PrintExporter(eng);
+
+    // Remapping d'un panneau 170 × 300 mm (panneau droit x=182..328) vers Format A4 (210 × 297 mm)
+    const scaleX = 210 / 170;
+    const scaleY = 297 / 300;
+    const srcObj = {
+        id: 'obj_test',
+        type: 'category_list',
+        x: 182,
+        y: 25,
+        w: 146,
+        h: 250,
+        fontSize: 10.5
+    };
+    const mappedA4 = exporter.scaleObjectForTarget(srcObj, 170, scaleX, scaleY);
+    assert.ok(Math.abs(mappedA4.x - (12 * scaleX)) < 0.01, 'Coordonnée X du panneau droit ramenée à 0..210 mm pour A4');
+    assert.ok(Math.abs(mappedA4.w - (146 * scaleX)) < 0.01, 'Largeur adaptée proportionnellement à 210 mm (A4)');
+    assert.ok(Math.abs(mappedA4.h - (250 * scaleY)) < 0.01, 'Hauteur adaptée proportionnellement à 297 mm (A4)');
+});
+
 
 
 
