@@ -11,9 +11,9 @@ for (const f of ['utils.js', 'engine.js']) {
     // const/class de premier niveau ne sont pas exposés : on les rattache au contexte
     const code = fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8');
     vm.runInContext(code + '\n;this.__exp = Object.assign(this.__exp||{}, {' +
-        (f === 'utils.js' ? 'generateUniqueId, sanitizeFileName' : 'DocumentEngine, FORMAT_PRESETS') + '});', ctx);
+        (f === 'utils.js' ? 'generateUniqueId, sanitizeFileName, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES' : 'DocumentEngine, FORMAT_PRESETS') + '});', ctx);
 }
-const { DocumentEngine } = ctx.__exp;
+const { DocumentEngine, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES } = ctx.__exp;
 const flyer = () => { const e = new DocumentEngine(); e.setFormat('flyer_a4_portrait', true); e.persistReady = false; return e; };
 
 test('numérotation romaine au-delà de 20', () => {
@@ -94,8 +94,12 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         'renderInspector', 'updateSelectedProp', 'updateObjProp', 'updateInlineDishFromInspector',
         'addDishToSelectedCategory', 'deleteDishFromInspector', 'syncSelectedCategoryTitle',
         'updateCategorySlice', 'splitSelectedCategoryIntoColumns', 'transformSelectedTextCase',
-        'updateFaceBgColor', 'uploadPhotoFile', 'downscaleImageDataUrl', 'alignSelected', 'duplicateSelected',
-        'toggleLockSelected', 'deleteSelected', 'updateTopTransformBar', 'updateSelectedFromTopBar',
+        'updateFaceBgColor', 'uploadPhotoFile', 'downscaleImageDataUrl', 'alignSelected', 'distributeSelected',
+        'groupSelectedObjects', 'ungroupSelectedObjects', 'copySelectedObjects', 'pasteClipboardObjects',
+        'copySelectedStyle', 'pasteSelectedStyle', 'toggleVisibilitySelected', 'toggleMasterSelected',
+        'threadOversetCategory', 'toggleGridOverlay', 'setGridColumns', 'updateGridGutter',
+        'applyPhotoFilterPreset', 'setPhotoMaskShape', 'setCulinaryIcon', 'onFontPairingChange', 'updateGlobalTypography',
+        'duplicateSelected', 'toggleLockSelected', 'deleteSelected', 'updateTopTransformBar', 'updateSelectedFromTopBar',
         'renderLayersList', 'bringToFront', 'bringForward', 'sendBackward', 'sendToBack',
         'renderSpreadsNavigator', 'addNewPage', 'duplicatePage', 'duplicateCurrentPage',
         'removePage', 'removeCurrentPage', 'updateFaceName',
@@ -103,6 +107,7 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         // app-db-word.js
         'populateQuickDishSelect', 'refreshDbCategoryFilter', 'openDatabaseModal', 'closeDatabaseModal',
         'renderDatabaseTable', 'updateDishDB', 'addNewDishToDB', 'deleteDishFromDB', 'insertDishFromModal',
+        'toggleDishActiveStatus', 'createStoryFromDish', 'exportDatabaseCSV', 'triggerImportDatabaseCSV', 'importDatabaseCSV',
         'initWordDropzone', 'updateWordModeCardsUI', 'openWordImportModal', 'closeWordImportModal',
         'loadFull10FacesSampleWordText', 'handleWordFileUpload', 'processWordFile',
         'parseWordRawText', 'parseWordRawTextDebounced', 'renderWordParsedPreview',
@@ -110,6 +115,7 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         // app-modals.js
         'applySpreadTemplate', 'buildFlyerPromoA4Template', 'open3DFoldModal', 'update3DFoldAngle', 'close3DFoldModal',
         'openEngineInspector', 'closeEngineInspector', 'copyEngineJSON', 'updateFormatHeaderUI',
+        'onHeaderFormatChange', 'magicResizeDocument',
         'openFormatModal', 'closeFormatModal', 'renderFormatModalCards', 'changeActiveFormat',
         'openTemplatesModal', 'closeTemplatesModal', 'renderTemplatesModalCategories', 'renderTemplatesModalCards',
         'filterTemplates', 'searchTemplates', 'startProjectFromTemplate', 'applyTemplateToActivePage',
@@ -335,4 +341,122 @@ test('preflight : détecte hors-page, texte minuscule et image sans source', () 
     ];
     const ids = e.preflight().map(i => i.id);
     assert.strictEqual(JSON.stringify(ids.sort()), JSON.stringify(['a', 'b', 'c']));
+});
+
+test('v4.0 - Formats v4 et Magic Resize', () => {
+    const e = new DocumentEngine();
+    e.persistReady = false;
+
+    // Vérifie les formats v4.0 requis
+    const requiredFormats = ['BOOKLET_34x30', 'A4_PORTRAIT', 'A3_LANDSCAPE', 'A6_TENT', 'INSTA_STORY', 'INSTA_POST'];
+    for (const fmt of requiredFormats) {
+        assert.ok(e.FORMAT_SPECS[fmt], `Format ${fmt} doit être présent dans FORMAT_SPECS`);
+        assert.ok(e.FORMAT_SPECS[fmt].widthMm > 0);
+        assert.ok(e.FORMAT_SPECS[fmt].heightMm > 0);
+    }
+
+    // Test Magic Resize
+    e.setFormat('A4_PORTRAIT', true);
+    e.faces[0].objects = [
+        { id: 'test_obj', type: 'text', x: 21, y: 29.7, w: 105, h: 50, fontSize: 20 }
+    ];
+    const ok = e.magicResize('INSTA_STORY');
+    assert.strictEqual(ok, true);
+    assert.strictEqual(e.currentFormat, 'INSTA_STORY');
+    const resized = e.faces[0].objects[0];
+    const expectedRatioX = 108 / 210;
+    const expectedRatioY = 192 / 297;
+    assert.ok(Math.abs(resized.x - (21 * expectedRatioX)) < 0.5, 'X proportionnel');
+    assert.ok(Math.abs(resized.y - (29.7 * expectedRatioY)) < 0.5, 'Y proportionnel');
+    assert.ok(Math.abs(resized.w - (105 * expectedRatioX)) < 0.5, 'W proportionnel');
+    assert.ok(Math.abs(resized.h - (50 * expectedRatioY)) < 0.5, 'H proportionnel');
+});
+
+test('v4.0 - Duos Typographiques (Font Pairings)', () => {
+    const e = flyer();
+    assert.ok(FONT_PAIRINGS.bistrot_chic);
+    assert.ok(FONT_PAIRINGS.palace_prestige);
+    assert.ok(FONT_PAIRINGS.moderne_minimal);
+
+    e.faces[0].objects = [
+        { id: 'title_1', type: 'title_heading', fontFamily: 'Arial' },
+        { id: 'cat_1', type: 'category_list', fontFamily: 'Arial', descFontFamily: 'Arial', priceFontFamily: 'Arial' },
+        { id: 'text_1', type: 'text', fontFamily: 'Arial' }
+    ];
+
+    e.applyFontPairing('palace_prestige');
+    assert.strictEqual(e.fontPairing, 'palace_prestige');
+    assert.strictEqual(e.faces[0].objects[0].fontFamily, 'Cinzel');
+    assert.strictEqual(e.faces[0].objects[1].fontFamily, 'Cinzel');
+    assert.strictEqual(e.faces[0].objects[1].descFontFamily, 'Cormorant Garamond');
+    assert.strictEqual(e.faces[0].objects[1].priceFontFamily, 'Montserrat');
+});
+
+test('v4.0 - Filtres Photo & Presets', () => {
+    assert.ok(PHOTO_FILTER_PRESETS.natural);
+    assert.ok(PHOTO_FILTER_PRESETS.warm);
+    assert.ok(PHOTO_FILTER_PRESETS.vintage);
+    assert.ok(PHOTO_FILTER_PRESETS.bw_contrast);
+    assert.ok(PHOTO_FILTER_PRESETS.studio_glow);
+
+    const warmCSS = buildPhotoFilterCSS(PHOTO_FILTER_PRESETS.warm);
+    assert.ok(warmCSS.includes('brightness('));
+    assert.ok(warmCSS.includes('contrast('));
+    assert.ok(warmCSS.includes('saturate('));
+
+    const bwCSS = buildPhotoFilterCSS(PHOTO_FILTER_PRESETS.bw_contrast);
+    assert.ok(bwCSS.includes('grayscale(100%)'));
+});
+
+test('v4.0 - QR Code Generator & Icônes Culinaires', () => {
+    assert.ok(QRCodeGenerator, 'QRCodeGenerator doit être disponible');
+    const matrix = QRCodeGenerator.generateMatrix('https://example.com');
+    assert.ok(Array.isArray(matrix));
+    assert.ok(matrix.length >= 21);
+    assert.ok(matrix[0].length >= 21);
+
+    const svg = QRCodeGenerator.buildSVG('https://example.com', { color: '#000000', bgColor: '#ffffff' });
+    assert.ok(svg.includes('<svg'));
+    assert.ok(svg.includes('</svg>'));
+
+    assert.ok(Array.isArray(CULINARY_ICON_BADGES));
+    assert.ok(CULINARY_ICON_BADGES.some(i => i.id === 'wifi'));
+    assert.ok(CULINARY_ICON_BADGES.some(i => i.id === 'spicy'));
+    assert.ok(CULINARY_ICON_BADGES.some(i => i.id === 'chef'));
+});
+
+test('v4.0 - Statut Actif / Rupture & Import/Export CSV', () => {
+    const e = flyer();
+    if (e.dishesDB.length === 0) {
+        e.dishesDB = [
+            { id: 'PDJ01', category: 'PETIT DÉJEUNER', name: 'Light', desc: 'Pain complet', price: '42 DH', badge: '', active: true },
+            { id: 'PDJ02', category: 'PETIT DÉJEUNER', name: 'Express', desc: 'Viennoiseries', price: '45 DH', badge: '', active: true }
+        ];
+    }
+    assert.ok(e.dishesDB.length > 0);
+
+    // Test de plat inactif
+    const firstDish = e.dishesDB[0];
+    const cat = firstDish.category;
+    const initialCount = e.getDishesByCategory(cat).length;
+
+    firstDish.active = false;
+    const activeCount = e.getDishesByCategory(cat, false).length;
+    const allCount = e.getDishesByCategory(cat, true).length;
+    assert.strictEqual(activeCount, initialCount - 1, 'Plat inactif masqué par défaut');
+    assert.strictEqual(allCount, initialCount, 'Plat inactif inclus si includeInactive=true');
+
+    // Test Export & Import CSV
+    const csv = e.exportDishesCSV();
+    assert.ok(csv.includes('ID,Catégorie,Plat,Description,Prix,Badge,Actif'));
+    assert.ok(csv.includes(firstDish.name));
+
+    const sampleCSV = `ID,Catégorie,Plat,Description,Prix,Badge,Actif\ntest_1,DESSERTS,Tarte Tatin,Pommes caramélisées,45 DH,CHEF,OUI`;
+    const count = e.importDishesCSV(sampleCSV);
+    assert.strictEqual(count, 1);
+    const imported = e.getDishById('test_1');
+    assert.ok(imported);
+    assert.strictEqual(imported.name, 'Tarte Tatin');
+    assert.strictEqual(imported.price, '45 DH');
+    assert.strictEqual(imported.active, true);
 });

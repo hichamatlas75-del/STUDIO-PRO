@@ -69,12 +69,14 @@ Object.assign(InMenuStudioApp.prototype, {
         }
 
         if (list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-gray-500 text-xs">${query ? 'Aucun plat ne correspond à votre recherche.' : 'Aucun plat dans cette catégorie.'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-gray-500 text-xs">${query ? 'Aucun plat ne correspond à votre recherche.' : 'Aucun plat dans cette catégorie.'}</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = list.map(dish => `
-            <tr class="hover:bg-white/5" data-dish-id="${escapeHTML(dish.id)}">
+        tbody.innerHTML = list.map(dish => {
+            const isActive = dish.active !== false;
+            return `
+            <tr class="hover:bg-white/5 ${!isActive ? 'opacity-60 bg-rose-950/10' : ''}" data-dish-id="${escapeHTML(dish.id)}">
                 <td class="py-2 px-2 font-mono text-[11px] text-gray-400">${escapeHTML(dish.id)}</td>
                 <td class="py-2 px-2">
                     <input type="text" value="${escapeHTML(dish.category)}" data-change="db-dish-field" data-field="category" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-amber-300 font-semibold">
@@ -95,7 +97,19 @@ Object.assign(InMenuStudioApp.prototype, {
                         <option value="CHEF" ${dish.badge === 'CHEF' ? 'selected' : ''}>★ CHEF</option>
                     </select>
                 </td>
-                <td class="py-2 px-2 text-right space-x-1">
+                <td class="py-2 px-2 text-center">
+                    <button type="button" data-action="toggle-dish-active" data-dish-id="${escapeHTML(dish.id)}" class="px-2 py-1 rounded text-[10px] font-bold border transition ${
+                        isActive
+                            ? 'bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border-emerald-500/40'
+                            : 'bg-rose-600/20 hover:bg-rose-600/35 text-rose-300 border-rose-500/40'
+                    }" title="${isActive ? 'Plat actif dans les cartes (Cliquez pour marquer En Rupture)' : 'En rupture (Masqué des cartes, cliquez pour réactiver)'}">
+                        <i class="fa-solid ${isActive ? 'fa-check' : 'fa-ban'} mr-1"></i>${isActive ? 'Actif' : 'Rupture'}
+                    </button>
+                </td>
+                <td class="py-2 px-2 text-right space-x-1 whitespace-nowrap">
+                    <button type="button" data-action="create-dish-story" data-dish-id="${escapeHTML(dish.id)}" class="bg-gradient-to-r from-purple-600/40 to-pink-600/40 hover:from-purple-600 hover:to-pink-600 border border-pink-500/40 text-pink-200 hover:text-white px-2 py-1 rounded text-[10px] font-bold" title="Créer une Story Instagram pour ce plat">
+                        📱 Story
+                    </button>
                     <button type="button" data-action="insert-dish-from-modal" class="bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white px-2 py-1 rounded text-[10px]" title="Poser ce plat sur la planche active">
                         + Planche
                     </button>
@@ -104,7 +118,8 @@ Object.assign(InMenuStudioApp.prototype, {
                     </button>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
     },
 
     updateDishDB(dishId, field, value) {
@@ -169,6 +184,210 @@ Object.assign(InMenuStudioApp.prototype, {
     insertDishFromModal(dishId) {
         this.closeDatabaseModal();
         this.insertSelectedQuickDish(dishId);
+    },
+
+    toggleDishActiveStatus(dishId) {
+        const dish = this.engine.getDishById(dishId);
+        if (!dish) return;
+        dish.active = dish.active === false ? true : false;
+        this._dbDirty = true;
+        this.renderDatabaseTable();
+        this.renderCurrentFace();
+        this.commitStateDebounced();
+        this.showToast(`Plat « ${dish.name} » marqué ${dish.active ? 'Actif' : 'En Rupture'}.`);
+    },
+
+    createStoryFromDish(dishId) {
+        const dish = this.engine.getDishById(dishId);
+        if (!dish) return;
+
+        // Magic Resize ou bascule vers format INSTA_STORY (108 × 192 mm)
+        this.engine.changeFormat('INSTA_STORY');
+        const storyFace = {
+            id: generateUniqueId('face_story'),
+            name: `Story - ${dish.name}`,
+            bgColor: '#121212',
+            objects: [
+                // Fond subtil avec bordure dorée
+                {
+                    id: generateUniqueId('obj'),
+                    type: 'shape',
+                    name: 'Cadre Chic Or',
+                    x: 4,
+                    y: 4,
+                    w: 100,
+                    h: 184,
+                    bgColor: 'transparent',
+                    borderColor: '#c8a96a',
+                    borderWidth: 1.5,
+                    radius: 4,
+                    opacity: 0.8
+                },
+                // En-tête Logo
+                {
+                    id: generateUniqueId('obj'),
+                    type: 'logo',
+                    name: 'Logo Grey Corner',
+                    title: 'GREY CORNER',
+                    subtitle: 'CAFÉ • RESTAURANT',
+                    color: '#c8a96a',
+                    x: 14,
+                    y: 12,
+                    w: 80,
+                    h: 18
+                },
+                // Badge
+                {
+                    id: generateUniqueId('obj'),
+                    type: 'badge_new',
+                    name: 'Badge Promo',
+                    text: dish.badge ? (dish.badge === 'CHEF' ? '★ COUP DE CŒUR DU CHEF' : 'NOUVEAU SUR LA CARTE') : 'PLAT DU JOUR',
+                    bgColor: dish.badge === 'CHEF' ? '#c8a96a' : '#e11d48',
+                    textColor: '#ffffff',
+                    radius: 6,
+                    x: 20,
+                    y: 35,
+                    w: 68,
+                    h: 8
+                },
+                // Photo centrale gourmande avec masque arrondi et ombre
+                {
+                    id: generateUniqueId('obj'),
+                    type: 'photo',
+                    name: 'Photo Plat du Jour',
+                    caption: dish.name,
+                    imageUrl: '',
+                    maskShape: 'rounded',
+                    filterPreset: 'warm',
+                    brightness: 104,
+                    contrast: 108,
+                    saturate: 110,
+                    shadowBlur: 20,
+                    shadowOffsetY: 8,
+                    shadowOpacity: 0.6,
+                    borderColor: '#c8a96a',
+                    borderWidth: 2,
+                    radius: 8,
+                    x: 14,
+                    y: 48,
+                    w: 80,
+                    h: 68
+                },
+                // Titre du plat
+                {
+                    id: generateUniqueId('obj'),
+                    type: 'text',
+                    name: 'Titre Plat',
+                    text: dish.name.toUpperCase(),
+                    fontFamily: 'Playfair Display',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    align: 'center',
+                    lineHeight: 1.2,
+                    x: 10,
+                    y: 122,
+                    w: 88,
+                    h: 14
+                },
+                // Description
+                {
+                    id: generateUniqueId('obj'),
+                    type: 'text',
+                    name: 'Description Plat',
+                    text: dish.desc || 'Préparé chaque matin avec des ingrédients frais du terroir.',
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    fontWeight: 400,
+                    color: '#cbd5e1',
+                    align: 'center',
+                    lineHeight: 1.3,
+                    x: 12,
+                    y: 138,
+                    w: 84,
+                    h: 16
+                },
+                // Prix
+                {
+                    id: generateUniqueId('obj'),
+                    type: 'text',
+                    name: 'Prix Story',
+                    text: dish.price,
+                    fontFamily: 'Montserrat',
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color: '#f59e0b',
+                    align: 'center',
+                    x: 24,
+                    y: 156,
+                    w: 60,
+                    h: 12
+                },
+                // Footer Instagram
+                {
+                    id: generateUniqueId('obj'),
+                    type: 'icon_badge',
+                    name: 'Footer Instagram',
+                    iconId: 'instagram',
+                    text: '@GREYCORNERFES',
+                    color: '#c8a96a',
+                    textColor: '#94a3b8',
+                    fontSize: 9.5,
+                    x: 20,
+                    y: 172,
+                    w: 68,
+                    h: 8
+                }
+            ]
+        };
+
+        this.engine.faces = [storyFace];
+        this.currentFaceIndex = 0;
+        this.selectedObjectId = null;
+        this.selectedObjectIds = [];
+        this.closeDatabaseModal();
+        this.commitState(false);
+        this.updateFormatHeaderUI();
+        this.renderCurrentFace();
+        this.renderInspector();
+        this.showToast(`Story Instagram générée pour « ${dish.name} » ! Exportez en PNG HD depuis le menu Export.`);
+    },
+
+    exportDatabaseCSV() {
+        const csv = this.engine.exportDishesCSV();
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `Menu_Plats_Grey_Corner_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        this.showToast('Base de plats exportée en CSV (compatible Excel / Google Sheets) !');
+    },
+
+    triggerImportDatabaseCSV() {
+        const input = document.getElementById('db-csv-file-input');
+        if (input) input.click();
+    },
+
+    async importDatabaseCSV(event) {
+        const input = event.target;
+        const file = input && input.files && input.files[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            const count = this.engine.importDishesCSV(text);
+            this._dbDirty = true;
+            this.refreshDbCategoryFilter(false);
+            this.renderDatabaseTable();
+            this.renderCurrentFace();
+            this.commitState(false);
+            this.showToast(`${count} plats importés depuis le fichier CSV !`);
+        } catch (err) {
+            console.error('Erreur import CSV:', err);
+            this.showToast('Erreur lors de l\'importation du fichier CSV.');
+        }
+        input.value = '';
     },
 
     // ==================== SMART WORD (.DOCX / .TXT) IMPORTER & AUTO-LAYOUT CONTROLLER ====================

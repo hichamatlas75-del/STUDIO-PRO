@@ -11,6 +11,8 @@ Object.assign(InMenuStudioApp.prototype, {
 
         if (!obj) {
             const specs = this.engine.specs || { widthMm: 340, heightMm: 300, bleedMm: 3 };
+            const gs = this.engine.gridSettings || { enabled: false, columns: 2, gutterMm: 8 };
+            const typo = this.engine.typography || { leaderStyle: 'dots', showCurrency: true };
             badge.textContent = `Page ${this.currentFaceIndex + 1} / ${this.engine.faces.length} (${specs.widthMm}×${specs.heightMm}mm)`;
             const faceBg = safeHex(this.currentFace.bgColor, '#fdfbf7');
             const pagePillsHTML = this.engine.faces.map((f, idx) => `
@@ -62,14 +64,70 @@ Object.assign(InMenuStudioApp.prototype, {
                             <label class="block text-[10px] text-gray-400 mb-1">Nom de la page active :</label>
                             <input type="text" value="${escapeHTML(this.currentFace.name || '')}" data-input="face-name" data-change="face-name" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white font-semibold text-xs">
                         </div>
-                        <div class="text-[10.5px] text-gray-400">Cliquez sur un élément du canevas pour le modifier ou double-cliquez sur un texte pour l'éditer directement.</div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 mb-1">Couleur de fond du papier :</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="color" value="${faceBg}" data-input="face-bg-color" data-change="face-bg-color" class="w-8 h-8 rounded cursor-pointer bg-transparent border border-idBorder">
+                                <input type="text" value="${escapeHTML(this.currentFace.bgColor || '#fdfbf7')}" data-change="face-bg-color" class="flex-1 bg-idPanel border border-idBorder rounded px-2 py-1 font-mono text-white">
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
-                        <label class="block text-[11px] text-gray-400 mb-1">Couleur de fond du papier :</label>
-                        <div class="flex items-center space-x-2">
-                            <input type="color" value="${faceBg}" data-input="face-bg-color" data-change="face-bg-color" class="w-8 h-8 rounded cursor-pointer bg-transparent border border-idBorder">
-                            <input type="text" value="${escapeHTML(this.currentFace.bgColor || '#fdfbf7')}" data-change="face-bg-color" class="flex-1 bg-idInput border border-idBorder rounded px-2 py-1 font-mono text-white">
+                    <!-- PILIER 0.2 & AXE 2.3 : Duo Typographique & Style Global des Lignes de Plats -->
+                    <div class="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-lg space-y-2">
+                        <div class="text-[10.5px] font-bold uppercase tracking-wider text-amber-300 flex items-center justify-between">
+                            <span><i class="fa-solid fa-font mr-1"></i>Kit Typographique & Pointillés</span>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 mb-1">Duo de Polices (1 clic sur tout le menu) :</label>
+                            <select data-change="font-pairing-select" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white text-[11px] font-semibold">
+                                <option value="bistrot_chic" ${this.engine.fontPairing === 'bistrot_chic' ? 'selected' : ''}>Bistrot Chic (Playfair + Inter + Montserrat)</option>
+                                <option value="palace_prestige" ${this.engine.fontPairing === 'palace_prestige' ? 'selected' : ''}>Palace & Prestige (Cinzel + Cormorant + Montserrat)</option>
+                                <option value="moderne_minimal" ${this.engine.fontPairing === 'moderne_minimal' ? 'selected' : ''}>Moderne Minimal (Montserrat + Inter + JetBrains)</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 items-center pt-1">
+                            <div>
+                                <label class="block text-[10px] text-gray-400 mb-0.5">Style de conducteur :</label>
+                                <select data-change="global-leader-style" class="w-full bg-idPanel border border-idBorder rounded px-1.5 py-1 text-white text-[10.5px]">
+                                    <option value="dots" ${typo.leaderStyle === 'dots' ? 'selected' : ''}>Pointillés (...)</option>
+                                    <option value="dashes" ${typo.leaderStyle === 'dashes' ? 'selected' : ''}>Tirets (---)</option>
+                                    <option value="solid" ${typo.leaderStyle === 'solid' ? 'selected' : ''}>Ligne fine (___)</option>
+                                    <option value="none" ${typo.leaderStyle === 'none' ? 'selected' : ''}>Aucun</option>
+                                </select>
+                            </div>
+                            <div class="pt-3">
+                                <label class="flex items-center space-x-1.5 cursor-pointer text-[10.5px] text-gray-200">
+                                    <input type="checkbox" ${typo.showCurrency !== false ? 'checked' : ''} data-change="global-show-currency" class="rounded accent-amber-500">
+                                    <span>Afficher « DH »</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AXE 2.4 : Grille de Colonnes & Gouttière Paramétrable -->
+                    <div class="bg-idInput p-2.5 rounded border border-idBorder space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10.5px] font-bold uppercase text-cyan-300">
+                                <i class="fa-solid fa-table-columns mr-1"></i>Grille de Colonnes PAO
+                            </span>
+                            <button type="button" data-action="toggle-grid-overlay" class="px-2 py-0.5 rounded text-[10px] font-bold border ${gs.enabled ? 'bg-cyan-500 text-slate-950 border-cyan-400' : 'bg-idPanel text-gray-300 border-idBorder'}">
+                                ${gs.enabled ? 'Grille Active' : 'Afficher Grille'}
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 items-center">
+                            <div>
+                                <label class="block text-[9.5px] text-gray-400 mb-1">Colonnes / page :</label>
+                                <div class="grid grid-cols-3 gap-1">
+                                    ${[1, 2, 3].map(c => `
+                                        <button type="button" data-action="set-grid-columns" data-cols="${c}" class="py-1 rounded text-[10px] font-mono font-bold border ${gs.columns === c ? 'bg-cyan-500/30 border-cyan-400 text-white' : 'bg-idPanel border-idBorder text-gray-400'}">${c} col</button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[9.5px] text-gray-400 mb-1">Gouttière (mm) :</label>
+                                <input type="number" min="0" max="40" step="1" value="${gs.gutterMm ?? 8}" data-input="grid-gutter" data-change="grid-gutter" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white font-mono text-[11px]">
+                            </div>
                         </div>
                     </div>
 
@@ -86,7 +144,7 @@ Object.assign(InMenuStudioApp.prototype, {
                         </div>` : ''}
                         <div class="flex items-center justify-between text-[11px] bg-idInput px-2.5 py-1.5 rounded">
                             <span class="text-gray-300">Fond perdu (Bleed)</span>
-                            <span class="font-mono text-red-400">+${specs.bleedMm || 3} mm</span>
+                            <span class="font-mono text-red-400">+${specs.bleedMm ?? 3} mm</span>
                         </div>
                     </div>
                 </div>
@@ -94,7 +152,10 @@ Object.assign(InMenuStudioApp.prototype, {
             return;
         }
 
-        badge.textContent = `${obj.type.toUpperCase()}${obj.locked ? ' (VERROUILLÉ)' : ''}`;
+        const selCount = this.selectedObjects.length;
+        badge.textContent = selCount > 1
+            ? `${selCount} BLOCS SÉLECTIONNÉS${obj.groupId ? ' (GROUPE)' : ''}`
+            : `${obj.type.toUpperCase()}${obj.locked ? ' (VERROUILLÉ)' : ''}`;
 
         // Lock notice if locked
         const lockNoticeHTML = obj.locked ? `
@@ -119,13 +180,43 @@ Object.assign(InMenuStudioApp.prototype, {
             </div>
         ` : '';
 
-        // Common Geometry Controls (X, Y, W, H in mm) + Alignment Buttons
+        // Common Geometry Controls (X, Y, W, H, Rotation) + Multi-Block Alignment & Distribution Bar (Axe 1.1, 1.2, 1.3, 2.1)
+        const rotVal = Number(obj.rotation ?? obj.rotate ?? 0);
         let html = `
             ${lockNoticeHTML}
             ${foldWarningHTML}
-            <!-- Quick Panel Alignment -->
-            <div>
-                <label class="text-[10px] font-bold uppercase text-gray-400 block mb-1.5">Alignement Rapide (${specs.widthMm}×${specs.heightMm} mm)</label>
+            <!-- AXE 1.3 : Barre d'Alignement & Distribution Multi-Blocs -->
+            <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                    <label class="text-[10px] font-bold uppercase text-gray-400">Alignement & Distribution</label>
+                    <span class="text-[9px] font-mono text-cyan-400">${selCount > 1 ? `${selCount} blocs` : 'Sur la page'}</span>
+                </div>
+                <div class="grid grid-cols-8 gap-1">
+                    <button type="button" data-action="align-selected" data-mode="left" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Aligner à gauche">
+                        <i class="fa-solid fa-align-left"></i>
+                    </button>
+                    <button type="button" data-action="align-selected" data-mode="center_h" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Centrer horizontalement">
+                        <i class="fa-solid fa-align-center"></i>
+                    </button>
+                    <button type="button" data-action="align-selected" data-mode="right" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Aligner à droite">
+                        <i class="fa-solid fa-align-right"></i>
+                    </button>
+                    <button type="button" data-action="align-selected" data-mode="top" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Aligner en haut">
+                        <i class="fa-solid fa-arrow-up-to-line"></i>
+                    </button>
+                    <button type="button" data-action="align-selected" data-mode="center_v" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Centrer verticalement">
+                        <i class="fa-solid fa-arrows-up-down"></i>
+                    </button>
+                    <button type="button" data-action="align-selected" data-mode="bottom" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Aligner en bas">
+                        <i class="fa-solid fa-arrow-down-to-line"></i>
+                    </button>
+                    <button type="button" data-action="distribute-selected" data-axis="h" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-cyan-300" title="Distribuer l'espacement horizontal (3+ blocs)">
+                        <i class="fa-solid fa-arrows-left-right-to-line"></i>
+                    </button>
+                    <button type="button" data-action="distribute-selected" data-axis="v" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-cyan-300" title="Distribuer l'espacement vertical (3+ blocs)">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                </div>
                 <div class="grid grid-cols-3 gap-1.5">
                     <button type="button" data-action="align-selected" data-mode="center_left_panel" class="bg-idInput hover:bg-white/10 border border-idBorder rounded py-1 text-[10px] text-gray-200" title="Centrer sur la moitié gauche">
                         <i class="fa-solid fa-align-center mr-1 text-cyan-400"></i>Centre G.
@@ -137,25 +228,54 @@ Object.assign(InMenuStudioApp.prototype, {
                         Fond Perdu
                     </button>
                 </div>
+                <!-- Groupement, Pinceau de Style & Page Maître -->
+                <div class="grid grid-cols-4 gap-1 pt-0.5">
+                    ${obj.groupId ? `
+                        <button type="button" data-action="ungroup-selected" class="bg-purple-600/30 hover:bg-purple-600/45 border border-purple-400 text-purple-100 rounded py-1 text-[9.5px] font-bold" title="Dégrouper (Ctrl+Shift+G)">
+                            <i class="fa-solid fa-object-ungroup mr-0.5"></i>Dégrouper
+                        </button>
+                    ` : `
+                        <button type="button" data-action="group-selected" class="bg-purple-600/20 hover:bg-purple-600/35 border border-purple-500/40 text-purple-200 rounded py-1 text-[9.5px] font-bold" title="Grouper (Ctrl+G)">
+                            <i class="fa-solid fa-object-group mr-0.5"></i>Grouper
+                        </button>
+                    `}
+                    <button type="button" data-action="copy-style" class="bg-idInput hover:bg-white/10 border border-idBorder text-gray-200 rounded py-1 text-[9.5px]" title="Copier le style graphique">
+                        <i class="fa-solid fa-paintbrush mr-0.5 text-amber-400"></i>Cop. Style
+                    </button>
+                    <button type="button" data-action="paste-style" class="bg-idInput hover:bg-white/10 border border-idBorder text-gray-200 rounded py-1 text-[9.5px]" title="Coller le style graphique">
+                        <i class="fa-solid fa-fill-drip mr-0.5 text-emerald-400"></i>Col. Style
+                    </button>
+                    <button type="button" data-action="toggle-master-object" class="${obj.isMaster ? 'bg-purple-600 text-white border-purple-400' : 'bg-idInput text-gray-300 border-idBorder'} hover:bg-purple-500/30 border rounded py-1 text-[9.5px] font-bold" title="Synchroniser cet élément sur toutes les pages intérieures (Page Maître)">
+                        <i class="fa-solid fa-crown mr-0.5"></i>Maître
+                    </button>
+                </div>
             </div>
 
-            <!-- Coordinates in mm -->
-            <div class="grid grid-cols-2 gap-2 bg-idInput p-2.5 rounded border border-idBorder font-mono text-[11px]">
+            <!-- Coordinates in mm & Rotation (Axe 1.2) -->
+            <div class="grid grid-cols-3 gap-2 bg-idInput p-2.5 rounded border border-idBorder font-mono text-[11px]">
                 <div>
-                    <label class="text-gray-400 text-[10px] block">Position X (mm)</label>
-                    <input type="number" step="0.5" value="${obj.x}" data-change="obj-prop" data-prop="x" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white">
+                    <label class="text-gray-400 text-[10px] block">X (mm)</label>
+                    <input type="number" step="0.5" value="${obj.x}" data-change="obj-prop" data-prop="x" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-1.5 py-1 text-white">
                 </div>
                 <div>
-                    <label class="text-gray-400 text-[10px] block">Position Y (mm)</label>
-                    <input type="number" step="0.5" value="${obj.y}" data-change="obj-prop" data-prop="y" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white">
+                    <label class="text-gray-400 text-[10px] block">Y (mm)</label>
+                    <input type="number" step="0.5" value="${obj.y}" data-change="obj-prop" data-prop="y" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-1.5 py-1 text-white">
                 </div>
                 <div>
-                    <label class="text-gray-400 text-[10px] block">Largeur L (mm)</label>
-                    <input type="number" step="0.5" min="8" value="${obj.w}" data-change="obj-prop" data-prop="w" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white">
+                    <label class="text-gray-400 text-[10px] block">Rotation (°)</label>
+                    <input type="number" min="-180" max="180" step="5" value="${rotVal}" data-input="obj-prop" data-change="obj-prop" data-prop="rotation" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-1.5 py-1 text-cyan-300">
                 </div>
                 <div>
-                    <label class="text-gray-400 text-[10px] block">Hauteur H (mm)</label>
-                    <input type="number" step="0.5" min="6" value="${obj.h}" data-change="obj-prop" data-prop="h" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-2 py-1 text-white">
+                    <label class="text-gray-400 text-[10px] block">Largeur (mm)</label>
+                    <input type="number" step="0.5" min="8" value="${obj.w}" data-change="obj-prop" data-prop="w" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-1.5 py-1 text-white">
+                </div>
+                <div>
+                    <label class="text-gray-400 text-[10px] block">Hauteur (mm)</label>
+                    <input type="number" step="0.5" min="6" value="${obj.h}" data-change="obj-prop" data-prop="h" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-1.5 py-1 text-white">
+                </div>
+                <div>
+                    <label class="text-gray-400 text-[10px] block">Ombre (px)</label>
+                    <input type="number" min="0" max="40" step="1" value="${obj.shadowBlur ?? (obj.shadow ? 10 : 0)}" data-input="obj-prop" data-change="obj-prop" data-prop="shadowBlur" data-val-type="number" class="w-full bg-idPanel border border-idBorder rounded px-1.5 py-1 text-amber-300">
                 </div>
             </div>
         `;
@@ -256,9 +376,24 @@ Object.assign(InMenuStudioApp.prototype, {
                             <input type="color" value="${safeHex(obj.priceColor, '#9a3412')}" data-input="obj-prop" data-change="obj-prop" data-prop="priceColor" class="w-full h-7 rounded bg-idInput border border-idBorder">
                         </div>
                     </div>
-                    <div>
-                        <label class="text-gray-400 text-[10px] block mb-1">Taille Police (pt)</label>
-                        <input type="number" min="6" step="0.5" value="${obj.fontSize || obj.fontSizePt || 11}" data-change="obj-prop" data-prop="fontSize" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Taille (pt)</label>
+                            <input type="number" min="6" step="0.5" value="${obj.fontSize || obj.fontSizePt || 11}" data-change="obj-prop" data-prop="fontSize" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Interligne</label>
+                            <input type="number" min="0.8" max="2.5" step="0.05" value="${obj.lineHeight || 1.25}" data-input="obj-prop" data-change="obj-prop" data-prop="lineHeight" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Style filets</label>
+                            <select data-change="obj-prop" data-prop="leaderStyle" class="w-full bg-idInput border border-idBorder rounded px-1 py-1 text-white text-[10px]">
+                                <option value="dots" ${(obj.leaderStyle || 'dots') === 'dots' ? 'selected' : ''}>Pointillés ...</option>
+                                <option value="dashes" ${obj.leaderStyle === 'dashes' ? 'selected' : ''}>Tirets ---</option>
+                                <option value="solid" ${obj.leaderStyle === 'solid' ? 'selected' : ''}>Ligne ___</option>
+                                <option value="none" ${obj.leaderStyle === 'none' ? 'selected' : ''}>Aucun</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             `;
@@ -363,9 +498,25 @@ Object.assign(InMenuStudioApp.prototype, {
                             <input type="color" value="${safeHex(obj.priceColor, '#9a3412')}" data-input="obj-prop" data-change="obj-prop" data-prop="priceColor" class="w-full h-7 rounded bg-idInput border border-idBorder">
                         </div>
                     </div>
-                    <div>
-                        <label class="text-gray-400 text-[10px] block mb-1">Taille Police Plats (pt)</label>
-                        <input type="number" min="6" step="0.5" value="${obj.fontSize || 10.5}" data-change="obj-prop" data-prop="fontSize" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                    <!-- Axe 2.3 : Contrôles Typographiques Avancés -->
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Taille (pt)</label>
+                            <input type="number" min="6" step="0.5" value="${obj.fontSize || 10.5}" data-change="obj-prop" data-prop="fontSize" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Interligne</label>
+                            <input type="number" min="0.8" max="2.5" step="0.05" value="${obj.lineHeight || (this.engine.typography && this.engine.typography.lineHeight) || 1.25}" data-input="obj-prop" data-change="obj-prop" data-prop="lineHeight" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Filets Prix</label>
+                            <select data-change="obj-prop" data-prop="leaderStyle" class="w-full bg-idInput border border-idBorder rounded px-1 py-1 text-white text-[10px]">
+                                <option value="dots" ${(obj.leaderStyle || (this.engine.typography && this.engine.typography.leaderStyle) || 'dots') === 'dots' ? 'selected' : ''}>Pointillés ...</option>
+                                <option value="dashes" ${(obj.leaderStyle || (this.engine.typography && this.engine.typography.leaderStyle)) === 'dashes' ? 'selected' : ''}>Tirets ---</option>
+                                <option value="solid" ${(obj.leaderStyle || (this.engine.typography && this.engine.typography.leaderStyle)) === 'solid' ? 'selected' : ''}>Ligne ___</option>
+                                <option value="none" ${(obj.leaderStyle || (this.engine.typography && this.engine.typography.leaderStyle)) === 'none' ? 'selected' : ''}>Aucun</option>
+                            </select>
+                        </div>
                     </div>
                     ${(() => {
                         if (typeof WordMenuImporter === 'undefined') return '';
@@ -375,11 +526,16 @@ Object.assign(InMenuStudioApp.prototype, {
                                 <div class="bg-red-500/15 border border-red-500/40 text-red-300 p-2 rounded text-[10px] space-y-1.5 mt-2">
                                     <div class="flex items-center space-x-1.5 font-bold">
                                         <i class="fa-solid fa-triangle-exclamation text-red-400"></i>
-                                        <span>Débordement : ${dishes.length} plats nécessitent ≈ ${Math.round(estimatedH)} mm (hauteur : ${obj.h} mm).</span>
+                                        <span>Débordement [+] : ${dishes.length} plats nécessitent ≈ ${Math.round(estimatedH)} mm (hauteur : ${obj.h} mm).</span>
                                     </div>
-                                    <button type="button" data-action="fit-block-height" data-height="${Math.round(estimatedH)}" class="w-full bg-red-600 hover:bg-red-500 text-white py-1 rounded font-bold text-[10px] shadow">
-                                        Ajuster la hauteur à ${Math.round(estimatedH)} mm
-                                    </button>
+                                    <div class="grid grid-cols-2 gap-1.5">
+                                        <button type="button" data-action="fit-block-height" data-height="${Math.round(estimatedH)}" class="bg-red-600 hover:bg-red-500 text-white py-1 rounded font-bold text-[10px] shadow">
+                                            Ajuster (${Math.round(estimatedH)} mm)
+                                        </button>
+                                        <button type="button" data-action="thread-overset-category" data-obj-id="${escapeHTML(obj.id)}" class="bg-purple-600 hover:bg-purple-500 text-white py-1 rounded font-bold text-[10px] shadow">
+                                            [+] Chaîner la suite
+                                        </button>
+                                    </div>
                                 </div>
                             `;
                         }
@@ -413,6 +569,8 @@ Object.assign(InMenuStudioApp.prototype, {
             `;
         }
         else if (obj.type === 'photo') {
+            const curPreset = obj.filterPreset || 'natural';
+            const curShape = obj.maskShape || 'rounded';
             html += `
                 <div class="space-y-2.5 border-t border-idBorder pt-3">
                     <div>
@@ -427,6 +585,53 @@ Object.assign(InMenuStudioApp.prototype, {
                         <label class="text-gray-400 text-[11px] block mb-1">Légende de la photo</label>
                         <input type="text" value="${escapeHTML(obj.caption || '')}" data-input="obj-prop" data-change="obj-prop" data-prop="caption" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
                     </div>
+
+                    <!-- Pilier 0.3 : Filtres Photo & Réglages d'Image -->
+                    <div class="bg-idInput/80 border border-amber-500/30 rounded p-2 space-y-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
+                            <i class="fa-solid fa-sliders mr-1"></i>Filtres Photo Studio (300 DPI)
+                        </span>
+                        <div class="grid grid-cols-3 gap-1">
+                            <button type="button" data-action="apply-photo-filter-preset" data-preset="natural" class="py-1 px-1.5 rounded text-[9.5px] font-semibold border ${curPreset === 'natural' ? 'bg-amber-600 text-white border-amber-400' : 'bg-idPanel text-gray-300 border-idBorder'}">Naturel</button>
+                            <button type="button" data-action="apply-photo-filter-preset" data-preset="warm" class="py-1 px-1.5 rounded text-[9.5px] font-semibold border ${curPreset === 'warm' ? 'bg-amber-600 text-white border-amber-400' : 'bg-idPanel text-gray-300 border-idBorder'}">Chaud</button>
+                            <button type="button" data-action="apply-photo-filter-preset" data-preset="vintage" class="py-1 px-1.5 rounded text-[9.5px] font-semibold border ${curPreset === 'vintage' ? 'bg-amber-600 text-white border-amber-400' : 'bg-idPanel text-gray-300 border-idBorder'}">Vintage</button>
+                            <button type="button" data-action="apply-photo-filter-preset" data-preset="bw_contrast" class="py-1 px-1.5 rounded text-[9.5px] font-semibold border ${curPreset === 'bw_contrast' ? 'bg-amber-600 text-white border-amber-400' : 'bg-idPanel text-gray-300 border-idBorder'}">N&B</button>
+                            <button type="button" data-action="apply-photo-filter-preset" data-preset="studio_glow" class="py-1 px-1.5 rounded text-[9.5px] font-semibold border ${curPreset === 'studio_glow' ? 'bg-amber-600 text-white border-amber-400' : 'bg-idPanel text-gray-300 border-idBorder'} col-span-2">Éclat Studio</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-[10px]">
+                            <div>
+                                <div class="flex justify-between text-gray-400"><span>Luminosité</span><span>${obj.brightness ?? 100}%</span></div>
+                                <input type="range" min="50" max="150" step="2" value="${obj.brightness ?? 100}" data-input="obj-prop" data-change="obj-prop" data-prop="brightness" data-val-type="number" data-refresh-inspector="true" class="w-full accent-amber-500">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-gray-400"><span>Contraste</span><span>${obj.contrast ?? 100}%</span></div>
+                                <input type="range" min="50" max="160" step="2" value="${obj.contrast ?? 100}" data-input="obj-prop" data-change="obj-prop" data-prop="contrast" data-val-type="number" data-refresh-inspector="true" class="w-full accent-amber-500">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-gray-400"><span>Saturation</span><span>${obj.saturate ?? 100}%</span></div>
+                                <input type="range" min="0" max="200" step="5" value="${obj.saturate ?? 100}" data-input="obj-prop" data-change="obj-prop" data-prop="saturate" data-val-type="number" data-refresh-inspector="true" class="w-full accent-amber-500">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-gray-400"><span>Flou (px)</span><span>${obj.blur ?? 0}px</span></div>
+                                <input type="range" min="0" max="15" step="0.5" value="${obj.blur ?? 0}" data-input="obj-prop" data-change="obj-prop" data-prop="blur" data-val-type="number" data-refresh-inspector="true" class="w-full accent-amber-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Axe 3.2 : Masques de Forme Photo -->
+                    <div class="bg-idInput/80 border border-cyan-500/30 rounded p-2 space-y-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-cyan-300 block">
+                            <i class="fa-solid fa-shapes mr-1"></i>Masque de Forme Photo
+                        </span>
+                        <div class="grid grid-cols-5 gap-1">
+                            <button type="button" data-action="set-photo-mask-shape" data-shape="rounded" class="py-1 rounded text-[9px] font-bold border ${curShape === 'rounded' ? 'bg-cyan-600 text-white border-cyan-400' : 'bg-idPanel text-gray-300 border-idBorder'}" title="Rectangle arrondi">Rect.</button>
+                            <button type="button" data-action="set-photo-mask-shape" data-shape="circle" class="py-1 rounded text-[9px] font-bold border ${curShape === 'circle' ? 'bg-cyan-600 text-white border-cyan-400' : 'bg-idPanel text-gray-300 border-idBorder'}" title="Cercle / Ovale">Cercle</button>
+                            <button type="button" data-action="set-photo-mask-shape" data-shape="arch" class="py-1 rounded text-[9px] font-bold border ${curShape === 'arch' ? 'bg-cyan-600 text-white border-cyan-400' : 'bg-idPanel text-gray-300 border-idBorder'}" title="Arche Orientale / Bistrot">Arche</button>
+                            <button type="button" data-action="set-photo-mask-shape" data-shape="diamond" class="py-1 rounded text-[9px] font-bold border ${curShape === 'diamond' ? 'bg-cyan-600 text-white border-cyan-400' : 'bg-idPanel text-gray-300 border-idBorder'}" title="Losange">Losange</button>
+                            <button type="button" data-action="set-photo-mask-shape" data-shape="hexagon" class="py-1 rounded text-[9px] font-bold border ${curShape === 'hexagon' ? 'bg-cyan-600 text-white border-cyan-400' : 'bg-idPanel text-gray-300 border-idBorder'}" title="Hexagone">Hexa.</button>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="text-gray-400 text-[10px] block mb-1">Arrondi (mm)</label>
@@ -439,6 +644,74 @@ Object.assign(InMenuStudioApp.prototype, {
                         <div>
                             <label class="text-gray-400 text-[10px] block mb-1">Couleur</label>
                             <input type="color" value="${safeHex(obj.borderColor, '#c8a96a')}" data-input="obj-prop" data-change="obj-prop" data-prop="borderColor" class="w-full h-7 rounded bg-idInput border border-idBorder">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        else if (obj.type === 'qrcode') {
+            html += `
+                <div class="space-y-2.5 border-t border-idBorder pt-3">
+                    <div>
+                        <label class="text-emerald-300 font-semibold text-[11px] block mb-1">
+                            <i class="fa-solid fa-qrcode mr-1"></i>URL ou Texte du QR Code
+                        </label>
+                        <input type="text" value="${escapeHTML(obj.qrText || obj.url || 'https://instagram.com/greycornerfes')}" data-input="obj-prop" data-change="obj-prop" data-prop="qrText" class="w-full bg-idInput border border-idBorder rounded px-2 py-1.5 text-white font-mono text-[10.5px]">
+                    </div>
+                    <div>
+                        <label class="text-gray-400 text-[11px] block mb-1">Légende sous le QR Code</label>
+                        <input type="text" value="${escapeHTML(obj.caption ?? 'SCAN POUR VOIR LE MENU')}" data-input="obj-prop" data-change="obj-prop" data-prop="caption" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white font-semibold">
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Couleur QR</label>
+                            <input type="color" value="${safeHex(obj.color, '#1e293b')}" data-input="obj-prop" data-change="obj-prop" data-prop="color" class="w-full h-7 rounded bg-idInput border border-idBorder">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Fond</label>
+                            <input type="color" value="${safeHex(obj.bgColor, '#ffffff')}" data-input="obj-prop" data-change="obj-prop" data-prop="bgColor" class="w-full h-7 rounded bg-idInput border border-idBorder">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Arrondi (mm)</label>
+                            <input type="number" min="0" step="0.5" value="${obj.radius ?? 3}" data-change="obj-prop" data-prop="radius" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        else if (obj.type === 'icon_badge') {
+            const icons = typeof CULINARY_ICON_BADGES !== 'undefined' ? CULINARY_ICON_BADGES : [];
+            const curIcon = obj.iconId || 'wifi';
+            html += `
+                <div class="space-y-2.5 border-t border-idBorder pt-3">
+                    <div>
+                        <label class="text-amber-400 font-semibold text-[10.5px] block mb-1">
+                            <i class="fa-solid fa-icons mr-1"></i>Choisir l'Icône Vectorielle Métier
+                        </label>
+                        <div class="grid grid-cols-3 gap-1 max-h-36 overflow-y-auto pr-1">
+                            ${icons.map(ic => `
+                                <button type="button" data-action="set-culinary-icon" data-icon-id="${escapeHTML(ic.id)}" class="p-1.5 rounded border text-[9.5px] font-medium truncate ${curIcon === ic.id ? 'bg-amber-600/30 border-amber-400 text-white' : 'bg-idInput border-idBorder text-gray-300 hover:bg-white/5'}">
+                                    ${escapeHTML(ic.name)}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-gray-400 text-[11px] block mb-1">Texte / Libellé accompagné</label>
+                        <input type="text" value="${escapeHTML(obj.text ?? '')}" placeholder="Ex: @GREYCORNERFES (vide = icône seule)" data-input="obj-prop" data-change="obj-prop" data-prop="text" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Couleur Icône</label>
+                            <input type="color" value="${safeHex(obj.color, '#c8a96a')}" data-input="obj-prop" data-change="obj-prop" data-prop="color" class="w-full h-7 rounded bg-idInput border border-idBorder">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Couleur Texte</label>
+                            <input type="color" value="${safeHex(obj.textColor || obj.color, '#1e293b')}" data-input="obj-prop" data-change="obj-prop" data-prop="textColor" class="w-full h-7 rounded bg-idInput border border-idBorder">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Taille Texte</label>
+                            <input type="number" min="6" step="0.5" value="${obj.fontSize || 10}" data-change="obj-prop" data-prop="fontSize" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
                         </div>
                     </div>
                 </div>
@@ -490,6 +763,7 @@ Object.assign(InMenuStudioApp.prototype, {
                                 <option value="Cormorant Garamond" ${obj.fontFamily === 'Cormorant Garamond' ? 'selected' : ''}>Cormorant</option>
                                 <option value="Montserrat" ${obj.fontFamily === 'Montserrat' ? 'selected' : ''}>Montserrat</option>
                                 <option value="Inter" ${obj.fontFamily === 'Inter' ? 'selected' : ''}>Inter</option>
+                                <option value="JetBrains Mono" ${obj.fontFamily === 'JetBrains Mono' ? 'selected' : ''}>JetBrains Mono</option>
                             </select>
                         </div>
                         <div>
@@ -519,6 +793,16 @@ Object.assign(InMenuStudioApp.prototype, {
                                 <option value="700" ${String(obj.fontWeight) === '700' ? 'selected' : ''}>Gras</option>
                                 <option value="800" ${String(obj.fontWeight) === '800' ? 'selected' : ''}>Extra-Gras</option>
                             </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Interligne</label>
+                            <input type="number" min="0.8" max="2.5" step="0.05" value="${obj.lineHeight || 1.25}" data-input="obj-prop" data-change="obj-prop" data-prop="lineHeight" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-[10px] block mb-1">Espacement lettres (px)</label>
+                            <input type="number" min="-2" max="12" step="0.2" value="${obj.letterSpacing ?? 0}" data-input="obj-prop" data-change="obj-prop" data-prop="letterSpacing" data-val-type="number" class="w-full bg-idInput border border-idBorder rounded px-2 py-1 text-white">
                         </div>
                     </div>
                 </div>
@@ -685,16 +969,21 @@ Object.assign(InMenuStudioApp.prototype, {
         const obj = this.selectedObject;
         if (!obj) return;
 
-        const numericProps = ['x', 'y', 'w', 'h', 'fontSize', 'radius', 'borderWidth', 'opacity', 'rotate'];
+        const numericProps = [
+            'x', 'y', 'w', 'h', 'fontSize', 'radius', 'borderWidth', 'opacity',
+            'rotate', 'rotation', 'brightness', 'contrast', 'saturate', 'blur',
+            'shadowBlur', 'shadowOffsetY', 'shadowOpacity', 'lineHeight', 'letterSpacing'
+        ];
         if (numericProps.includes(prop)) {
             if (typeof val !== 'number' || !Number.isFinite(val)) return;
             if (prop === 'w') val = Math.max(4, val);
             else if (prop === 'h') val = Math.max(4, val);
             else if (prop === 'fontSize') val = Math.max(5, val);
-            else if (prop === 'radius' || prop === 'borderWidth') val = Math.max(0, val);
-            else if (prop === 'opacity') val = Math.max(0.05, Math.min(1, val));
+            else if (prop === 'radius' || prop === 'borderWidth' || prop === 'blur' || prop === 'shadowBlur') val = Math.max(0, val);
+            else if (prop === 'opacity' || prop === 'shadowOpacity') val = Math.max(0.05, Math.min(1, val));
+            else if (prop === 'rotation' || prop === 'rotate') val = Math.max(-180, Math.min(180, val));
         }
-        if (prop === 'flipH' || prop === 'flipV') {
+        if (['flipH', 'flipV', 'showCurrency', 'isMaster', 'hidden', 'shadow'].includes(prop)) {
             val = Boolean(val);
         }
 
@@ -710,6 +999,9 @@ Object.assign(InMenuStudioApp.prototype, {
 
         const prevCat = obj.category;
         obj[prop] = val;
+        if (prop === 'rotation') obj.rotate = val;
+        if (prop === 'rotate') obj.rotation = val;
+        if (prop === 'shadowBlur') obj.shadow = val > 0;
         if (prop === 'text' && 'content' in obj) obj.content = val;
         if (prop === 'text' && 'customName' in obj) obj.customName = val;
         if (prop === 'fontSize' && 'fontSizePt' in obj) obj.fontSizePt = val;
@@ -726,7 +1018,7 @@ Object.assign(InMenuStudioApp.prototype, {
             this.commitStateDebounced();
         } else {
             this.commitState(false);
-            if (['x', 'y', 'w', 'h', 'category', 'dishId'].includes(prop)) {
+            if (['x', 'y', 'w', 'h', 'category', 'dishId', 'rotation'].includes(prop)) {
                 this.renderInspector();
             }
         }
@@ -982,19 +1274,324 @@ Object.assign(InMenuStudioApp.prototype, {
     },
 
     alignSelected(mode) {
-        const obj = this.selectedObject;
-        if (!obj) return;
-        if (mode === 'center_left_panel') {
-            obj.x = +(85 - obj.w / 2).toFixed(1);
-        } else if (mode === 'center_right_panel') {
-            obj.x = +(255 - obj.w / 2).toFixed(1);
-        } else if (mode === 'full_bleed') {
-            obj.x = -3;
-            obj.y = -3;
-            obj.w = 346;
-            obj.h = 306;
+        const specs = this.engine.specs || { widthMm: 340, heightMm: 300 };
+        const objs = this.selectedObjects && this.selectedObjects.length > 0 ? this.selectedObjects : (this.selectedObject ? [this.selectedObject] : []);
+        if (objs.length === 0) return;
+
+        if (objs.length > 1) {
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            objs.forEach(o => {
+                if (o.x < minX) minX = o.x;
+                if (o.x + o.w > maxX) maxX = o.x + o.w;
+                if (o.y < minY) minY = o.y;
+                if (o.y + o.h > maxY) maxY = o.y + o.h;
+            });
+            const boundW = maxX - minX;
+            const boundH = maxY - minY;
+
+            objs.forEach(o => {
+                if (mode === 'left') o.x = +minX.toFixed(1);
+                else if (mode === 'center_h') o.x = +(minX + boundW / 2 - o.w / 2).toFixed(1);
+                else if (mode === 'right') o.x = +(maxX - o.w).toFixed(1);
+                else if (mode === 'top') o.y = +minY.toFixed(1);
+                else if (mode === 'center_v') o.y = +(minY + boundH / 2 - o.h / 2).toFixed(1);
+                else if (mode === 'bottom') o.y = +(maxY - o.h).toFixed(1);
+            });
+        } else {
+            const obj = objs[0];
+            if (mode === 'left') obj.x = 0;
+            else if (mode === 'center_h') obj.x = +(specs.widthMm / 2 - obj.w / 2).toFixed(1);
+            else if (mode === 'right') obj.x = +(specs.widthMm - obj.w).toFixed(1);
+            else if (mode === 'top') obj.y = 0;
+            else if (mode === 'center_v') obj.y = +(specs.heightMm / 2 - obj.h / 2).toFixed(1);
+            else if (mode === 'bottom') obj.y = +(specs.heightMm - obj.h).toFixed(1);
+            else if (mode === 'center_left_panel') obj.x = +(85 - obj.w / 2).toFixed(1);
+            else if (mode === 'center_right_panel') obj.x = +(255 - obj.w / 2).toFixed(1);
+            else if (mode === 'full_bleed') {
+                const bleed = specs.bleedMm || 3;
+                obj.x = -bleed;
+                obj.y = -bleed;
+                obj.w = specs.widthMm + bleed * 2;
+                obj.h = specs.heightMm + bleed * 2;
+            }
         }
         this.commitState(false);
+        this.renderInspector();
+    },
+
+    distributeSelected(axis) {
+        const objs = this.selectedObjects;
+        if (!objs || objs.length < 3) {
+            this.showToast('Sélectionnez au moins 3 éléments pour distribuer l\'espacement.');
+            return;
+        }
+
+        if (axis === 'horizontal') {
+            const sorted = [...objs].sort((a, b) => a.x - b.x);
+            const first = sorted[0];
+            const last = sorted[sorted.length - 1];
+            const totalW = sorted.slice(0, -1).reduce((sum, o) => sum + o.w, 0);
+            const span = (last.x) - (first.x);
+            const gap = (span - totalW + first.w) / (sorted.length - 1);
+            let curX = first.x;
+            for (let i = 0; i < sorted.length; i++) {
+                sorted[i].x = +curX.toFixed(1);
+                curX += sorted[i].w + gap;
+            }
+        } else if (axis === 'vertical') {
+            const sorted = [...objs].sort((a, b) => a.y - b.y);
+            const first = sorted[0];
+            const last = sorted[sorted.length - 1];
+            const totalH = sorted.slice(0, -1).reduce((sum, o) => sum + o.h, 0);
+            const span = (last.y) - (first.y);
+            const gap = (span - totalH + first.h) / (sorted.length - 1);
+            let curY = first.y;
+            for (let i = 0; i < sorted.length; i++) {
+                sorted[i].y = +curY.toFixed(1);
+                curY += sorted[i].h + gap;
+            }
+        }
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Distribution ${axis === 'horizontal' ? 'horizontale' : 'verticale'} appliquée.`);
+    },
+
+    groupSelectedObjects() {
+        const objs = this.selectedObjects;
+        if (!objs || objs.length < 2) {
+            this.showToast('Sélectionnez au moins 2 éléments à grouper (Shift+Clic).');
+            return;
+        }
+        const gid = generateUniqueId('grp');
+        objs.forEach(o => { o.groupId = gid; });
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Groupe créé (${objs.length} éléments) !`);
+    },
+
+    ungroupSelectedObjects() {
+        const objs = this.selectedObjects;
+        if (!objs || objs.length === 0) return;
+        let count = 0;
+        objs.forEach(o => {
+            if (o.groupId) {
+                delete o.groupId;
+                count++;
+            }
+        });
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Éléments dégroupés (${count}).`);
+    },
+
+    copySelectedObjects() {
+        const objs = this.selectedObjects && this.selectedObjects.length > 0 ? this.selectedObjects : (this.selectedObject ? [this.selectedObject] : []);
+        if (objs.length === 0) return;
+        this.clipboardObjects = JSON.parse(JSON.stringify(objs));
+        this.showToast(`${objs.length} élément(s) copié(s) dans le presse-papier.`);
+    },
+
+    pasteClipboardObjects() {
+        if (!this.clipboardObjects || this.clipboardObjects.length === 0) {
+            this.showToast('Presse-papier vide.');
+            return;
+        }
+        const newIds = [];
+        this.clipboardObjects.forEach(item => {
+            const copy = JSON.parse(JSON.stringify(item));
+            copy.id = generateUniqueId('obj');
+            copy.name = (copy.name || copy.type) + ' (Copie)';
+            copy.x = +(copy.x + 8).toFixed(1);
+            copy.y = +(copy.y + 8).toFixed(1);
+            this.currentFace.objects.push(copy);
+            newIds.push(copy.id);
+        });
+        this.selectedObjectIds = newIds;
+        this.selectedObjectId = newIds[0] || null;
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`${newIds.length} élément(s) collé(s).`);
+    },
+
+    copySelectedStyle() {
+        const obj = this.selectedObject;
+        if (!obj) return;
+        const styleProps = [
+            'color', 'textColor', 'bgColor', 'borderColor', 'borderWidth', 'radius',
+            'fontSize', 'fontFamily', 'fontWeight', 'lineHeight', 'letterSpacing',
+            'leaderStyle', 'shadow', 'shadowBlur', 'shadowOffsetY', 'shadowOpacity',
+            'filterPreset', 'brightness', 'contrast', 'saturate', 'blur', 'maskShape'
+        ];
+        this.copiedStyle = {};
+        styleProps.forEach(p => {
+            if (obj[p] !== undefined) this.copiedStyle[p] = obj[p];
+        });
+        this.showToast(`Style de « ${obj.name || obj.type} » copié au pinceau !`);
+    },
+
+    pasteSelectedStyle() {
+        if (!this.copiedStyle) {
+            this.showToast('Aucun style copié au préalable.');
+            return;
+        }
+        const objs = this.selectedObjects && this.selectedObjects.length > 0 ? this.selectedObjects : (this.selectedObject ? [this.selectedObject] : []);
+        if (objs.length === 0) return;
+
+        objs.forEach(o => {
+            Object.assign(o, JSON.parse(JSON.stringify(this.copiedStyle)));
+        });
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Style appliqué à ${objs.length} élément(s) !`);
+    },
+
+    toggleVisibilitySelected(targetId = null) {
+        const id = targetId || this.selectedObjectId;
+        if (!id) return;
+        const obj = this.currentFace.objects.find(o => o.id === id);
+        if (!obj) return;
+        obj.hidden = !obj.hidden;
+        this.commitState(false);
+        this.renderInspector();
+    },
+
+    toggleMasterSelected(targetId = null) {
+        const id = targetId || this.selectedObjectId;
+        if (!id) return;
+        const obj = this.currentFace.objects.find(o => o.id === id);
+        if (!obj) return;
+        obj.isMaster = !obj.isMaster;
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(obj.isMaster ? 'Élément défini comme Gabarit Maître (synchronisé sur pages intérieures)' : 'Élément retiré du Gabarit Maître.');
+    },
+
+    threadOversetCategory(objId = null) {
+        const id = objId || this.selectedObjectId;
+        const obj = this.currentFace.objects.find(o => o.id === id) || this.selectedObject;
+        if (!obj || obj.type !== 'category_list') return;
+
+        const allDishes = this.engine.getDishesByCategory(obj.category);
+        const curStart = obj.sliceStart !== undefined ? obj.sliceStart : 0;
+        let visibleCount = 0;
+        if (typeof WordMenuImporter !== 'undefined') {
+            for (let i = 1; i <= allDishes.length - curStart; i++) {
+                const sub = allDishes.slice(curStart, curStart + i);
+                const estH = WordMenuImporter.estimateBlockHeightMm(sub, Boolean(obj.title));
+                if (estH <= obj.h + 2) visibleCount = i;
+                else break;
+            }
+        }
+        if (visibleCount <= 0) visibleCount = Math.max(1, Math.floor(allDishes.length / 2));
+
+        const mid = curStart + visibleCount;
+        if (mid >= allDishes.length) {
+            this.showToast('Tous les plats tiennent déjà dans ce bloc.');
+            return;
+        }
+
+        obj.sliceStart = curStart;
+        obj.sliceEnd = mid;
+
+        const copy = JSON.parse(JSON.stringify(obj));
+        copy.id = generateUniqueId('obj');
+        copy.name = `${obj.category} (Suite)`;
+        copy.title = `${obj.category} (Suite)`;
+        copy.sliceStart = mid;
+        copy.sliceEnd = allDishes.length;
+
+        const pageW = this.engine.specs ? this.engine.specs.widthMm : 340;
+        const nextX = +(obj.x + obj.w + 8).toFixed(1);
+        if (nextX + copy.w <= pageW - 5) {
+            copy.x = nextX;
+        } else {
+            copy.x = +(obj.x).toFixed(1);
+            copy.y = +(obj.y + 15).toFixed(1);
+        }
+
+        this.currentFace.objects.push(copy);
+        this.selectedObjectId = copy.id;
+        this.selectedObjectIds = [copy.id];
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Bloc lié « (Suite) » créé avec succès (${allDishes.length - mid} plats chaînés) !`);
+    },
+
+    toggleGridOverlay() {
+        if (!this.engine.gridSettings) {
+            this.engine.gridSettings = { enabled: false, columns: 2, gutterMm: 8, baselineMm: 5 };
+        }
+        this.engine.gridSettings.enabled = !this.engine.gridSettings.enabled;
+        this.renderGridOverlay();
+        this.renderInspector();
+        this.showToast(this.engine.gridSettings.enabled ? 'Grille de colonnes activée' : 'Grille masquée');
+    },
+
+    setGridColumns(cols) {
+        if (!this.engine.gridSettings) this.engine.gridSettings = { enabled: true, columns: 2, gutterMm: 8, baselineMm: 5 };
+        this.engine.gridSettings.columns = cols;
+        this.engine.gridSettings.enabled = true;
+        this.renderGridOverlay();
+        this.renderInspector();
+    },
+
+    updateGridGutter(val, debounce = false) {
+        if (!this.engine.gridSettings) this.engine.gridSettings = { enabled: true, columns: 2, gutterMm: 8, baselineMm: 5 };
+        const num = parseFloat(val);
+        if (Number.isFinite(num)) {
+            this.engine.gridSettings.gutterMm = Math.max(0, num);
+            this.renderGridOverlay();
+        }
+    },
+
+    applyPhotoFilterPreset(presetKey) {
+        const obj = this.selectedObject;
+        if (!obj || obj.type !== 'photo') return;
+        const preset = (typeof PHOTO_FILTER_PRESETS !== 'undefined' ? PHOTO_FILTER_PRESETS[presetKey] : null) || PHOTO_FILTER_PRESETS.natural;
+        obj.filterPreset = presetKey;
+        obj.brightness = preset.brightness;
+        obj.contrast = preset.contrast;
+        obj.saturate = preset.saturate;
+        obj.blur = preset.blur;
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Filtre photo « ${preset.name} » appliqué.`);
+    },
+
+    setPhotoMaskShape(shape) {
+        const obj = this.selectedObject;
+        if (!obj || obj.type !== 'photo') return;
+        obj.maskShape = shape;
+        this.commitState(false);
+        this.renderInspector();
+        this.showToast(`Masque de forme « ${shape} » appliqué.`);
+    },
+
+    setCulinaryIcon(iconId) {
+        const obj = this.selectedObject;
+        if (!obj || obj.type !== 'icon_badge') return;
+        obj.iconId = iconId;
+        this.commitState(false);
+        this.renderInspector();
+    },
+
+    onFontPairingChange(pairingKey) {
+        this.engine.applyFontPairing(pairingKey);
+        this.commitState(false);
+        this.renderCurrentFace();
+        this.renderInspector();
+        const headerSelect = document.getElementById('header-font-pairing-select');
+        if (headerSelect) headerSelect.value = pairingKey;
+        this.showToast(`Duo typographique « ${pairingKey} » appliqué sur tout le menu !`);
+    },
+
+    updateGlobalTypography(prop, val) {
+        if (!this.engine.typography) {
+            this.engine.typography = { lineHeight: 1.25, letterSpacing: 0, leaderStyle: 'dots', showCurrency: true };
+        }
+        this.engine.typography[prop] = val;
+        this.commitState(false);
+        this.renderCurrentFace();
         this.renderInspector();
     },
 
@@ -1079,16 +1676,20 @@ Object.assign(InMenuStudioApp.prototype, {
         if (!list) return;
 
         list.innerHTML = [...objects].reverse().map(obj => {
-            const active = obj.id === this.selectedObjectId;
+            const active = obj.id === this.selectedObjectId || (this.selectedObjectIds && this.selectedObjectIds.includes(obj.id));
             return `
                 <div data-action="select-object" data-obj-id="${escapeHTML(obj.id)}" class="px-2.5 py-1.5 rounded flex items-center justify-between cursor-pointer ${
                     active ? 'bg-blue-600/30 border border-blue-500 text-white' : 'bg-idInput hover:bg-white/5 text-gray-300 border border-transparent'
-                }">
+                } ${obj.hidden ? 'opacity-40' : ''}">
                     <div class="truncate flex items-center space-x-2 min-w-0">
-                        <span class="w-2 h-2 rounded-full ${obj.locked ? 'bg-amber-400' : 'bg-blue-400'} shrink-0"></span>
+                        <span class="w-2 h-2 rounded-full ${obj.locked ? 'bg-amber-400' : (obj.isMaster ? 'bg-purple-400' : 'bg-blue-400')} shrink-0"></span>
+                        ${obj.isMaster ? '<i class="fa-solid fa-crown text-purple-400 text-[9px] shrink-0" title="Élément de Page Maître"></i>' : ''}
                         <span class="truncate font-medium text-[11px]">${escapeHTML(obj.name || obj.title || obj.type)}</span>
                     </div>
-                    <div class="flex items-center space-x-2 shrink-0 ml-2">
+                    <div class="flex items-center space-x-1.5 shrink-0 ml-2">
+                        <button type="button" data-action="toggle-visibility" data-obj-id="${escapeHTML(obj.id)}" class="p-0.5 text-[10px] ${obj.hidden ? 'text-gray-500' : 'text-blue-400 hover:text-white'}" title="${obj.hidden ? 'Afficher ce calque (actuellement masqué)' : 'Masquer ce calque'}">
+                            <i class="fa-solid ${obj.hidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
+                        </button>
                         <button type="button" data-action="toggle-lock" data-obj-id="${escapeHTML(obj.id)}" class="p-0.5 text-[10px] ${obj.locked ? 'text-amber-400' : 'text-gray-500 hover:text-gray-300'}" title="${obj.locked ? 'Déverrouiller' : 'Verrouiller'}">
                             <i class="fa-solid ${obj.locked ? 'fa-lock' : 'fa-lock-open'}"></i>
                         </button>

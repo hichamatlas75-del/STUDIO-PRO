@@ -28,7 +28,7 @@ input, textarea, select {
     background-size: 20px 20px;
 }
 
-/* Resize Handles */
+/* Resize Handles & Rotation Handle (Axe 1.2) */
 .resize-handle {
     width: 8px;
     height: 8px;
@@ -46,14 +46,70 @@ input, textarea, select {
 .handle-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
 .handle-w  { top: calc(50% - 4px); left: -5px; cursor: ew-resize; }
 
-/* Dotted Leaders for Menu Items */
-.menu-dots {
+.rotate-handle {
+    width: 14px;
+    height: 14px;
+    background-color: #3b82f6;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    position: absolute;
+    top: -24px;
+    left: calc(50% - 7px);
+    cursor: grab;
+    z-index: 65;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.rotate-handle:hover {
+    background-color: #06b6d4;
+    transform: scale(1.2);
+}
+.rotate-handle::after {
+    content: '';
+    position: absolute;
+    top: 13px;
+    left: 4px;
+    width: 2px;
+    height: 10px;
+    background-color: #3b82f6;
+}
+
+/* Dotted & Line Leaders for Menu Items (Axe 2.3) */
+.menu-dots, .menu-dots-dots {
     flex-grow: 1;
     border-bottom: 1.5px dotted currentColor;
     opacity: 0.45;
     margin: 0 6px;
     position: relative;
     top: -4px;
+}
+.menu-dots-dashes {
+    flex-grow: 1;
+    border-bottom: 1.5px dashed currentColor;
+    opacity: 0.45;
+    margin: 0 6px;
+    position: relative;
+    top: -4px;
+}
+.menu-dots-solid {
+    flex-grow: 1;
+    border-bottom: 1px solid currentColor;
+    opacity: 0.45;
+    margin: 0 6px;
+    position: relative;
+    top: -4px;
+}
+.menu-dots-none {
+    flex-grow: 1;
+    margin: 0 6px;
+}
+
+/* Selection Marquee Box (Axe 1.1) */
+#marquee-selection-box {
+    background-color: rgba(59, 130, 246, 0.15);
+    border: 1px dashed #3b82f6;
+    pointer-events: none;
+    z-index: 70;
 }
 
 /* 3D Fold Preview Perspective */

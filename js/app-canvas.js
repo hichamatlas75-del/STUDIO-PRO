@@ -194,8 +194,23 @@ Object.assign(InMenuStudioApp.prototype, {
         pageEl.style.backgroundColor = bg;
         layerEl.innerHTML = '';
 
+        // 1. Render Master Page Objects on interior faces (Axe 2.1)
+        const isInteriorFace = this.currentFaceIndex > 0 || this.engine.faces.length === 1;
+        if (isInteriorFace && this.exporter && typeof this.exporter.getEffectiveMasterObjects === 'function') {
+            const masterList = this.exporter.getEffectiveMasterObjects(face);
+            masterList.forEach((mObj, mIdx) => {
+                if (mObj.hidden) return;
+                // Avoid duplicate if object is already on this face
+                if (face.objects.some(o => o.id === mObj.id)) return;
+                const masterEl = this.createObjectDOM(mObj, mIdx, true);
+                layerEl.appendChild(masterEl);
+            });
+        }
+
+        // 2. Render Face Objects (skipping hidden layers)
         face.objects.forEach((obj, idx) => {
-            const el = this.createObjectDOM(obj, idx);
+            if (obj.hidden) return;
+            const el = this.createObjectDOM(obj, idx + 20, false);
             layerEl.appendChild(el);
         });
 
@@ -214,6 +229,7 @@ Object.assign(InMenuStudioApp.prototype, {
         const mobCanvasPill = document.getElementById('mobile-canvas-face-pill');
         if (mobCanvasPill) mobCanvasPill.textContent = `${face.name} (${this.currentFaceIndex + 1}/${this.engine.faces.length})`;
 
+        this.renderGridOverlay();
         this.renderCanvasPageNumberOverlay();
 
         this.renderLayersList();
@@ -221,10 +237,13 @@ Object.assign(InMenuStudioApp.prototype, {
         this.updateTopTransformBar();
     },
 
-    createObjectDOM(obj, zIndex) {
-        const isSelected = obj.id === this.selectedObjectId && !this.previewMode;
+    createObjectDOM(obj, zIndex, isMasterInstance = false) {
+        const isSelected = !isMasterInstance && !this.previewMode && (
+            obj.id === this.selectedObjectId ||
+            (Array.isArray(this.selectedObjectIds) && this.selectedObjectIds.includes(obj.id))
+        );
         const wrapper = document.createElement('div');
-        wrapper.id = `dom_${obj.id}`;
+        wrapper.id = isMasterInstance ? `dom_master_${obj.id}` : `dom_${obj.id}`;
         wrapper.style.position = 'absolute';
         wrapper.style.left = `${this.mmToPx(obj.x)}px`;
         wrapper.style.top = `${this.mmToPx(obj.y)}px`;
@@ -232,41 +251,83 @@ Object.assign(InMenuStudioApp.prototype, {
         wrapper.style.height = `${this.mmToPx(obj.h)}px`;
         wrapper.style.zIndex = zIndex + 1;
         wrapper.style.opacity = obj.opacity !== undefined ? obj.opacity : 1;
-        const cursorClass = obj.locked ? 'cursor-default' : 'cursor-move';
+
+        const rotDeg = Number(obj.rotation ?? obj.rotate ?? 0);
+        if (rotDeg && obj.type !== 'illustration') {
+            wrapper.style.transform = `rotate(${rotDeg}deg)`;
+            wrapper.style.transformOrigin = 'center center';
+        }
+
+        if (isMasterInstance) {
+            wrapper.style.pointerEvents = 'none';
+        }
+
+        const cursorClass = (obj.locked || isMasterInstance) ? 'cursor-default' : 'cursor-move';
         wrapper.className = `group ${cursorClass} select-none ${
             isSelected
-                ? (obj.locked ? 'ring-2 ring-amber-500' : 'ring-2 ring-blue-500')
-                : (!this.previewMode ? (obj.locked ? 'hover:ring-1 hover:ring-amber-400/60' : 'hover:ring-1 hover:ring-blue-400/60') : '')
+                ? (obj.locked ? 'ring-2 ring-amber-500' : (obj.groupId ? 'ring-2 ring-purple-500' : 'ring-2 ring-blue-500'))
+                : (!this.previewMode && !isMasterInstance ? (obj.locked ? 'hover:ring-1 hover:ring-amber-400/60' : 'hover:ring-1 hover:ring-blue-400/60') : '')
         }`;
 
-        // Mouse Down to Select & Drag
-        wrapper.addEventListener('mousedown', (e) => {
-            if (e.target && (e.target.isContentEditable || (e.target.closest && e.target.closest('[contenteditable="true"]')))) {
-                e.stopPropagation();
-                return;
-            }
-            e.stopPropagation();
-            if (this.selectedObjectId !== obj.id) {
-                this.selectObject(obj.id);
-            }
-            if (!obj.locked) {
-                const currentObj = this.currentFace.objects.find(o => o.id === obj.id);
-                if (currentObj) {
-                    this.startDragObject(e, currentObj);
+        // Mouse Down to Select & Drag (supports Shift+Click multi-select)
+        if (!isMasterInstance) {
+            wrapper.addEventListener('mousedown', (e) => {
+                if (e.button === 2) return; // Right click handled by contextmenu
+                if (e.target && (e.target.isContentEditable || (e.target.closest && e.target.closest('[contenteditable="true"]')))) {
+                    e.stopPropagation();
+                    return;
                 }
-            }
-        });
+                e.stopPropagation();
+                if (e.shiftKey) {
+                    this.selectObject(obj.id, true);
+                } else if (!this.selectedObjectIds.includes(obj.id) && this.selectedObjectId !== obj.id) {
+                    this.selectObject(obj.id, false);
+                }
+                if (!obj.locked) {
+                    const currentObj = this.currentFace.objects.find(o => o.id === obj.id);
+                    if (currentObj) {
+                        this.startDragObject(e, currentObj);
+                    }
+                }
+            });
 
-        if (obj.locked && !this.previewMode) {
+            // Right-Click Context Menu (Axe 1.6)
+            wrapper.addEventListener('contextmenu', (e) => {
+                if (this.previewMode) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (!this.selectedObjectIds.includes(obj.id) && this.selectedObjectId !== obj.id) {
+                    this.selectObject(obj.id, false);
+                }
+                this.openContextMenu(e, obj);
+            });
+        }
+
+        if (obj.locked && !this.previewMode && !isMasterInstance) {
             const lockBadge = document.createElement('div');
             lockBadge.className = 'absolute top-1 right-1 bg-amber-500 text-slate-900 rounded px-1 py-0.5 text-[8px] font-bold shadow flex items-center space-x-1 pointer-events-none z-30';
             lockBadge.innerHTML = '<i class="fa-solid fa-lock"></i>';
             wrapper.appendChild(lockBadge);
         }
+        if ((obj.isMaster || isMasterInstance) && !this.previewMode) {
+            const masterBadge = document.createElement('div');
+            masterBadge.className = 'absolute top-1 left-1 bg-purple-600/90 text-white rounded px-1 py-0.5 text-[7.5px] font-mono font-bold shadow pointer-events-none z-30';
+            masterBadge.textContent = 'M';
+            masterBadge.title = 'Élément de Page Maître (synchronisé sur les pages intérieures)';
+            wrapper.appendChild(masterBadge);
+        }
 
         // Inner Visual Content according to Block Type
         const content = document.createElement('div');
         content.className = 'w-full h-full overflow-hidden relative';
+
+        // Drop Shadow (Axe 3.2)
+        const sBlur = Number(obj.shadowBlur ?? (obj.shadow ? 10 : 0));
+        const sOffsetY = Number(obj.shadowOffsetY ?? (obj.shadow ? 4 : 0));
+        const sOpacity = Number(obj.shadowOpacity ?? 0.28);
+        if (sBlur > 0 || sOffsetY !== 0) {
+            content.style.boxShadow = `0px ${Math.round(sOffsetY)}px ${Math.round(sBlur)}px rgba(0,0,0,${Math.max(0, Math.min(1, sOpacity))})`;
+        }
 
         if (obj.type === 'shape' || obj.type === 'frame') {
             const bw = obj.borderWidth ?? obj.borderWidthPt ?? 0;
@@ -280,6 +341,7 @@ Object.assign(InMenuStudioApp.prototype, {
             content.style.backgroundColor = obj.bgColor || '#1e293b';
             content.style.color = obj.textColor || '#ffffff';
             content.style.borderRadius = `${this.mmToPx(obj.radius ?? 2)}px`;
+            content.style.fontFamily = obj.fontFamily || 'Montserrat';
             content.className += ' flex items-center justify-center font-montserrat font-bold tracking-widest uppercase shadow-sm';
             content.style.fontSize = `${this.mmToPx((obj.fontSize || 12) * PT_TO_MM)}px`;
             const span = document.createElement('span');
@@ -314,6 +376,7 @@ Object.assign(InMenuStudioApp.prototype, {
             const iconSize = Math.max(7, Math.round(crestSize * 0.44));
             const titleSize = Math.max(8, Math.round(hPx * 0.22));
             const subSize = Math.max(5, Math.round(hPx * 0.10));
+            const titleFont = obj.fontFamily || 'Cinzel';
 
             content.style.color = color;
             content.className += ' flex flex-col items-center justify-center text-center px-1';
@@ -321,7 +384,7 @@ Object.assign(InMenuStudioApp.prototype, {
                 <div class="rounded-full flex items-center justify-center shrink-0" style="width:${crestSize}px; height:${crestSize}px; border:${Math.max(1, hPx * 0.018)}px solid ${escapeHTML(color)}; margin-bottom:${Math.max(2, hPx * 0.05)}px;">
                     <i class="fa-solid fa-utensils" style="font-size:${iconSize}px;"></i>
                 </div>
-                <div data-logo-field="title" title="Double-cliquez pour modifier le nom" class="font-cinzel font-bold tracking-widest leading-none truncate max-w-full" style="font-size:${titleSize}px;">${escapeHTML(obj.title ?? 'GREY CORNER')}</div>
+                <div data-logo-field="title" title="Double-cliquez pour modifier le nom" class="font-bold tracking-widest leading-none truncate max-w-full" style="font-family:'${escapeHTML(titleFont)}', serif; font-size:${titleSize}px;">${escapeHTML(obj.title ?? 'GREY CORNER')}</div>
                 <div data-logo-field="subtitle" title="Double-cliquez pour modifier le sous-titre" class="font-montserrat tracking-[0.22em] opacity-85 truncate max-w-full" style="font-size:${subSize}px; margin-top:${Math.max(2, hPx * 0.04)}px;">${escapeHTML(obj.subtitle ?? 'CAFÉ • SINCE 2024')}</div>
             `;
             const titleEl = content.querySelector('[data-logo-field="title"]');
@@ -337,11 +400,19 @@ Object.assign(InMenuStudioApp.prototype, {
                 price: obj.customPrice ?? '00 DH',
                 badge: obj.customBadge || ''
             };
+            const typo = this.engine.typography || {};
             content.innerHTML = this.buildDishRowHTML(dish, {
                 nameColor: obj.textColor || obj.color || '#1e293b',
                 descColor: obj.descColor || obj.dotsColor || '#64748b',
                 priceColor: obj.priceColor || obj.color || '#9a3412',
-                fontSize: obj.fontSize || obj.fontSizePt || 11
+                fontSize: obj.fontSize || obj.fontSizePt || 11,
+                titleFont: obj.titleFont || 'Playfair Display',
+                bodyFont: obj.fontFamily || 'Inter',
+                priceFont: obj.priceFont || 'Montserrat',
+                leaderStyle: obj.leaderStyle || typo.leaderStyle || 'dots',
+                showCurrency: obj.showCurrency !== undefined ? obj.showCurrency : (typo.showCurrency !== false),
+                lineHeight: obj.lineHeight || typo.lineHeight || 1.28,
+                letterSpacing: obj.letterSpacing || typo.letterSpacing || 0
             });
             this.attachDishInlineEditing(content, obj);
         }
@@ -350,12 +421,14 @@ Object.assign(InMenuStudioApp.prototype, {
             const dishes = (obj.sliceStart !== undefined || obj.sliceEnd !== undefined)
                 ? allDishes.slice(obj.sliceStart || 0, obj.sliceEnd)
                 : allDishes;
+            const typo = this.engine.typography || {};
+            const titleFont = obj.titleFont || 'Playfair Display';
             let html = `<div class="flex flex-col" style="gap:${this.mmToPx(2.5)}px">`;
             if (obj.title) {
                 const titleSizePx = this.mmToPx(4.4);
                 html += `
                     <div class="border-b flex items-center justify-between" style="border-color:${escapeHTML(obj.titleColor || '#9a3412')}; padding-bottom:${this.mmToPx(1.2)}px;">
-                        <span data-edit-cat-title="true" title="Double-cliquez pour modifier le titre de section" class="font-serif font-bold tracking-wide truncate" style="color:${escapeHTML(obj.titleColor || '#9a3412')}; font-size:${titleSizePx}px; line-height:1.15;">${escapeHTML(obj.title)}</span>
+                        <span data-edit-cat-title="true" title="Double-cliquez pour modifier le titre de section" class="font-bold tracking-wide truncate" style="font-family:'${escapeHTML(titleFont)}', serif; color:${escapeHTML(obj.titleColor || '#9a3412')}; font-size:${titleSizePx}px; line-height:1.15;">${escapeHTML(obj.title)}</span>
                         ${this.previewMode ? '' : `<span class="font-mono opacity-60 shrink-0 ml-2" style="color:${escapeHTML(obj.titleColor || '#9a3412')}; font-size:${this.mmToPx(2.5)}px;" title="Indication éditeur (non imprimée)">${dishes.length} plats</span>`}
                     </div>
                 `;
@@ -365,7 +438,14 @@ Object.assign(InMenuStudioApp.prototype, {
                     nameColor: obj.textColor || '#1e293b',
                     descColor: obj.descColor || '#64748b',
                     priceColor: obj.priceColor || '#9a3412',
-                    fontSize: obj.fontSize || 10.5
+                    fontSize: obj.fontSize || 10.5,
+                    titleFont: obj.titleFont || 'Playfair Display',
+                    bodyFont: obj.fontFamily || 'Inter',
+                    priceFont: obj.priceFont || 'Montserrat',
+                    leaderStyle: obj.leaderStyle || typo.leaderStyle || 'dots',
+                    showCurrency: obj.showCurrency !== undefined ? obj.showCurrency : (typo.showCurrency !== false),
+                    lineHeight: obj.lineHeight || typo.lineHeight || 1.28,
+                    letterSpacing: obj.letterSpacing || typo.letterSpacing || 0
                 });
             });
             html += `</div>`;
@@ -379,27 +459,37 @@ Object.assign(InMenuStudioApp.prototype, {
             }
             this.attachDishInlineEditing(content, obj);
 
-            // Détection de débordement de texte en mode édition
+            // Détection de débordement de texte (Overset Text [+]) & Chaînage automatique (Axe 2.2)
             if (!this.previewMode && typeof WordMenuImporter !== 'undefined') {
                 const estimatedH = WordMenuImporter.estimateBlockHeightMm(dishes, Boolean(obj.title));
-                if (estimatedH > obj.h + 2) {
-                    const overflowBadge = document.createElement('button');
-                    overflowBadge.type = 'button';
-                    overflowBadge.className = 'absolute bottom-1 right-1 bg-red-600 hover:bg-red-500 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded shadow z-40 flex items-center space-x-1 cursor-pointer';
-                    overflowBadge.title = `Débordement de texte détecté (${Math.round(estimatedH)} mm requis vs ${obj.h} mm actuel). Cliquez pour ajuster automatiquement.`;
-                    overflowBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><span>+${Math.round(estimatedH - obj.h)}mm</span>`;
-                    overflowBadge.addEventListener('mousedown', (e) => e.stopPropagation());
-                    overflowBadge.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.updateObjProp('h', Math.round(estimatedH));
-                        this.renderInspector();
-                    });
-                    wrapper.appendChild(overflowBadge);
+                if (estimatedH > obj.h + 2 && dishes.length > 1) {
+                    const oversetBtn = document.createElement('button');
+                    oversetBtn.type = 'button';
+                    oversetBtn.dataset.action = 'thread-overset-category';
+                    oversetBtn.dataset.objId = obj.id;
+                    oversetBtn.className = 'absolute bottom-1 right-1 bg-red-600 hover:bg-red-500 text-white font-mono text-[9.5px] font-extrabold px-1.5 py-0.5 rounded shadow-lg border border-white/40 z-40 flex items-center space-x-1 cursor-pointer';
+                    oversetBtn.title = `Texte en débordement (${Math.round(estimatedH)} mm requis pour ${dishes.length} plats). Cliquez sur [+] pour chaîner automatiquement la suite sur la colonne/page suivante !`;
+                    oversetBtn.innerHTML = `<span>[+]</span><span class="text-[8px] opacity-90">Chaîner suite</span>`;
+                    oversetBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+                    wrapper.appendChild(oversetBtn);
                 }
             }
         }
         else if (obj.type === 'photo') {
-            content.style.borderRadius = `${this.mmToPx(obj.radius ?? 4)}px`;
+            const maskShape = obj.maskShape || 'rounded';
+            const radPx = this.mmToPx(obj.radius ?? 4);
+            if (maskShape === 'circle') {
+                content.style.borderRadius = '50%';
+            } else if (maskShape === 'arch') {
+                content.style.borderRadius = '9999px 9999px 6px 6px';
+            } else if (maskShape === 'diamond') {
+                content.style.clipPath = 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)';
+            } else if (maskShape === 'hexagon') {
+                content.style.clipPath = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
+            } else {
+                content.style.borderRadius = `${radPx}px`;
+            }
+
             content.style.border = (obj.borderWidth > 0 && obj.borderColor !== 'transparent')
                 ? `${obj.borderWidth}px solid ${obj.borderColor || '#c8a96a'}`
                 : 'none';
@@ -407,6 +497,10 @@ Object.assign(InMenuStudioApp.prototype, {
             const imgEl = document.createElement('img');
             imgEl.src = safeUrl || OFFLINE_PHOTO_PLACEHOLDER;
             imgEl.className = 'w-full h-full object-cover pointer-events-none';
+            const filterCss = typeof buildPhotoFilterCSS === 'function' ? buildPhotoFilterCSS(obj) : 'none';
+            if (filterCss && filterCss !== 'none') {
+                imgEl.style.filter = filterCss;
+            }
             imgEl.onerror = function () {
                 if (!this.dataset.fallbackApplied) {
                     this.dataset.fallbackApplied = '1';
@@ -425,11 +519,63 @@ Object.assign(InMenuStudioApp.prototype, {
                 this.attachInlineTextEditing(capEl, obj, (val) => { obj.caption = val; }, { singleLine: true });
             }
         }
-        else if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header') {
+        else if (obj.type === 'qrcode') {
+            // Bloc QR Code Vectoriel Natif (Axe 3.1)
+            const radPx = this.mmToPx(obj.radius ?? 3);
+            content.style.backgroundColor = obj.bgColor || '#ffffff';
+            content.style.borderRadius = `${radPx}px`;
+            if (obj.borderWidth > 0 && obj.borderColor && obj.borderColor !== 'transparent') {
+                content.style.border = `${obj.borderWidth}px solid ${obj.borderColor}`;
+            }
+            content.className += ' flex flex-col items-center justify-between p-1.5';
+            const svgHtml = typeof QRCodeGenerator !== 'undefined'
+                ? QRCodeGenerator.buildSVG(obj.qrText || obj.text || 'GREY CORNER CAFE', {
+                    color: obj.color || '#1e293b',
+                    bgColor: obj.bgColor || '#ffffff'
+                })
+                : '';
+            const qrWrap = document.createElement('div');
+            qrWrap.className = 'w-full flex-1 flex items-center justify-center overflow-hidden pointer-events-none';
+            qrWrap.innerHTML = svgHtml;
+            content.appendChild(qrWrap);
+
+            if (obj.caption) {
+                const capEl = document.createElement('div');
+                capEl.className = 'w-full text-center font-montserrat font-bold uppercase tracking-wider truncate shrink-0 pt-0.5';
+                capEl.style.color = obj.color || '#1e293b';
+                capEl.style.fontSize = `${Math.max(7, this.mmToPx(2.3))}px`;
+                capEl.title = 'Double-cliquez pour modifier la légende du QR Code';
+                capEl.textContent = obj.caption;
+                content.appendChild(capEl);
+                this.attachInlineTextEditing(capEl, obj, (val) => { obj.caption = val; }, { singleLine: true });
+            }
+        }
+        else if (obj.type === 'icon_badge') {
+            // Icône Vectorielle Culinaire & Infos (Axe 3.3)
+            content.className += ' flex flex-col items-center justify-center p-1';
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'w-full flex-1 flex items-center justify-center overflow-hidden pointer-events-none';
+            if (typeof buildCulinaryIconSVG === 'function') {
+                iconWrap.innerHTML = buildCulinaryIconSVG(obj.iconId || 'wifi', obj.color || '#c8a96a', '');
+            }
+            content.appendChild(iconWrap);
+            if (obj.text) {
+                const lblEl = document.createElement('div');
+                lblEl.className = 'w-full text-center font-montserrat font-semibold tracking-wide truncate shrink-0 mt-0.5';
+                lblEl.style.color = obj.textColor || obj.color || '#c8a96a';
+                lblEl.style.fontSize = `${this.mmToPx((obj.fontSize || 9) * PT_TO_MM)}px`;
+                lblEl.title = 'Double-cliquez pour modifier le libellé';
+                lblEl.textContent = obj.text;
+                content.appendChild(lblEl);
+                this.attachInlineTextEditing(lblEl, obj, (val) => { obj.text = val; }, { singleLine: true });
+            }
+        }
+        else if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header' || obj.type === 'section_header') {
             content.style.fontFamily = obj.fontFamily || 'Playfair Display';
             content.style.fontSize = `${this.mmToPx((obj.fontSize || obj.fontSizePt || 12) * PT_TO_MM)}px`;
-            content.style.lineHeight = obj.lineHeight || '1.35';
-            if (obj.letterSpacing) content.style.letterSpacing = `${obj.letterSpacing}em`;
+            content.style.lineHeight = obj.lineHeight || (this.engine.typography && this.engine.typography.lineHeight) || '1.35';
+            const ls = obj.letterSpacing ?? (this.engine.typography && this.engine.typography.letterSpacing) ?? 0;
+            if (ls) content.style.letterSpacing = `${ls}em`;
             content.style.color = obj.color || '#1e293b';
             content.style.textAlign = obj.align || obj.textAlign || 'left';
             content.style.fontWeight = obj.fontWeight || (obj.type === 'title_heading' ? '700' : '500');
@@ -454,7 +600,7 @@ Object.assign(InMenuStudioApp.prototype, {
                     opacity: obj.opacity !== undefined ? obj.opacity : 1,
                     flipH: obj.flipH,
                     flipV: obj.flipV,
-                    rotate: obj.rotate || 0
+                    rotate: obj.rotation ?? obj.rotate ?? 0
                 });
             } else {
                 content.innerHTML = '<div class="w-full h-full border border-dashed border-amber-400/50 flex items-center justify-center text-[10px] text-amber-400 font-mono">Illustration</div>';
@@ -473,7 +619,7 @@ Object.assign(InMenuStudioApp.prototype, {
 
         wrapper.appendChild(content);
 
-        // If Selected: Add 8 Resize Handles (if unlocked) + Millimeter Coordinate Pill
+        // If Selected: Add 8 Resize Handles + Circular Rotation Handle (if unlocked) + Millimeter Coordinate Pill
         if (isSelected) {
             if (!obj.locked) {
                 const dirs = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -489,15 +635,30 @@ Object.assign(InMenuStudioApp.prototype, {
                     });
                     wrapper.appendChild(h);
                 });
+
+                // Poignée de rotation circulaire (Axe 1.2)
+                const rotHandle = document.createElement('div');
+                rotHandle.className = 'rotate-handle';
+                rotHandle.title = 'Faire pivoter le bloc (maintenir Shift pour aimanter par pas de 15°)';
+                rotHandle.innerHTML = '<i class="fa-solid fa-rotate text-[8px]"></i>';
+                rotHandle.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    const currentObj = this.currentFace.objects.find(o => o.id === obj.id);
+                    if (currentObj) {
+                        this.startRotateObject(e, currentObj);
+                    }
+                });
+                wrapper.appendChild(rotHandle);
             }
 
-            const isTextEditableType = ['text', 'title_heading', 'category_header', 'dish_item', 'category_list', 'vertical_banner', 'badge_new', 'logo', 'page_number'].includes(obj.type);
+            const isTextEditableType = ['text', 'title_heading', 'category_header', 'dish_item', 'category_list', 'vertical_banner', 'badge_new', 'logo', 'page_number', 'qrcode', 'icon_badge'].includes(obj.type);
             const badge = document.createElement('div');
             badge.id = `coord_pill_${obj.id}`;
-            badge.className = `absolute -top-5 left-0 ${obj.locked ? 'bg-amber-600' : 'bg-blue-600'} text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50 flex items-center space-x-1.5`;
+            badge.className = `absolute -top-5 left-0 ${obj.locked ? 'bg-amber-600' : (obj.groupId ? 'bg-purple-600' : 'bg-blue-600')} text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50 flex items-center space-x-1.5`;
             const coordSpan = document.createElement('span');
             coordSpan.className = 'pointer-events-none';
-            coordSpan.textContent = `${obj.locked ? '🔒 ' : ''}${obj.w} × ${obj.h} mm  (X:${obj.x}, Y:${obj.y})`;
+            const rotTxt = rotDeg ? ` ↻${rotDeg}°` : '';
+            coordSpan.textContent = `${obj.locked ? '🔒 ' : ''}${obj.w} × ${obj.h} mm  (X:${obj.x}, Y:${obj.y})${rotTxt}`;
             badge.appendChild(coordSpan);
 
             if (isTextEditableType && !obj.locked) {
@@ -652,37 +813,158 @@ Object.assign(InMenuStudioApp.prototype, {
             badgeHTML = `<span class="ml-1.5 bg-amber-600 text-white font-montserrat font-bold px-1.5 py-0.2 rounded uppercase shrink-0" style="font-size:${badgeFontPx}px;">★ CHEF</span>`;
         }
 
+        const titleFont = style.titleFont || 'Playfair Display';
+        const bodyFont = style.bodyFont || 'Inter';
+        const priceFont = style.priceFont || 'Montserrat';
+        const leaderStyle = style.leaderStyle || 'dots';
+        const showCurrency = style.showCurrency !== false;
+        const lineHeight = style.lineHeight || 1.28;
+        const letterSpacing = style.letterSpacing ? `${style.letterSpacing}em` : 'normal';
+
+        const rawPrice = String(dish.price || '');
+        const displayPrice = showCurrency ? rawPrice : rawPrice.replace(/\s*DH\b/gi, '').trim();
+
+        const leaderClass = leaderStyle === 'dashes' ? 'menu-dots menu-dots-dashes'
+            : leaderStyle === 'solid' ? 'menu-dots menu-dots-solid'
+            : leaderStyle === 'none' ? 'menu-dots menu-dots-none'
+            : 'menu-dots';
+
         const titleSizePx = this.mmToPx((style.fontSize || 10.5) * PT_TO_MM);
         const descSizePx = Math.max(7, titleSizePx * 0.82);
         const cleanDesc = (dish.desc || '').trim();
         const descHTML = cleanDesc
-            ? `<div data-edit-dish-field="desc" title="Double-cliquez pour modifier la description" class="font-sans leading-snug pr-4" style="color:${escapeHTML(style.descColor)}; font-size:${descSizePx}px; margin-top:${this.mmToPx(0.8)}px;">${escapeHTML(cleanDesc)}</div>`
+            ? `<div data-edit-dish-field="desc" title="Double-cliquez pour modifier la description" class="pr-4" style="font-family:'${escapeHTML(bodyFont)}', sans-serif; line-height:${lineHeight}; letter-spacing:${letterSpacing}; color:${escapeHTML(style.descColor)}; font-size:${descSizePx}px; margin-top:${this.mmToPx(0.8)}px;">${escapeHTML(cleanDesc)}</div>`
             : (!this.previewMode
-                ? `<div data-edit-dish-field="desc" data-empty-desc="true" title="Double-cliquez pour ajouter une description" class="font-sans leading-snug pr-4 opacity-0 group-hover:opacity-60 italic" style="color:${escapeHTML(style.descColor)}; font-size:${descSizePx}px; margin-top:${this.mmToPx(0.5)}px;">+ Ajouter une description (double-clic)</div>`
+                ? `<div data-edit-dish-field="desc" data-empty-desc="true" title="Double-cliquez pour ajouter une description" class="leading-snug pr-4 opacity-0 group-hover:opacity-60 italic" style="font-family:'${escapeHTML(bodyFont)}', sans-serif; color:${escapeHTML(style.descColor)}; font-size:${descSizePx}px; margin-top:${this.mmToPx(0.5)}px;">+ Ajouter une description (double-clic)</div>`
                 : '');
 
         return `
-            <div data-dish-row="true" data-dish-id="${escapeHTML(dish.id || '')}" class="w-full leading-tight">
-                <div class="flex items-baseline justify-between font-serif font-bold" style="color:${escapeHTML(style.nameColor)}; font-size:${titleSizePx}px;">
+            <div data-dish-row="true" data-dish-id="${escapeHTML(dish.id || '')}" class="w-full" style="line-height:${lineHeight}; letter-spacing:${letterSpacing};">
+                <div class="flex items-baseline justify-between font-bold" style="font-family:'${escapeHTML(titleFont)}', serif; color:${escapeHTML(style.nameColor)}; font-size:${titleSizePx}px;">
                     <span class="flex items-center flex-wrap"><span data-edit-dish-field="name" title="Double-cliquez pour modifier l'intitulé du plat">${escapeHTML(dish.name)}</span>${badgeHTML}</span>
-                    <span class="menu-dots"></span>
-                    <span data-edit-dish-field="price" title="Double-cliquez pour modifier le prix" class="font-montserrat font-bold shrink-0" style="color:${escapeHTML(style.priceColor)};">${escapeHTML(dish.price)}</span>
+                    <span class="${leaderClass}"></span>
+                    <span data-edit-dish-field="price" title="Double-cliquez pour modifier le prix" class="font-bold shrink-0" style="font-family:'${escapeHTML(priceFont)}', sans-serif; color:${escapeHTML(style.priceColor)};">${escapeHTML(displayPrice)}</span>
                 </div>
                 ${descHTML}
             </div>
         `;
     },
 
-    // ==================== DRAG & RESIZE WITH MAGNETIC FOLD/MARGIN SNAPPING ====================
+    // ==================== DRAG, MARQUEE, ROTATE & RESIZE WITH MAGNETIC FOLD/MARGIN SNAPPING ====================
     onViewportMouseDown(e) {
+        if (e.button === 2) return;
+        const ctxMenu = document.getElementById('canvas-context-menu');
+        if (ctxMenu && !ctxMenu.classList.contains('hidden')) {
+            ctxMenu.classList.add('hidden');
+        }
         if (e.target.closest && e.target.closest('[id^="dom_"]')) return;
         if (['viewport', 'viewport-center', 'spread-stage', 'bleed-clip', 'spread-page', 'objects-layer'].includes(e.target.id)) {
-            this.selectObject(null);
+            if (!e.shiftKey) {
+                this.selectObject(null);
+            }
+            if (!this.previewMode) {
+                this.startMarqueeSelection(e);
+            }
         }
     },
 
-    selectObject(id) {
-        this.selectedObjectId = id;
+    startMarqueeSelection(e) {
+        const pageEl = document.getElementById('spread-page');
+        if (!pageEl) return;
+        const pageRect = pageEl.getBoundingClientRect();
+        const startClientX = e.clientX;
+        const startClientY = e.clientY;
+
+        let marqueeEl = document.getElementById('marquee-selection-box');
+        if (!marqueeEl) {
+            marqueeEl = document.createElement('div');
+            marqueeEl.id = 'marquee-selection-box';
+            marqueeEl.className = 'fixed border border-blue-400 bg-blue-500/15 pointer-events-none z-[90] hidden';
+            document.body.appendChild(marqueeEl);
+        }
+
+        let dragged = false;
+        const onMove = (moveEvt) => {
+            const dx = Math.abs(moveEvt.clientX - startClientX);
+            const dy = Math.abs(moveEvt.clientY - startClientY);
+            if (dx > 4 || dy > 4) {
+                dragged = true;
+                marqueeEl.classList.remove('hidden');
+                const left = Math.min(startClientX, moveEvt.clientX);
+                const top = Math.min(startClientY, moveEvt.clientY);
+                const width = Math.abs(moveEvt.clientX - startClientX);
+                const height = Math.abs(moveEvt.clientY - startClientY);
+                marqueeEl.style.left = `${left}px`;
+                marqueeEl.style.top = `${top}px`;
+                marqueeEl.style.width = `${width}px`;
+                marqueeEl.style.height = `${height}px`;
+            }
+        };
+
+        const onUp = (upEvt) => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            marqueeEl.classList.add('hidden');
+            if (!dragged) return;
+
+            const boxLeft = Math.min(startClientX, upEvt.clientX);
+            const boxRight = Math.max(startClientX, upEvt.clientX);
+            const boxTop = Math.min(startClientY, upEvt.clientY);
+            const boxBottom = Math.max(startClientY, upEvt.clientY);
+
+            const minXMm = (boxLeft - pageRect.left) / (this.basePxPerMm * this.zoom);
+            const maxXMm = (boxRight - pageRect.left) / (this.basePxPerMm * this.zoom);
+            const minYMm = (boxTop - pageRect.top) / (this.basePxPerMm * this.zoom);
+            const maxYMm = (boxBottom - pageRect.top) / (this.basePxPerMm * this.zoom);
+
+            const hits = (this.currentFace.objects || []).filter(o => {
+                if (o.hidden || o.locked) return false;
+                const ox2 = o.x + o.w;
+                const oy2 = o.y + o.h;
+                return !(ox2 < minXMm || o.x > maxXMm || oy2 < minYMm || o.y > maxYMm);
+            }).map(o => o.id);
+
+            if (hits.length > 0) {
+                this.selectedObjectIds = hits;
+                this.selectedObjectId = hits[0];
+                this.renderCurrentFace();
+                this.renderInspector();
+            }
+        };
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    },
+
+    selectObject(id, additive = false) {
+        if (!id) {
+            this.selectedObjectId = null;
+            this.selectedObjectIds = [];
+            this.renderCurrentFace();
+            this.renderInspector();
+            return;
+        }
+
+        const targetObj = this.currentFace && this.currentFace.objects.find(o => o.id === id);
+        // Si l'objet fait partie d'un groupe, inclure tous les membres du groupe
+        const groupIds = (targetObj && targetObj.groupId)
+            ? this.currentFace.objects.filter(o => o.groupId === targetObj.groupId && !o.hidden).map(o => o.id)
+            : [id];
+
+        if (additive) {
+            const set = new Set(this.selectedObjectIds.length > 0 ? this.selectedObjectIds : (this.selectedObjectId ? [this.selectedObjectId] : []));
+            if (set.has(id)) {
+                groupIds.forEach(gid => set.delete(gid));
+            } else {
+                groupIds.forEach(gid => set.add(gid));
+            }
+            this.selectedObjectIds = [...set];
+            this.selectedObjectId = this.selectedObjectIds[0] || null;
+        } else {
+            this.selectedObjectIds = groupIds;
+            this.selectedObjectId = id;
+        }
+
         this.renderCurrentFace();
         this.renderInspector();
     },
@@ -691,9 +973,14 @@ Object.assign(InMenuStudioApp.prototype, {
         if (this.previewMode || (e.button !== undefined && e.button !== 0)) return;
         const startMouseX = e.clientX;
         const startMouseY = e.clientY;
+
+        const movingObjs = (this.selectedObjects.length > 1 && this.selectedObjects.some(o => o.id === obj.id))
+            ? this.selectedObjects.filter(o => !o.locked)
+            : [obj];
+
+        const initialPositions = new Map(movingObjs.map(o => [o.id, { x: o.x, y: o.y }]));
         const origX = obj.x;
         const origY = obj.y;
-        const domEl = document.getElementById(`dom_${obj.id}`);
         const barX = document.getElementById('bar-x');
         const barY = document.getElementById('bar-y');
 
@@ -704,21 +991,29 @@ Object.assign(InMenuStudioApp.prototype, {
             let newX = +(origX + dxMm).toFixed(1);
             let newY = +(origY + dyMm).toFixed(1);
 
-            if (this.snapEnabled) {
+            if (this.snapEnabled && movingObjs.length === 1) {
                 const snapped = this.computeSmartSnap(newX, newY, obj.w, obj.h);
                 newX = snapped.x;
                 newY = snapped.y;
             }
 
-            obj.x = newX;
-            obj.y = newY;
+            const effDx = +(newX - origX).toFixed(1);
+            const effDy = +(newY - origY).toFixed(1);
 
-            if (domEl) {
-                domEl.style.left = `${this.mmToPx(newX)}px`;
-                domEl.style.top = `${this.mmToPx(newY)}px`;
-            }
-            if (barX) barX.value = newX;
-            if (barY) barY.value = newY;
+            movingObjs.forEach(mObj => {
+                const initPos = initialPositions.get(mObj.id);
+                if (!initPos) return;
+                mObj.x = +(initPos.x + effDx).toFixed(1);
+                mObj.y = +(initPos.y + effDy).toFixed(1);
+                const el = document.getElementById(`dom_${mObj.id}`);
+                if (el) {
+                    el.style.left = `${this.mmToPx(mObj.x)}px`;
+                    el.style.top = `${this.mmToPx(mObj.y)}px`;
+                }
+            });
+
+            if (barX) barX.value = obj.x;
+            if (barY) barY.value = obj.y;
         };
 
         const onUp = () => {
@@ -733,6 +1028,125 @@ Object.assign(InMenuStudioApp.prototype, {
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
+    },
+
+    /**
+     * Rotation interactive d'un bloc autour de son centre (-180° à +180°, snap 15° avec Shift)
+     */
+    startRotateObject(e, obj) {
+        if (this.previewMode || obj.locked || (e.button !== undefined && e.button !== 0)) return;
+        const domEl = document.getElementById(`dom_${obj.id}`);
+        if (!domEl) return;
+        const rect = domEl.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const origRot = Number(obj.rotation ?? obj.rotate ?? 0);
+
+        const onMove = (moveEvt) => {
+            const dx = moveEvt.clientX - centerX;
+            const dy = moveEvt.clientY - centerY;
+            let angleDeg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI + 90);
+            if (angleDeg > 180) angleDeg -= 360;
+            if (angleDeg < -180) angleDeg += 360;
+            if (moveEvt.shiftKey) {
+                angleDeg = Math.round(angleDeg / 15) * 15;
+            }
+            obj.rotation = angleDeg;
+            obj.rotate = angleDeg;
+            domEl.style.transform = `rotate(${angleDeg}deg)`;
+            const pillSpan = domEl.querySelector(`#coord_pill_${obj.id} span`);
+            if (pillSpan) {
+                pillSpan.textContent = `${obj.w} × ${obj.h} mm  (X:${obj.x}, Y:${obj.y}) ↻${angleDeg}°`;
+            }
+        };
+
+        const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            if ((obj.rotation ?? 0) !== origRot) {
+                this.commitState(false);
+                this.renderInspector();
+            }
+        };
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    },
+
+    /**
+     * Menu Contextuel au Clic Droit sur le Canevas (Axe 1.6)
+     */
+    openContextMenu(e, obj) {
+        const menuEl = document.getElementById('canvas-context-menu');
+        if (!menuEl) return;
+        const lockLabel = menuEl.querySelector('[data-ctx-lock-label]');
+        if (lockLabel) {
+            lockLabel.textContent = obj && obj.locked ? 'Déverrouiller le bloc' : 'Verrouiller le bloc';
+        }
+        const masterLabel = menuEl.querySelector('[data-ctx-master-label]');
+        if (masterLabel) {
+            masterLabel.textContent = obj && obj.isMaster ? 'Retirer de la Page Maître' : 'Marquer Page Maître (Global)';
+        }
+        menuEl.classList.remove('hidden');
+        const maxX = Math.max(16, window.innerWidth - 220);
+        const maxY = Math.max(16, window.innerHeight - 310);
+        menuEl.style.left = `${Math.min(e.clientX, maxX)}px`;
+        menuEl.style.top = `${Math.min(e.clientY, maxY)}px`;
+    },
+
+    /**
+     * Grille de Colonnes & Ligne de Base Paramétrable (Axe 2.4)
+     */
+    renderGridOverlay() {
+        const pageEl = document.getElementById('spread-page');
+        if (!pageEl) return;
+        const oldGrid = document.getElementById('canvas-grid-overlay');
+        if (oldGrid) oldGrid.remove();
+
+        const gs = this.engine.gridSettings;
+        if (!gs || !gs.enabled || this.previewMode) return;
+
+        const specs = this.engine.specs;
+        const cols = Math.max(1, Math.min(4, Number(gs.columns) || 2));
+        const gutterMm = Math.max(0, Number(gs.gutterMm) ?? 8);
+        const safeMm = Number(specs.safeOuterMm) || 10;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'canvas-grid-overlay';
+        overlay.className = 'absolute inset-0 pointer-events-none select-none z-10';
+
+        const panels = (specs.hasFold && specs.foldXMm)
+            ? [
+                { startX: safeMm, endX: specs.foldXMm - (specs.safeFoldHalfMm || 10) },
+                { startX: specs.foldXMm + (specs.safeFoldHalfMm || 10), endX: specs.widthMm - safeMm }
+            ]
+            : [
+                { startX: safeMm, endX: specs.widthMm - safeMm }
+            ];
+
+        const topPx = this.mmToPx(safeMm);
+        const heightPx = this.mmToPx(specs.heightMm - safeMm * 2);
+
+        panels.forEach(p => {
+            const availW = p.endX - p.startX;
+            if (availW <= 10) return;
+            const colW = (availW - gutterMm * (cols - 1)) / cols;
+            for (let c = 0; c < cols; c++) {
+                const colX = p.startX + c * (colW + gutterMm);
+                const colDiv = document.createElement('div');
+                colDiv.style.position = 'absolute';
+                colDiv.style.left = `${this.mmToPx(colX)}px`;
+                colDiv.style.top = `${topPx}px`;
+                colDiv.style.width = `${this.mmToPx(colW)}px`;
+                colDiv.style.height = `${heightPx}px`;
+                colDiv.style.backgroundColor = 'rgba(56, 189, 248, 0.04)';
+                colDiv.style.borderLeft = '1px dashed rgba(56, 189, 248, 0.35)';
+                colDiv.style.borderRight = '1px dashed rgba(56, 189, 248, 0.35)';
+                overlay.appendChild(colDiv);
+            }
+        });
+
+        pageEl.appendChild(overlay);
     },
 
     startResizeObject(e, obj, dir) {
@@ -958,11 +1372,38 @@ Object.assign(InMenuStudioApp.prototype, {
                 text: this.engine.formatPageNumberString(this.currentFaceIndex + 1),
                 fontSize: 9, fontFamily: 'Montserrat', color: '#64748b', align: 'center'
             };
+        } else if (normalizedType === 'qrcode') {
+            newObj = {
+                id, type: 'qrcode', name: 'QR Code Menu Digital',
+                x: Math.max(15, Math.round((this.engine.specs.widthMm - 38) / 2)),
+                y: Math.max(20, Math.round((this.engine.specs.heightMm - 44) / 2)),
+                w: 38, h: 44,
+                qrText: '@GREYCORNERFES',
+                caption: 'SCAN POUR VOIR LE MENU',
+                color: '#1e293b',
+                bgColor: '#ffffff',
+                borderColor: '#c8a96a',
+                borderWidth: 1,
+                radius: 3
+            };
+        } else if (normalizedType === 'icon_badge') {
+            newObj = {
+                id, type: 'icon_badge', name: 'Icône Métier : Wi-Fi',
+                x: Math.max(15, Math.round((this.engine.specs.widthMm - 24) / 2)),
+                y: Math.max(20, Math.round((this.engine.specs.heightMm - 24) / 2)),
+                w: 24, h: 24,
+                iconId: 'wifi',
+                text: 'WI-FI GRATUIT',
+                color: '#c8a96a',
+                textColor: '#1e293b',
+                fontSize: 8
+            };
         }
 
         if (newObj) {
             this.currentFace.objects.push(newObj);
             this.selectedObjectId = newObj.id;
+            this.selectedObjectIds = [newObj.id];
             this.commitState(false);
             this.renderInspector();
             this.showToast(`Bloc « ${newObj.name} » ajouté sur ${this.currentFace.name}`);

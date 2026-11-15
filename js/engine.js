@@ -96,17 +96,148 @@ const FORMAT_PRESETS = {
         defaultFaces: 2,
         orientation: 'landscape',
         defaultBgColor: '#fdfbf7'
+    },
+    // --- PILIER 0 : Formats v4.0 Multi-Formats & Social Media ---
+    'BOOKLET_34x30': {
+        id: 'BOOKLET_34x30',
+        name: 'Livret 340 × 300 mm (5 feuilles / 10 faces)',
+        badge: 'Livret 34×30',
+        sub: 'Format ouvert 340 × 300 mm • Pli central 170 mm • Sécurité ±10 mm • Fond perdu 3 mm',
+        category: 'menu',
+        widthMm: 340,
+        heightMm: 300,
+        hasFold: true,
+        foldXMm: 170,
+        foldMarks: [170],
+        bleedMm: 3,
+        safeOuterMm: 10,
+        safeFoldHalfMm: 10,
+        defaultFaces: 10,
+        orientation: 'landscape',
+        defaultBgColor: '#fdfbf7'
+    },
+    'A4_PORTRAIT': {
+        id: 'A4_PORTRAIT',
+        name: 'Menu Petit-Déjeuner / Carte A4 (210 × 297 mm)',
+        badge: 'Carte A4 Portrait',
+        sub: '2 pages Recto/Verso • Sans pli central • Fond perdu 3 mm',
+        category: 'flyer',
+        widthMm: 210,
+        heightMm: 297,
+        hasFold: false,
+        foldXMm: null,
+        foldMarks: [],
+        bleedMm: 3,
+        safeOuterMm: 8,
+        safeFoldHalfMm: 0,
+        defaultFaces: 2,
+        orientation: 'portrait',
+        defaultBgColor: '#fdfbf7'
+    },
+    'A3_LANDSCAPE': {
+        id: 'A3_LANDSCAPE',
+        name: 'Set de Table / Grand Menu A3 (420 × 297 mm)',
+        badge: 'Grand Menu A3',
+        sub: '2 faces • Pli optionnel à 210 mm • Fond perdu 3 mm',
+        category: 'menu',
+        widthMm: 420,
+        heightMm: 297,
+        hasFold: true,
+        foldXMm: 210,
+        foldMarks: [210],
+        bleedMm: 3,
+        safeOuterMm: 10,
+        safeFoldHalfMm: 8,
+        defaultFaces: 2,
+        orientation: 'landscape',
+        defaultBgColor: '#fdfbf7'
+    },
+    'A6_TENT': {
+        id: 'A6_TENT',
+        name: 'Chevalet de Table / Carte Desserts A6 (105 × 148 mm)',
+        badge: 'Chevalet A6',
+        sub: '2 faces Recto/Verso • Fond perdu 3 mm',
+        category: 'flyer',
+        widthMm: 105,
+        heightMm: 148,
+        hasFold: false,
+        foldXMm: null,
+        foldMarks: [],
+        bleedMm: 3,
+        safeOuterMm: 6,
+        safeFoldHalfMm: 0,
+        defaultFaces: 2,
+        orientation: 'portrait',
+        defaultBgColor: '#fdfbf7'
+    },
+    'INSTA_STORY': {
+        id: 'INSTA_STORY',
+        name: 'Story Instagram / Reel Cover (1080 × 1920 px)',
+        badge: 'Story Instagram',
+        sub: 'Ratio 9:16 (108 × 192 mm) • Sans fond perdu • Export PNG direct HD',
+        category: 'social',
+        widthMm: 108,
+        heightMm: 192,
+        hasFold: false,
+        foldXMm: null,
+        foldMarks: [],
+        bleedMm: 0,
+        safeOuterMm: 6,
+        safeFoldHalfMm: 0,
+        defaultFaces: 1,
+        orientation: 'portrait',
+        defaultBgColor: '#2d3134'
+    },
+    'INSTA_POST': {
+        id: 'INSTA_POST',
+        name: 'Post Instagram Portrait 4:5 (1080 × 1350 px)',
+        badge: 'Post Instagram 4:5',
+        sub: 'Ratio 4:5 (108 × 135 mm) • Sans fond perdu • Export PNG direct HD',
+        category: 'social',
+        widthMm: 108,
+        heightMm: 135,
+        hasFold: false,
+        foldXMm: null,
+        foldMarks: [],
+        bleedMm: 0,
+        safeOuterMm: 6,
+        safeFoldHalfMm: 0,
+        defaultFaces: 1,
+        orientation: 'portrait',
+        defaultBgColor: '#2d3134'
     }
 };
 
 class DocumentEngine {
     constructor() {
+        this.FORMAT_SPECS = FORMAT_PRESETS;
+        this.FORMAT_PRESETS = FORMAT_PRESETS;
         // Format & Physical Geometry (Default: Menu 34x30cm)
         this.currentFormat = 'menu_34x30';
         this.specs = Object.assign({}, FORMAT_PRESETS['menu_34x30']);
 
         // Centralized Dish & Price Database (Single source of truth)
         this.dishesDB = this.getDefaultDishesDatabase();
+
+        // Font Pairing & Global Typography Settings (v4.0)
+        this.fontPairing = 'bistrot_chic';
+        this.typography = {
+            leaderStyle: 'dots',      // 'dots' (...), 'dashes' (---), 'solid' (___), 'none'
+            showCurrency: true,       // Afficher ou masquer le symbole 'DH'
+            lineHeight: 1.3,
+            letterSpacing: 0
+        };
+
+        // Configurable Column & Baseline Grid (v4.0)
+        this.gridSettings = {
+            enabled: false,
+            columns: 2,               // 1, 2 ou 3 colonnes par page/volet
+            gutterMm: 8,
+            baselineMm: 0
+        };
+
+        // Master Page Objects (Page Maître / Gabarit Global synchronisé sur les pages intérieures)
+        this.masterObjects = [];
 
         // Automated Page Numbering Configuration
         this.pageNumbering = {
@@ -140,7 +271,7 @@ class DocumentEngine {
 
     getDefaultDishesDatabase() {
         if (typeof GREY_CORNER_DEFAULT_DB !== 'undefined') {
-            return JSON.parse(JSON.stringify(GREY_CORNER_DEFAULT_DB));
+            return JSON.parse(JSON.stringify(GREY_CORNER_DEFAULT_DB)).map(d => Object.assign({ active: true }, d));
         }
         return [];
     }
@@ -149,7 +280,7 @@ class DocumentEngine {
         const preset = FORMAT_PRESETS[this.currentFormat] || FORMAT_PRESETS['menu_34x30'];
         const faces = [];
 
-        if (this.currentFormat === 'menu_34x30') {
+        if (this.currentFormat === 'menu_34x30' || this.currentFormat === 'BOOKLET_34x30') {
             for (let sheet = 1; sheet <= 5; sheet++) {
                 faces.push({
                     id: `sheet_${sheet}_recto`,
@@ -180,7 +311,7 @@ class DocumentEngine {
                 });
             }
             return faces;
-        } else if (this.currentFormat.startsWith('flyer_') || this.currentFormat.startsWith('depliant_')) {
+        } else {
             const count = preset.defaultFaces || 2;
             for (let i = 1; i <= count; i++) {
                 const sideName = i === 1 ? 'Recto' : (i === 2 ? 'Verso' : `Page ${i}`);
@@ -196,12 +327,10 @@ class DocumentEngine {
             this.faces = faces;
             return faces;
         }
-
-        return faces;
     }
 
     /**
-     * Switch format (e.g. 'flyer_a4_portrait', 'menu_34x30', etc.)
+     * Switch format (e.g. 'flyer_a4_portrait', 'menu_34x30', 'BOOKLET_34x30', 'INSTA_STORY', etc.)
      */
     setFormat(formatKey, resetPages = false) {
         if (!FORMAT_PRESETS[formatKey]) {
@@ -214,6 +343,88 @@ class DocumentEngine {
         if (resetPages) {
             this.faces = this.createInitialFaces();
         }
+        this.saveState();
+        return true;
+    }
+
+    /**
+     * Magic Resize (v4.0) : adapte proportionnellement tous les blocs existants
+     * vers un nouveau format sans perdre le contenu des pages.
+     */
+    magicResize(formatKey) {
+        if (!FORMAT_PRESETS[formatKey]) {
+            console.warn(`Format preset "${formatKey}" non reconnu pour Magic Resize.`);
+            return false;
+        }
+        const oldW = Number(this.specs && this.specs.widthMm) || 340;
+        const oldH = Number(this.specs && this.specs.heightMm) || 300;
+        const newPreset = FORMAT_PRESETS[formatKey];
+        const newW = Number(newPreset.widthMm) || oldW;
+        const newH = Number(newPreset.heightMm) || oldH;
+
+        const scaleX = newW / oldW;
+        const scaleY = newH / oldH;
+        const fontScale = Math.sqrt(scaleX * scaleY);
+
+        const rescaleObj = (o) => {
+            o.x = Math.round(o.x * scaleX * 10) / 10;
+            o.y = Math.round(o.y * scaleY * 10) / 10;
+            o.w = Math.max(4, Math.round(o.w * scaleX * 10) / 10);
+            o.h = Math.max(4, Math.round(o.h * scaleY * 10) / 10);
+            if (typeof o.fontSize === 'number') {
+                o.fontSize = Math.max(5, Math.round(o.fontSize * fontScale * 10) / 10);
+            }
+        };
+
+        this.faces.forEach(face => {
+            (face.objects || []).forEach(rescaleObj);
+        });
+        (this.masterObjects || []).forEach(rescaleObj);
+
+        this.currentFormat = formatKey;
+        this.specs = Object.assign({}, newPreset);
+        this.saveState();
+        return true;
+    }
+
+    /**
+     * Applique un Duo Typographique (Font Pairing) en 1 clic sur toutes les pages
+     */
+    applyFontPairing(pairingKey) {
+        const pairings = (typeof FONT_PAIRINGS !== 'undefined') ? FONT_PAIRINGS : {
+            bistrot_chic: { titleFont: 'Playfair Display', bodyFont: 'Inter', priceFont: 'Montserrat' },
+            palace_prestige: { titleFont: 'Cinzel', bodyFont: 'Cormorant Garamond', priceFont: 'Montserrat' },
+            moderne_minimal: { titleFont: 'Montserrat', bodyFont: 'Inter', priceFont: 'JetBrains Mono' }
+        };
+        const duo = pairings[pairingKey];
+        if (!duo) return false;
+
+        this.fontPairing = pairingKey;
+        const titleFont = duo.headingFont || duo.titleFont;
+        const bodyFont = duo.bodyFont;
+        const priceFont = duo.priceFont;
+
+        const updateObjFont = (o) => {
+            if (o.type === 'section_header' || o.type === 'title_heading' || o.type === 'category_header' || o.type === 'logo' || o.type === 'vertical_banner') {
+                o.fontFamily = titleFont;
+            } else if (o.type === 'category_list' || o.type === 'dish_item') {
+                o.titleFont = titleFont;
+                o.fontFamily = titleFont;
+                o.descFontFamily = bodyFont;
+                o.priceFontFamily = priceFont;
+                o.bodyFont = bodyFont;
+                o.priceFont = priceFont;
+            } else if (o.type === 'text') {
+                const isHeading = (o.fontSize && o.fontSize >= 15) || Number(o.fontWeight) >= 700;
+                o.fontFamily = isHeading ? titleFont : bodyFont;
+            }
+        };
+
+        this.faces.forEach(face => {
+            (face.objects || []).forEach(updateObjFont);
+        });
+        (this.masterObjects || []).forEach(updateObjFont);
+
         this.saveState();
         return true;
     }
@@ -473,6 +684,10 @@ class DocumentEngine {
             activeFaceIndex,
             currentFormat: this.currentFormat,
             specs: this.specs,
+            fontPairing: this.fontPairing,
+            typography: this.typography,
+            gridSettings: this.gridSettings,
+            masterObjects: this.masterObjects,
             pageNumbering: this.pageNumbering,
             dishesDB: this.dishesDB,
             faces: this.faces
@@ -499,6 +714,10 @@ class DocumentEngine {
             this.currentFormat = prev.currentFormat;
             this.specs = prev.specs || Object.assign({}, FORMAT_PRESETS[prev.currentFormat]);
         }
+        if (prev.fontPairing) this.fontPairing = prev.fontPairing;
+        if (prev.typography) this.typography = Object.assign({}, this.typography, prev.typography);
+        if (prev.gridSettings) this.gridSettings = Object.assign({}, this.gridSettings, prev.gridSettings);
+        if (Array.isArray(prev.masterObjects)) this.masterObjects = prev.masterObjects;
         if (prev.pageNumbering) {
             this.pageNumbering = Object.assign({}, this.pageNumbering, prev.pageNumbering);
         }
@@ -518,6 +737,10 @@ class DocumentEngine {
             this.currentFormat = next.currentFormat;
             this.specs = next.specs || Object.assign({}, FORMAT_PRESETS[next.currentFormat]);
         }
+        if (next.fontPairing) this.fontPairing = next.fontPairing;
+        if (next.typography) this.typography = Object.assign({}, this.typography, next.typography);
+        if (next.gridSettings) this.gridSettings = Object.assign({}, this.gridSettings, next.gridSettings);
+        if (Array.isArray(next.masterObjects)) this.masterObjects = next.masterObjects;
         if (next.pageNumbering) {
             this.pageNumbering = Object.assign({}, this.pageNumbering, next.pageNumbering);
         }
@@ -575,6 +798,21 @@ class DocumentEngine {
             }
         }
 
+        // Font Pairing, Typography & Grid Settings recovery (v4.0)
+        const fontPairing = (typeof data.fontPairing === 'string' && data.fontPairing) ? data.fontPairing : 'bistrot_chic';
+        const typography = Object.assign({
+            leaderStyle: 'dots',
+            showCurrency: true,
+            lineHeight: 1.3,
+            letterSpacing: 0
+        }, (data.typography && typeof data.typography === 'object') ? data.typography : {});
+        const gridSettings = Object.assign({
+            enabled: false,
+            columns: 2,
+            gutterMm: 8,
+            baselineMm: 0
+        }, (data.gridSettings && typeof data.gridSettings === 'object') ? data.gridSettings : {});
+
         // Page Numbering recovery
         let pageNumbering = {
             enabled: false,
@@ -606,7 +844,8 @@ class DocumentEngine {
                     name: String(d.name || 'Plat Signature'),
                     desc: String(d.desc || ''),
                     price: String(d.price || '00 DH'),
-                    badge: (d.badge === 'NOUVEAU' || d.badge === 'CHEF') ? d.badge : ''
+                    badge: (d.badge === 'NOUVEAU' || d.badge === 'CHEF') ? d.badge : '',
+                    active: d.active !== false
                 };
             });
 
@@ -631,7 +870,11 @@ class DocumentEngine {
         if (pageNumbering.color !== undefined) pageNumbering.color = sanitizeColor(pageNumbering.color) || '#64748b';
         pageNumbering.fontFamily = sanitizeFont(pageNumbering.fontFamily) || 'Montserrat';
 
-        const optionalNumericProps = ['fontSize', 'radius', 'borderWidth', 'opacity', 'sliceStart', 'sliceEnd', 'rotate'];
+        const optionalNumericProps = [
+            'fontSize', 'radius', 'borderWidth', 'opacity', 'sliceStart', 'sliceEnd',
+            'rotate', 'rotation', 'brightness', 'contrast', 'saturate', 'blur',
+            'shadowBlur', 'shadowOffsetY', 'shadowOpacity', 'lineHeight', 'letterSpacing'
+        ];
         const sanitizeObject = (o) => {
             optionalNumericProps.forEach(prop => {
                 if (o[prop] === undefined || o[prop] === null) {
@@ -647,12 +890,17 @@ class DocumentEngine {
             if (o.borderWidth !== undefined) o.borderWidth = clamp(o.borderWidth, 0, 100);
             if (o.radius !== undefined) o.radius = clamp(o.radius, 0, 1000);
             if (o.locked !== undefined) o.locked = Boolean(o.locked);
+            if (o.hidden !== undefined) o.hidden = Boolean(o.hidden);
+            if (o.isMaster !== undefined) o.isMaster = Boolean(o.isMaster);
+            if (o.shadow !== undefined) o.shadow = Boolean(o.shadow);
+            if (o.showCurrency !== undefined) o.showCurrency = Boolean(o.showCurrency);
             if (o.flipH !== undefined) o.flipH = Boolean(o.flipH);
             if (o.flipV !== undefined) o.flipV = Boolean(o.flipV);
 
-            ['type', 'name', 'text', 'title', 'subtitle', 'caption', 'category', 'dishId', 'fontFamily', 'fontWeight', 'align',
-             'bgColor', 'borderColor', 'color', 'textColor', 'titleColor', 'descColor', 'priceColor', 'imageUrl',
-             'customName', 'customDesc', 'customPrice', 'svgKey', 'illustrationId']
+            ['type', 'name', 'text', 'title', 'subtitle', 'caption', 'category', 'dishId', 'fontFamily', 'titleFont', 'priceFont',
+             'fontWeight', 'align', 'bgColor', 'borderColor', 'color', 'textColor', 'titleColor', 'descColor', 'priceColor',
+             'imageUrl', 'customName', 'customDesc', 'customPrice', 'svgKey', 'illustrationId', 'groupId',
+             'filterPreset', 'maskShape', 'qrText', 'iconId', 'leaderStyle', 'threadedFromId', 'threadedToId']
                 .forEach(prop => {
                     if (o[prop] !== undefined && o[prop] !== null && typeof o[prop] !== 'string') o[prop] = String(o[prop]);
                 });
@@ -665,10 +913,26 @@ class DocumentEngine {
                 }
             });
             if (o.fontFamily !== undefined) o.fontFamily = sanitizeFont(o.fontFamily);
+            if (o.titleFont !== undefined) o.titleFont = sanitizeFont(o.titleFont);
+            if (o.priceFont !== undefined) o.priceFont = sanitizeFont(o.priceFont);
             if (o.align !== undefined && !['left', 'center', 'right', 'justify'].includes(o.align)) delete o.align;
             if (o.imageUrl !== undefined) o.imageUrl = sanitizeUrl(o.imageUrl);
             return o;
         };
+
+        const masterObjects = Array.isArray(data.masterObjects)
+            ? data.masterObjects
+                .filter(o => o && typeof o === 'object' && o.type)
+                .map((o, idx) => sanitizeObject({
+                    ...o,
+                    id: String(o.id || '').trim() || generateUniqueId(`master_${idx}`),
+                    isMaster: true,
+                    x: clamp(Number.isFinite(Number(o.x)) ? Number(o.x) : 0, -5000, 5000),
+                    y: clamp(Number.isFinite(Number(o.y)) ? Number(o.y) : 0, -5000, 5000),
+                    w: clamp(Number.isFinite(Number(o.w)) ? Number(o.w) : 40, 2, 5000),
+                    h: clamp(Number.isFinite(Number(o.h)) ? Number(o.h) : 20, 2, 5000)
+                }))
+            : [];
 
         const targetCount = Math.max(1, data.faces.length);
         const faces = [];
@@ -709,7 +973,7 @@ class DocumentEngine {
             });
         }
 
-        return { dishesDB, faces, currentFormat, specs, pageNumbering };
+        return { dishesDB, faces, currentFormat, specs, pageNumbering, fontPairing, typography, gridSettings, masterObjects };
     }
 
     loadFromLocalStorage() {
@@ -723,6 +987,10 @@ class DocumentEngine {
                 if (normalized.currentFormat) this.currentFormat = normalized.currentFormat;
                 if (normalized.specs) this.specs = normalized.specs;
                 if (normalized.pageNumbering) this.pageNumbering = normalized.pageNumbering;
+                if (normalized.fontPairing) this.fontPairing = normalized.fontPairing;
+                if (normalized.typography) this.typography = normalized.typography;
+                if (normalized.gridSettings) this.gridSettings = normalized.gridSettings;
+                if (Array.isArray(normalized.masterObjects)) this.masterObjects = normalized.masterObjects;
                 return true;
             }
         } catch (e) {
@@ -745,6 +1013,10 @@ class DocumentEngine {
                         if (normalized.currentFormat) this.currentFormat = normalized.currentFormat;
                         if (normalized.specs) this.specs = normalized.specs;
                         if (normalized.pageNumbering) this.pageNumbering = normalized.pageNumbering;
+                        if (normalized.fontPairing) this.fontPairing = normalized.fontPairing;
+                        if (normalized.typography) this.typography = normalized.typography;
+                        if (normalized.gridSettings) this.gridSettings = normalized.gridSettings;
+                        if (Array.isArray(normalized.masterObjects)) this.masterObjects = normalized.masterObjects;
                         loaded = true;
                     }
                 } catch (err) {
@@ -775,6 +1047,7 @@ class DocumentEngine {
         if (!W || !H) return issues;
         this.faces.forEach((face, fi) => {
             (face.objects || []).forEach(o => {
+                if (o.hidden) return;
                 const label = `${face.name || 'Page ' + (fi + 1)} — ${o.name || o.type}`;
                 const outside = o.x + o.w <= 0 || o.y + o.h <= 0 || o.x >= W || o.y >= H;
                 if (outside) {
@@ -800,9 +1073,13 @@ class DocumentEngine {
     toJSON(pretty = true) {
         const payload = {
             app: 'InMenu Studio Pro',
-            version: '2.0',
+            version: '4.0',
             currentFormat: this.currentFormat,
             specs: this.specs,
+            fontPairing: this.fontPairing,
+            typography: this.typography,
+            gridSettings: this.gridSettings,
+            masterObjects: this.masterObjects,
             pageNumbering: this.pageNumbering,
             dishesDB: this.dishesDB,
             faces: this.faces
@@ -818,6 +1095,10 @@ class DocumentEngine {
         if (normalized.currentFormat) this.currentFormat = normalized.currentFormat;
         if (normalized.specs) this.specs = normalized.specs;
         if (normalized.pageNumbering) this.pageNumbering = normalized.pageNumbering;
+        if (normalized.fontPairing) this.fontPairing = normalized.fontPairing;
+        if (normalized.typography) this.typography = normalized.typography;
+        if (normalized.gridSettings) this.gridSettings = normalized.gridSettings;
+        if (Array.isArray(normalized.masterObjects)) this.masterObjects = normalized.masterObjects;
         this.saveState();
     }
 
@@ -825,8 +1106,8 @@ class DocumentEngine {
         return this.dishesDB.find(d => d.id === id) || null;
     }
 
-    getDishesByCategory(cat) {
-        return this.dishesDB.filter(d => d.category === cat);
+    getDishesByCategory(cat, includeInactive = false) {
+        return this.dishesDB.filter(d => d.category === cat && (includeInactive || d.active !== false));
     }
 
     getCategories() {
@@ -843,9 +1124,102 @@ class DocumentEngine {
         while (existing.has(`${prefix}${seq}`)) seq++;
         return `${prefix}${seq}`;
     }
+
+    /**
+     * Exporte la base de données des plats en format CSV (compatible Excel / Google Sheets)
+     */
+    exportDishesCSV() {
+        const escapeCell = (val) => {
+            const str = String(val ?? '').replace(/\r?\n/g, ' ');
+            if (/[",;]/.test(str)) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+        const headers = ['ID', 'Catégorie', 'Plat', 'Description', 'Prix', 'Badge', 'Actif'];
+        const rows = [headers.join(',')];
+        this.dishesDB.forEach(d => {
+            rows.push([
+                escapeCell(d.id),
+                escapeCell(d.category),
+                escapeCell(d.name),
+                escapeCell(d.desc),
+                escapeCell(d.price),
+                escapeCell(d.badge || ''),
+                escapeCell(d.active !== false ? 'OUI' : 'NON')
+            ].join(','));
+        });
+        return '\uFEFF' + rows.join('\r\n');
+    }
+
+    /**
+     * Importe une table CSV de plats/prix et synchronise la base centrale
+     */
+    importDishesCSV(csvText) {
+        if (!csvText || typeof csvText !== 'string') return 0;
+        const cleanText = csvText.replace(/^\uFEFF/, '').trim();
+        if (!cleanText) return 0;
+
+        const lines = cleanText.split(/\r?\n/).filter(l => l.trim().length > 0);
+        if (lines.length < 2) return 0;
+
+        const delimiter = (lines[0].split(';').length > lines[0].split(',').length) ? ';' : ',';
+        const parseLine = (line) => {
+            const cells = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (ch === '"') {
+                    if (inQuotes && line[i + 1] === '"') {
+                        cur += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (ch === delimiter && !inQuotes) {
+                    cells.push(cur.trim());
+                    cur = '';
+                } else {
+                    cur += ch;
+                }
+            }
+            cells.push(cur.trim());
+            return cells;
+        };
+
+        const imported = [];
+        const seenIds = new Set();
+        for (let i = 1; i < lines.length; i++) {
+            const cols = parseLine(lines[i]);
+            if (cols.length < 3) continue;
+            let id = cols[0] || this.generateUniqueDishId('PLT');
+            if (seenIds.has(id)) id = generateUniqueId(id);
+            seenIds.add(id);
+            const category = (cols[1] || 'GÉNÉRAL').toUpperCase();
+            const name = cols[2] || 'Plat Signature';
+            const desc = cols[3] || '';
+            const price = cols[4] || '00 DH';
+            const rawBadge = (cols[5] || '').toUpperCase().trim();
+            const badge = (rawBadge === 'NOUVEAU' || rawBadge === 'CHEF') ? rawBadge : '';
+            const rawActive = (cols[6] || 'OUI').toUpperCase().trim();
+            const active = !(rawActive === 'NON' || rawActive === 'FALSE' || rawActive === '0' || rawActive === 'INACTIF');
+            imported.push({ id, category, name, desc, price, badge, active });
+        }
+
+        if (imported.length > 0) {
+            this.dishesDB = imported;
+            this.saveState();
+        }
+        return imported.length;
+    }
 }
+
+DocumentEngine.FORMAT_SPECS = FORMAT_PRESETS;
+DocumentEngine.FORMAT_PRESETS = FORMAT_PRESETS;
 
 if (typeof window !== 'undefined') {
     window.FORMAT_PRESETS = FORMAT_PRESETS;
+    window.FORMAT_SPECS = FORMAT_PRESETS;
     window.DocumentEngine = DocumentEngine;
 }

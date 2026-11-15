@@ -86,8 +86,21 @@ class PrintExporter {
                 ctx.fillStyle = face.bgColor || '#fdfbf7';
                 ctx.fillRect(clipX, clipY, clipW, clipH);
 
-                // 3. Draw every object on the face (remapped if target format differs)
+                // 3A. Draw Master Page objects on interior faces (or all faces if not cover spread)
+                const faceIndex = this.engine.faces.indexOf(face);
+                const isInteriorFace = faceIndex > 0 || this.engine.faces.length === 1;
+                const masterList = this.getEffectiveMasterObjects(face);
+                if (isInteriorFace && masterList.length > 0) {
+                    for (const mObj of masterList) {
+                        if (mObj.hidden) continue;
+                        const drawObj = this.scaleObjectForTarget(mObj, 0, scaleX, scaleY);
+                        await this.drawObjectOnCanvas(ctx, drawObj, trimOriginX, trimOriginY, pxPerMm, failedImages);
+                    }
+                }
+
+                // 3B. Draw every object on the face (remapped if target format differs)
                 for (const obj of (face.objects || [])) {
+                    if (obj.hidden) continue;
                     const drawObj = this.scaleObjectForTarget(obj, 0, scaleX, scaleY);
                     await this.drawObjectOnCanvas(ctx, drawObj, trimOriginX, trimOriginY, pxPerMm, failedImages);
                 }
@@ -167,8 +180,21 @@ class PrintExporter {
                 ctx.fillStyle = face.bgColor || '#fdfbf7';
                 ctx.fillRect(clipX, clipY, clipW, clipH);
 
-                // 3. Draw objects mapped onto target panel dimensions (e.g. A4 210x297mm or 170x300mm)
+                // 3A. Draw Master Page objects on interior faces
+                const faceIndex = this.engine.faces.indexOf(face);
+                const isInteriorFace = faceIndex > 0 || this.engine.faces.length === 1;
+                const masterList = this.getEffectiveMasterObjects(face);
+                if (isInteriorFace && masterList.length > 0) {
+                    for (const mObj of masterList) {
+                        if (mObj.hidden) continue;
+                        const drawObj = this.scaleObjectForTarget(mObj, offsetXMm, scaleX, scaleY);
+                        await this.drawObjectOnCanvas(ctx, drawObj, trimOriginX, trimOriginY, pxPerMm, failedImages);
+                    }
+                }
+
+                // 3B. Draw objects mapped onto target panel dimensions (e.g. A4 210x297mm or 170x300mm)
                 for (const obj of (face.objects || [])) {
+                    if (obj.hidden) continue;
                     const drawObj = this.scaleObjectForTarget(obj, offsetXMm, scaleX, scaleY);
                     await this.drawObjectOnCanvas(ctx, drawObj, trimOriginX, trimOriginY, pxPerMm, failedImages);
                 }
@@ -284,14 +310,103 @@ class PrintExporter {
                 return out;
             }
 
+            /**
+             * Retourne la liste consolidée des éléments de Page Maître applicables à une face intérieure
+             */
+            getEffectiveMasterObjects(currentFace) {
+                const list = [];
+                const seenIds = new Set();
+                (this.engine.masterObjects || []).forEach(o => {
+                    if (o && !seenIds.has(o.id)) {
+                        seenIds.add(o.id);
+                        list.push(o);
+                    }
+                });
+                (this.engine.faces || []).forEach(f => {
+                    if (f === currentFace) return;
+                    (f.objects || []).forEach(o => {
+                        if (o && o.isMaster && !seenIds.has(o.id)) {
+                            seenIds.add(o.id);
+                            list.push(o);
+                        }
+                    });
+                });
+                return list;
+            }
+
+            /**
+             * Construit le tracé de découpe (masque de forme) pour un bloc photo ou forme
+             */
+            buildMaskPath(ctx, x, y, w, h, radiusPx = 0, maskShape = 'rounded') {
+                ctx.beginPath();
+                if (maskShape === 'circle') {
+                    ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+                    ctx.closePath();
+                } else if (maskShape === 'arch') {
+                    const archR = Math.min(w / 2, h * 0.48);
+                    ctx.moveTo(x, y + h);
+                    ctx.lineTo(x, y + archR);
+                    ctx.arc(x + w / 2, y + archR, w / 2, Math.PI, 0, false);
+                    ctx.lineTo(x + w, y + h);
+                    ctx.closePath();
+                } else if (maskShape === 'diamond') {
+                    ctx.moveTo(x + w / 2, y);
+                    ctx.lineTo(x + w, y + h / 2);
+                    ctx.lineTo(x + w / 2, y + h);
+                    ctx.lineTo(x, y + h / 2);
+                    ctx.closePath();
+                } else if (maskShape === 'hexagon') {
+                    ctx.moveTo(x + w * 0.25, y);
+                    ctx.lineTo(x + w * 0.75, y);
+                    ctx.lineTo(x + w, y + h * 0.5);
+                    ctx.lineTo(x + w * 0.75, y + h);
+                    ctx.lineTo(x + w * 0.25, y + h);
+                    ctx.lineTo(x, y + h * 0.5);
+                    ctx.closePath();
+                } else {
+                    this.roundRect(ctx, x, y, w, h, radiusPx);
+                }
+            }
+
             async drawObjectOnCanvas(ctx, obj, originX, originY, pxPerMm, failedImages = []) {
-                const x = originX + obj.x * pxPerMm;
-                const y = originY + obj.y * pxPerMm;
+                if (obj.hidden) return;
+                const rawX = originX + obj.x * pxPerMm;
+                const rawY = originY + obj.y * pxPerMm;
                 const w = obj.w * pxPerMm;
                 const h = obj.h * pxPerMm;
 
                 ctx.save();
                 ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1;
+
+                // Rotation autour du centre du bloc (Axe 1.2)
+                const rotDeg = Number(obj.rotation ?? obj.rotate ?? 0);
+                let x = rawX;
+                let y = rawY;
+                if (rotDeg && obj.type !== 'illustration') {
+                    ctx.translate(rawX + w / 2, rawY + h / 2);
+                    ctx.rotate((rotDeg * Math.PI) / 180);
+                    x = -w / 2;
+                    y = -h / 2;
+                }
+
+                // Ombre portée paramétrable (Axe 3.2)
+                const applyShadowIfNeeded = () => {
+                    const sBlur = Number(obj.shadowBlur ?? (obj.shadow ? 10 : 0));
+                    const sOffsetY = Number(obj.shadowOffsetY ?? (obj.shadow ? 4 : 0));
+                    const sOpacity = Number(obj.shadowOpacity ?? 0.28);
+                    if (sBlur > 0 || sOffsetY !== 0) {
+                        ctx.shadowColor = `rgba(0, 0, 0, ${Math.max(0, Math.min(1, sOpacity))})`;
+                        ctx.shadowBlur = sBlur * (pxPerMm * 0.28);
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = sOffsetY * (pxPerMm * 0.28);
+                    }
+                };
+                const resetShadow = () => {
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                };
 
                 if (obj.type === 'shape' || obj.type === 'frame') {
                     const bg = obj.bgColor || obj.backgroundColor || 'transparent';
@@ -299,8 +414,11 @@ class PrintExporter {
                     const rad = obj.radius ?? obj.borderRadius ?? 0;
                     this.roundRect(ctx, x, y, w, h, rad * pxPerMm);
                     if (bg && bg !== 'transparent') {
+                        ctx.save();
+                        applyShadowIfNeeded();
                         ctx.fillStyle = bg;
                         ctx.fill();
+                        ctx.restore();
                     }
                     if (bw > 0 && obj.borderColor && obj.borderColor !== 'transparent') {
                         ctx.lineWidth = bw * (pxPerMm * 0.35);
@@ -319,7 +437,8 @@ class PrintExporter {
                     ctx.rotate(-Math.PI / 2);
                     ctx.fillStyle = obj.textColor || '#ffffff';
                     const fontPx = Math.max(1, (obj.fontSize || 12) * PT_TO_MM * pxPerMm);
-                    ctx.font = `700 ${fontPx}px Montserrat, sans-serif`;
+                    const family = obj.fontFamily || 'Montserrat';
+                    ctx.font = `700 ${fontPx}px "${family}", sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText((obj.text || 'CATÉGORIE').toUpperCase(), 0, 0, Math.max(10, h - 4 * pxPerMm));
@@ -328,9 +447,11 @@ class PrintExporter {
                 else if (obj.type === 'badge_new') {
                     this.roundRect(ctx, x, y, w, h, (obj.radius ?? 8) * pxPerMm);
                     ctx.save();
-                    ctx.clip();
+                    applyShadowIfNeeded();
                     ctx.fillStyle = obj.bgColor || '#e11d48';
-                    ctx.fillRect(x, y, w, h);
+                    ctx.fill();
+                    resetShadow();
+                    ctx.clip();
 
                     ctx.fillStyle = obj.textColor || '#ffffff';
                     const fontPx = Math.max(2.8 * pxPerMm, h * 0.42);
@@ -370,7 +491,8 @@ class PrintExporter {
 
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = `700 ${Math.max(2.5 * pxPerMm, h * 0.22)}px Cinzel, serif`;
+                    const titleFont = obj.fontFamily || 'Cinzel';
+                    ctx.font = `700 ${Math.max(2.5 * pxPerMm, h * 0.22)}px "${titleFont}", serif`;
                     ctx.fillText(obj.title ?? 'GREY CORNER', centerX, y + h * 0.65, Math.max(10, w - 2 * pxPerMm));
 
                     ctx.globalAlpha *= 0.85;
@@ -390,11 +512,18 @@ class PrintExporter {
                         price: obj.customPrice ?? '00 DH',
                         badge: obj.customBadge || ''
                     };
+                    const typo = this.engine.typography || {};
                     this.drawSingleDishRow(ctx, dish, x, y, w, pxPerMm, {
                         nameColor: obj.textColor || obj.color || '#1e293b',
                         descColor: obj.descColor || obj.dotsColor || '#64748b',
                         priceColor: obj.priceColor || obj.color || '#9a3412',
-                        fontSize: obj.fontSize || obj.fontSizePt || 11
+                        fontSize: obj.fontSize || obj.fontSizePt || 11,
+                        titleFont: obj.titleFont || 'Playfair Display',
+                        bodyFont: obj.fontFamily || 'Inter',
+                        priceFont: obj.priceFont || 'Montserrat',
+                        leaderStyle: obj.leaderStyle || typo.leaderStyle || 'dots',
+                        showCurrency: obj.showCurrency !== undefined ? obj.showCurrency : (typo.showCurrency !== false),
+                        lineHeight: obj.lineHeight || typo.lineHeight || 1.28
                     });
                     ctx.restore();
                 }
@@ -408,10 +537,12 @@ class PrintExporter {
                     const dishes = (obj.sliceStart !== undefined || obj.sliceEnd !== undefined)
                         ? allDishes.slice(obj.sliceStart || 0, obj.sliceEnd)
                         : allDishes;
+                    const typo = this.engine.typography || {};
+                    const titleFont = obj.titleFont || 'Playfair Display';
                     let currY = y;
                     if (obj.title) {
                         ctx.fillStyle = obj.titleColor || '#9a3412';
-                        ctx.font = `700 ${4.4 * pxPerMm}px "Playfair Display", serif`;
+                        ctx.font = `700 ${4.4 * pxPerMm}px "${titleFont}", serif`;
                         ctx.textAlign = 'left';
                         ctx.textBaseline = 'top';
                         ctx.fillText(obj.title, x, currY, w);
@@ -433,7 +564,13 @@ class PrintExporter {
                             nameColor: obj.textColor || '#1e293b',
                             descColor: obj.descColor || '#64748b',
                             priceColor: obj.priceColor || '#9a3412',
-                            fontSize: obj.fontSize || 10.5
+                            fontSize: obj.fontSize || 10.5,
+                            titleFont: obj.titleFont || 'Playfair Display',
+                            bodyFont: obj.fontFamily || 'Inter',
+                            priceFont: obj.priceFont || 'Montserrat',
+                            leaderStyle: obj.leaderStyle || typo.leaderStyle || 'dots',
+                            showCurrency: obj.showCurrency !== undefined ? obj.showCurrency : (typo.showCurrency !== false),
+                            lineHeight: obj.lineHeight || typo.lineHeight || 1.28
                         });
                         currY += rowHeight + (2.5 * pxPerMm);
                     }
@@ -441,9 +578,28 @@ class PrintExporter {
                 }
                 else if (obj.type === 'photo') {
                     const radiusPx = (obj.radius ?? 4) * pxPerMm;
-                    this.roundRect(ctx, x, y, w, h, radiusPx);
+                    const maskShape = obj.maskShape || 'rounded';
+
+                    // Drop shadow under photo mask
+                    if (obj.shadow || obj.shadowBlur > 0) {
+                        ctx.save();
+                        applyShadowIfNeeded();
+                        this.buildMaskPath(ctx, x, y, w, h, radiusPx, maskShape);
+                        ctx.fillStyle = '#000000';
+                        ctx.fill();
+                        ctx.restore();
+                    }
+
+                    this.buildMaskPath(ctx, x, y, w, h, radiusPx, maskShape);
                     ctx.save();
                     ctx.clip();
+
+                    // Filtres Photo 300 DPI (Pilier 0.3)
+                    const filterCss = typeof buildPhotoFilterCSS === 'function' ? buildPhotoFilterCSS(obj) : 'none';
+                    if (filterCss && filterCss !== 'none') {
+                        ctx.filter = filterCss;
+                    }
+
                     const safeUrl = sanitizeUrl(obj.imageUrl);
                     try {
                         if (!safeUrl) throw new Error('Invalid image URL');
@@ -470,6 +626,7 @@ class PrintExporter {
                         ctx.textBaseline = 'middle';
                         ctx.fillText('Image non chargée (CORS / URL)', x + w / 2, y + h / 2, Math.max(10, w - 6 * pxPerMm));
                     }
+                    ctx.filter = 'none';
                     if (obj.caption) {
                         const capH = 7.5 * pxPerMm;
                         ctx.fillStyle = 'rgba(0,0,0,0.65)';
@@ -483,13 +640,91 @@ class PrintExporter {
                     ctx.restore();
 
                     if (obj.borderWidth > 0 && obj.borderColor !== 'transparent') {
-                        this.roundRect(ctx, x, y, w, h, radiusPx);
+                        this.buildMaskPath(ctx, x, y, w, h, radiusPx, maskShape);
                         ctx.lineWidth = obj.borderWidth * (pxPerMm * 0.35);
                         ctx.strokeStyle = obj.borderColor || '#c8a96a';
                         ctx.stroke();
                     }
                 }
-                else if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header') {
+                else if (obj.type === 'qrcode') {
+                    // Générateur de QR Code vectoriel haute résolution 300 DPI (Axe 3.1)
+                    const radPx = (obj.radius ?? 3) * pxPerMm;
+                    ctx.save();
+                    applyShadowIfNeeded();
+                    this.roundRect(ctx, x, y, w, h, radPx);
+                    ctx.fillStyle = obj.bgColor || '#ffffff';
+                    ctx.fill();
+                    resetShadow();
+                    ctx.clip();
+
+                    const captionText = (obj.caption || '').trim();
+                    const capHeight = captionText ? Math.max(4 * pxPerMm, h * 0.16) : 0;
+                    const qrBoxH = h - capHeight;
+                    const qrSize = Math.min(w, qrBoxH) * 0.84;
+                    const qrX = x + (w - qrSize) / 2;
+                    const qrY = y + (qrBoxH - qrSize) / 2;
+
+                    if (typeof QRCodeGenerator !== 'undefined') {
+                        const matrix = QRCodeGenerator.generateMatrix(obj.qrText || obj.text || 'GREY CORNER CAFE');
+                        const n = matrix.length;
+                        const cell = qrSize / n;
+                        ctx.fillStyle = obj.color || '#1e293b';
+                        for (let r = 0; r < n; r++) {
+                            for (let c = 0; c < n; c++) {
+                                if (matrix[r][c]) {
+                                    ctx.fillRect(qrX + c * cell, qrY + r * cell, Math.ceil(cell), Math.ceil(cell));
+                                }
+                            }
+                        }
+                    }
+
+                    if (captionText) {
+                        ctx.fillStyle = obj.color || '#1e293b';
+                        const fontPx = Math.max(2 * pxPerMm, capHeight * 0.45);
+                        ctx.font = `700 ${fontPx}px Montserrat, sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(captionText.toUpperCase(), x + w / 2, y + h - capHeight / 2, w - 2 * pxPerMm);
+                    }
+                    ctx.restore();
+
+                    if (obj.borderWidth > 0 && obj.borderColor && obj.borderColor !== 'transparent') {
+                        this.roundRect(ctx, x, y, w, h, radPx);
+                        ctx.lineWidth = obj.borderWidth * (pxPerMm * 0.35);
+                        ctx.strokeStyle = obj.borderColor;
+                        ctx.stroke();
+                    }
+                }
+                else if (obj.type === 'icon_badge') {
+                    // Icône Vectorielle Culinaire & Infos (Axe 3.3)
+                    if (typeof buildCulinaryIconSVG === 'function') {
+                        const labelText = (obj.text || '').trim();
+                        const iconBoxH = labelText ? h * 0.72 : h;
+                        const svgString = buildCulinaryIconSVG(obj.iconId || 'wifi', obj.color || '#c8a96a', '');
+                        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        try {
+                            const img = await this.loadImage(blobUrl, 5000);
+                            const iconSize = Math.min(w, iconBoxH);
+                            ctx.drawImage(img, x + (w - iconSize) / 2, y + (iconBoxH - iconSize) / 2, iconSize, iconSize);
+                        } catch (err) {
+                            console.warn('Erreur rendu icon_badge:', err);
+                        } finally {
+                            URL.revokeObjectURL(blobUrl);
+                        }
+                        if (labelText) {
+                            ctx.save();
+                            ctx.fillStyle = obj.textColor || obj.color || '#c8a96a';
+                            const fontPx = Math.max(2 * pxPerMm, (obj.fontSize || 9) * PT_TO_MM * pxPerMm);
+                            ctx.font = `600 ${fontPx}px Montserrat, sans-serif`;
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(labelText, x + w / 2, y + h * 0.86, w);
+                            ctx.restore();
+                        }
+                    }
+                }
+                else if (obj.type === 'text' || obj.type === 'title_heading' || obj.type === 'category_header' || obj.type === 'section_header') {
                     ctx.save();
                     ctx.beginPath();
                     ctx.rect(x, y, w, h);
@@ -501,6 +736,7 @@ class PrintExporter {
                     const fallback = typeof getFontFallback === 'function' ? getFontFallback(family) : (isSansFontFamily(family) ? 'sans-serif' : 'serif');
                     const weight = obj.fontWeight || (obj.type === 'title_heading' ? '700' : '500');
                     const align = obj.align || obj.textAlign || 'left';
+                    const lineHeightMult = Number(obj.lineHeight || (this.engine.typography && this.engine.typography.lineHeight) || 1.35);
                     ctx.fillStyle = obj.color || '#1e293b';
                     ctx.font = `${weight} ${fontPx}px "${family}", ${fallback}`;
                     ctx.textBaseline = 'top';
@@ -521,7 +757,7 @@ class PrintExporter {
                             ctx.textAlign = 'left';
                         }
                         ctx.fillText(line, lineX, lineY);
-                        lineY += fontPx * 1.35;
+                        lineY += fontPx * lineHeightMult;
                     }
                     ctx.restore();
                 }
@@ -535,7 +771,7 @@ class PrintExporter {
                             opacity: obj.opacity !== undefined ? obj.opacity : 1,
                             flipH: obj.flipH,
                             flipV: obj.flipV,
-                            rotate: obj.rotate || 0
+                            rotate: obj.rotation ?? obj.rotate ?? 0
                         });
                         const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
                         const blobUrl = URL.createObjectURL(blob);
@@ -575,6 +811,12 @@ class PrintExporter {
                 const hasBadge = dish.badge === 'NOUVEAU' || dish.badge === 'CHEF';
                 const badgeLabel = dish.badge === 'NOUVEAU' ? 'NOUVEAU' : '★ CHEF';
                 const badgeBg = dish.badge === 'NOUVEAU' ? '#e11d48' : '#d97706';
+                const titleFont = style.titleFont || 'Playfair Display';
+                const bodyFont = style.bodyFont || 'Inter';
+                const priceFont = style.priceFont || 'Montserrat';
+                const leaderStyle = style.leaderStyle || 'dots';
+                const showCurrency = style.showCurrency !== false;
+                const lineHeightMult = Number(style.lineHeight || 1.28);
 
                 let badgeW = 0;
                 if (hasBadge) {
@@ -582,9 +824,10 @@ class PrintExporter {
                     badgeW = ctx.measureText(badgeLabel).width + (2.4 * pxPerMm);
                 }
 
-                // Measure Price on right
-                const priceText = dish.price || '';
-                ctx.font = `700 ${titlePx}px Montserrat, sans-serif`;
+                // Measure Price on right (strip DH if showCurrency is false)
+                const rawPrice = String(dish.price || '');
+                const priceText = showCurrency ? rawPrice : rawPrice.replace(/\s*DH\b/gi, '').trim();
+                ctx.font = `700 ${titlePx}px "${priceFont}", sans-serif`;
                 const priceW = ctx.measureText(priceText).width;
 
                 // Draw Price aligned right on first line
@@ -594,7 +837,7 @@ class PrintExporter {
                 ctx.fillText(priceText, x + w, y);
 
                 // Wrap Name so it never collides with Price
-                ctx.font = `700 ${titlePx}px "Playfair Display", serif`;
+                ctx.font = `700 ${titlePx}px "${titleFont}", serif`;
                 const maxNameFirstLineW = Math.max(10 * pxPerMm, w - priceW - (3 * pxPerMm));
                 const nameWords = String(dish.name || '').split(/\s+/).filter(Boolean);
                 const nameLines = [];
@@ -648,8 +891,8 @@ class PrintExporter {
                     ctx.restore();
                 }
 
-                // Dotted Leader on first line when space allows
-                if (nameLines.length === 1) {
+                // Leader line on first line when space allows (Axe 2.3 : dots / dashes / solid / none)
+                if (nameLines.length === 1 && leaderStyle !== 'none') {
                     const dotsStart = firstLineUsedEndX + (2 * pxPerMm);
                     const dotsEnd = x + w - priceW - (2 * pxPerMm);
                     if (dotsEnd > dotsStart + (2 * pxPerMm)) {
@@ -657,7 +900,14 @@ class PrintExporter {
                         ctx.strokeStyle = style.descColor;
                         ctx.globalAlpha *= 0.45;
                         ctx.lineWidth = 0.3 * pxPerMm;
-                        ctx.setLineDash([0.6 * pxPerMm, 1.2 * pxPerMm]);
+                        if (leaderStyle === 'dashes') {
+                            ctx.setLineDash([1.6 * pxPerMm, 1.2 * pxPerMm]);
+                        } else if (leaderStyle === 'solid') {
+                            ctx.setLineDash([]);
+                            ctx.lineWidth = 0.22 * pxPerMm;
+                        } else {
+                            ctx.setLineDash([0.6 * pxPerMm, 1.2 * pxPerMm]);
+                        }
                         ctx.beginPath();
                         ctx.moveTo(dotsStart, y + titlePx * 0.78);
                         ctx.lineTo(dotsEnd, y + titlePx * 0.78);
@@ -672,13 +922,13 @@ class PrintExporter {
                 if (cleanDesc) {
                     currY += 1.1 * pxPerMm;
                     ctx.fillStyle = style.descColor;
-                    ctx.font = `400 ${descPx}px Inter, sans-serif`;
+                    ctx.font = `400 ${descPx}px "${bodyFont}", sans-serif`;
                     ctx.textAlign = 'left';
                     const maxDescW = Math.max(10 * pxPerMm, w - (6 * pxPerMm));
                     const descLines = this.wrapCanvasText(ctx, cleanDesc, maxDescW);
                     for (const dl of descLines) {
                         ctx.fillText(dl, x, currY);
-                        currY += descPx * 1.28;
+                        currY += descPx * lineHeightMult;
                     }
                 }
 

@@ -275,6 +275,33 @@ Object.assign(InMenuStudioApp.prototype, {
         if (pageNumLabel) {
             pageNumLabel.textContent = this.engine.pageNumbering && this.engine.pageNumbering.enabled ? 'Folios: Actif' : 'Numérotation';
         }
+        const headerFormatSelect = document.getElementById('header-format-select');
+        if (headerFormatSelect) {
+            headerFormatSelect.value = this.engine.currentFormat;
+        }
+        const headerFontPairingSelect = document.getElementById('header-font-pairing-select');
+        if (headerFontPairingSelect) {
+            headerFontPairingSelect.value = this.engine.fontPairing || 'bistrot_chic';
+        }
+    },
+
+    onHeaderFormatChange(formatKey) {
+        if (!formatKey) return;
+        this.changeActiveFormat(formatKey);
+    },
+
+    magicResizeDocument(formatKey) {
+        const target = formatKey || this.engine.currentFormat;
+        const ok = this.engine.magicResize(target);
+        if (ok) {
+            this.setupGeometryDOM();
+            this.renderCurrentFace();
+            this.renderInspector();
+            this.renderSpreadsNavigator();
+            this.updateFormatHeaderUI();
+            this.closeFormatModal();
+            this.showToast(`Magic Resize appliqué avec succès vers le format ${this.engine.specs.name} !`);
+        }
     },
 
     openFormatModal() {
@@ -300,31 +327,34 @@ Object.assign(InMenuStudioApp.prototype, {
             const p = presets[key];
             const isCurrent = (p.id === currentId || key === currentId);
             return `
-                <div data-action="change-active-format" data-format="${escapeHTML(key)}" class="p-3.5 rounded-lg border cursor-pointer transition ${
+                <div class="p-3.5 rounded-lg border transition ${
                     isCurrent
                         ? 'border-cyan-400 bg-cyan-500/15 ring-2 ring-cyan-400/50 shadow-lg'
                         : 'border-idBorder bg-idInput hover:border-gray-500 hover:bg-white/5'
                 }">
-                    <div class="flex items-center justify-between mb-1.5">
+                    <div class="flex items-center justify-between mb-1.5 cursor-pointer" data-action="change-active-format" data-format="${escapeHTML(key)}">
                         <span class="font-bold text-white text-xs flex items-center space-x-1.5">
-                            <i class="fa-solid ${p.category === 'flyer' ? 'fa-file-lines text-amber-400' : 'fa-book-open text-cyan-400'}"></i>
+                            <i class="fa-solid ${p.category === 'social' ? 'fa-mobile-screen text-pink-400' : (p.category === 'flyer' ? 'fa-file-lines text-amber-400' : 'fa-book-open text-cyan-400')}"></i>
                             <span>${escapeHTML(p.name)}</span>
                         </span>
                         <span class="text-[9px] px-1.5 py-0.5 rounded font-mono ${
                             isCurrent ? 'bg-cyan-500 text-black font-bold' : 'bg-white/10 text-gray-300'
                         }">${escapeHTML(p.badge || 'Format')}</span>
                     </div>
-                    <p class="text-[11px] text-gray-400 mb-2 leading-relaxed">${escapeHTML(p.sub || '')}</p>
+                    <p class="text-[11px] text-gray-400 mb-2 leading-relaxed cursor-pointer" data-action="change-active-format" data-format="${escapeHTML(key)}">${escapeHTML(p.sub || '')}</p>
                     <div class="flex items-center justify-between text-[10px] font-mono text-gray-400 pt-1.5 border-t border-white/5">
                         <span>${p.widthMm} × ${p.heightMm} mm</span>
-                        <span>${p.hasFold ? `Pli à ${p.foldXMm} mm` : 'Page simple'}</span>
+                        <span>${p.hasFold ? `Pli à ${p.foldXMm} mm` : 'Sans pli'}</span>
                         <span>Fond perdu +${p.bleedMm} mm</span>
                     </div>
-                    ${isCurrent ? `
-                        <div class="mt-2 text-center py-1 bg-cyan-500/20 text-cyan-300 text-[10px] font-bold rounded">
-                            <i class="fa-solid fa-check mr-1"></i>Format Actif
-                        </div>
-                    ` : ''}
+                    <div class="grid grid-cols-2 gap-1.5 mt-2.5">
+                        <button type="button" data-action="change-active-format" data-format="${escapeHTML(key)}" class="py-1 px-2 rounded text-[10px] font-bold border ${isCurrent ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-idPanel text-gray-200 border-idBorder hover:bg-white/10'}">
+                            ${isCurrent ? '✓ Format Actif' : 'Choisir Format'}
+                        </button>
+                        <button type="button" data-action="magic-resize-current" data-format="${escapeHTML(key)}" class="py-1 px-2 rounded text-[10px] font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40" title="Adapter proportionnellement les éléments vers ce format">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-300"></i>Magic Resize
+                        </button>
+                    </div>
                 </div>
             `;
         }).join('');

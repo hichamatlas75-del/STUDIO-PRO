@@ -59,6 +59,37 @@
                     <i class="fa-solid fa-shapes text-pink-400"></i>
                     <span>Modèles InDesign</span>
                 </button>
+                <!-- Pilier 0.1 : Sélecteur de Formats & Magic Resize -->
+                <div class="hidden md:flex items-center space-x-1">
+                    <select id="header-format-select" data-change="header-format-select" class="bg-idInput border border-cyan-500/40 text-cyan-300 rounded px-2 py-1 text-xs font-semibold focus:outline-none">
+                        <option value="BOOKLET_34x30">Livret 340×300 mm (10 faces)</option>
+                        <option value="A4_PORTRAIT">Menu A4 Portrait (210×297)</option>
+                        <option value="A3_LANDSCAPE">Set de Table A3 (420×297)</option>
+                        <option value="A6_TENT">Chevalet A6 (105×148)</option>
+                        <option value="INSTA_STORY">Story Instagram (1080×1920)</option>
+                        <option value="INSTA_POST">Post Instagram (1080×1350)</option>
+                        <option value="flyer_a4_portrait">Flyer A4 Portrait</option>
+                        <option value="flyer_a4_landscape">Set de Table A4 Paysage</option>
+                        <option value="flyer_a5_portrait">Chevalet A5 Portrait</option>
+                        <option value="depliant_a4_3volets">Dépliant A4 3 Volets</option>
+                    </select>
+                    <button type="button" data-action="magic-resize-current" class="px-2 py-1 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 rounded text-xs font-bold transition" title="Adapter proportionnellement les éléments au format actif (Magic Resize)">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-400"></i>Resize
+                    </button>
+                </div>
+                <!-- Pilier 0.2 : Duo Typographique -->
+                <div class="hidden lg:flex items-center space-x-1">
+                    <select id="header-font-pairing-select" data-change="font-pairing-select" class="bg-idInput border border-amber-500/40 text-amber-300 rounded px-2 py-1 text-xs font-semibold focus:outline-none" title="Duo typographique global">
+                        <option value="bistrot_chic">Bistrot Chic (Playfair + Inter)</option>
+                        <option value="palace_prestige">Palace & Prestige (Cinzel + Cormorant)</option>
+                        <option value="moderne_minimal">Moderne Minimal (Montserrat + JetBrains)</option>
+                    </select>
+                </div>
+                <!-- Axe 2.4 : Grille de Colonnes -->
+                <button type="button" data-action="toggle-grid-overlay" class="hidden md:flex items-center space-x-1.5 bg-idInput hover:bg-white/10 text-cyan-300 border border-idBorder px-2 py-1 rounded text-xs font-medium transition" title="Afficher/masquer la grille de colonnes (PAO)">
+                    <i class="fa-solid fa-table-columns text-cyan-400"></i>
+                    <span>Grille</span>
+                </button>
                 <button type="button" data-action="open-format-modal" class="flex items-center space-x-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 px-2 py-1 rounded font-medium transition" title="Changer le format du document (Menu 34×30, Flyer A4, A5...)">
                     <i class="fa-solid fa-expand text-cyan-400"></i>
                     <span id="header-format-label">34×30 cm</span>
@@ -285,7 +316,25 @@
                             <span class="text-[9px] text-purple-300">Bloc manuel</span>
                         </button>
 
-                        <!-- 10. Pack Illustrations Canva -->
+                        <!-- 10. QR Code Vectoriel 300 DPI (Axe 3.1) -->
+                        <button type="button" data-action="add-menu-block" data-type="qrcode" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-emerald-600/20 border border-idBorder hover:border-emerald-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-qrcode text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">QR Code</span>
+                            <span class="text-[9px] text-emerald-300">Menu / Wi-Fi</span>
+                        </button>
+
+                        <!-- 11. Icône Métier Culinaires & Infos (Axe 3.3) -->
+                        <button type="button" data-action="add-menu-block" data-type="icon_badge" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-amber-600/20 border border-idBorder hover:border-amber-500/50 rounded-md transition group text-center">
+                            <div class="w-8 h-8 rounded bg-amber-500/20 text-amber-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-icons text-sm"></i>
+                            </div>
+                            <span class="font-semibold text-gray-200 text-[11px]">Icône Métier</span>
+                            <span class="text-[9px] text-amber-300">Wi-Fi, Épicé, Chef</span>
+                        </button>
+
+                        <!-- 12. Pack Illustrations Canva -->
                         <button type="button" data-action="switch-left-tab" data-tab="illustrations" class="flex flex-col items-center justify-center p-2.5 bg-idInput hover:bg-amber-600/20 border border-idBorder hover:border-amber-500/50 rounded-md transition group text-center">
                             <div class="w-8 h-8 rounded bg-amber-500/20 text-amber-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
                                 <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
@@ -568,9 +617,18 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
+                    <button type="button" data-action="export-db-csv" class="bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 px-2.5 py-1.5 rounded font-semibold flex items-center space-x-1.5 text-xs transition" title="Exporter la table des plats au format CSV (compatible Excel / Google Sheets)">
+                        <i class="fa-solid fa-file-csv"></i>
+                        <span>Exporter CSV</span>
+                    </button>
+                    <button type="button" data-action="trigger-import-db-csv" class="bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 px-2.5 py-1.5 rounded font-semibold flex items-center space-x-1.5 text-xs transition" title="Importer des plats depuis un fichier CSV">
+                        <i class="fa-solid fa-file-import"></i>
+                        <span>Importer CSV</span>
+                    </button>
+                    <input id="db-csv-file-input" type="file" accept=".csv,text/csv" class="hidden" data-change="import-db-csv">
                     <button type="button" data-action="open-word-import" data-close-db="true" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded font-semibold flex items-center space-x-1.5">
                         <i class="fa-solid fa-file-word"></i>
-                        <span>Importer depuis Word (.docx)</span>
+                        <span>Word (.docx)</span>
                     </button>
                     <button type="button" data-action="add-dish-db" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded font-semibold flex items-center space-x-1.5">
                         <i class="fa-solid fa-plus"></i>
@@ -605,12 +663,13 @@
                     <thead>
                         <tr class="border-b border-idBorder text-[10px] uppercase text-gray-400 font-mono">
                             <th class="py-2 px-2 w-20">ID</th>
-                            <th class="py-2 px-2 w-40">Catégorie</th>
-                            <th class="py-2 px-2 w-56">Nom du Plat / Formule</th>
+                            <th class="py-2 px-2 w-36">Catégorie</th>
+                            <th class="py-2 px-2 w-52">Nom du Plat / Formule</th>
                             <th class="py-2 px-2">Description / Ingrédients</th>
                             <th class="py-2 px-2 w-24 text-right">Prix</th>
-                            <th class="py-2 px-2 w-28">Badge</th>
-                            <th class="py-2 px-2 w-32 text-right">Actions</th>
+                            <th class="py-2 px-2 w-24">Badge</th>
+                            <th class="py-2 px-2 w-24 text-center">Statut</th>
+                            <th class="py-2 px-2 w-48 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="db-table-body" class="divide-y divide-idBorder/60 text-xs">
@@ -1395,6 +1454,53 @@
             <span>Menu</span>
         </button>
     </nav>
+
+    <!-- ==================== CONTEXT MENU (Axe 1.6 : Clic Droit PAO) ==================== -->
+    <div id="canvas-context-menu" class="hidden fixed z-50 bg-idPanel border border-idBorder rounded-lg shadow-2xl py-1.5 w-52 text-xs text-gray-200 select-none font-sans backdrop-blur-md">
+        <button type="button" data-action="duplicate-selected" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-regular fa-clone text-amber-400 w-4"></i>
+            <span>Dupliquer</span>
+        </button>
+        <button type="button" data-action="copy-selected" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-regular fa-copy text-blue-400 w-4"></i>
+            <span>Copier (Ctrl+C)</span>
+        </button>
+        <button type="button" data-action="paste-selected" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-regular fa-clipboard text-emerald-400 w-4"></i>
+            <span>Coller (Ctrl+V)</span>
+        </button>
+        <div class="border-t border-idBorder my-1"></div>
+        <button type="button" data-action="copy-style" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-solid fa-paintbrush text-amber-300 w-4"></i>
+            <span>Copier le style</span>
+        </button>
+        <button type="button" data-action="paste-style" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-solid fa-fill-drip text-emerald-300 w-4"></i>
+            <span>Coller le style</span>
+        </button>
+        <div class="border-t border-idBorder my-1"></div>
+        <button type="button" data-action="toggle-master-object" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-solid fa-crown text-purple-400 w-4"></i>
+            <span>Page Maître (Gabarit)</span>
+        </button>
+        <button type="button" data-action="bring-to-front" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-solid fa-arrow-up text-cyan-400 w-4"></i>
+            <span>Premier plan</span>
+        </button>
+        <button type="button" data-action="send-to-back" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-solid fa-arrow-down text-cyan-400 w-4"></i>
+            <span>Arrière-plan</span>
+        </button>
+        <button type="button" data-action="toggle-lock" class="w-full text-left px-3 py-1.5 hover:bg-white/10 flex items-center space-x-2 text-white">
+            <i class="fa-solid fa-lock text-amber-400 w-4"></i>
+            <span>Verrouiller / Déverrouiller</span>
+        </button>
+        <div class="border-t border-idBorder my-1"></div>
+        <button type="button" data-action="delete-selected" class="w-full text-left px-3 py-1.5 hover:bg-rose-600/20 flex items-center space-x-2 text-rose-300 hover:text-rose-200">
+            <i class="fa-regular fa-trash-can w-4"></i>
+            <span>Supprimer</span>
+        </button>
+    </div>
 
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-14 right-6 bg-gray-900 border border-blue-500/50 text-white px-4 py-2.5 rounded-lg shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center space-x-2 pointer-events-none">

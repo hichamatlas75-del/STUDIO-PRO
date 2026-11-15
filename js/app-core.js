@@ -18,6 +18,9 @@ class InMenuStudioApp {
 
         this.currentFaceIndex = 0;
         this.selectedObjectId = null;
+        this.selectedObjectIds = [];
+        this.clipboardObjects = null;
+        this.copiedStyle = null;
         this.previewMode = false; // 'W' shortcut InDesign mode
         this.snapEnabled = true;
 
@@ -121,9 +124,16 @@ class InMenuStudioApp {
         this._delegationBound = true;
 
         document.addEventListener('click', (e) => {
+            const ctxMenu = document.getElementById('canvas-context-menu');
+            if (ctxMenu && !ctxMenu.classList.contains('hidden') && !e.target.closest('[data-action]')) {
+                ctxMenu.classList.add('hidden');
+            }
             const el = e.target.closest('[data-action]');
             if (!el) return;
             const action = el.dataset.action;
+            if (ctxMenu && !ctxMenu.classList.contains('hidden')) {
+                ctxMenu.classList.add('hidden');
+            }
             if (el.dataset.closeTools === 'true') {
                 this.closeMobileToolsMenu();
             }
@@ -364,14 +374,43 @@ class InMenuStudioApp {
                 this.addIllustrationObject(el.dataset.id);
                 break;
             case 'select-object':
-                this.selectObject(el.dataset.objId);
+                this.selectObject(el.dataset.objId, e.shiftKey);
                 break;
             case 'toggle-lock':
                 e.stopPropagation();
                 this.toggleLockSelected(el.dataset.objId || null);
                 break;
+            case 'toggle-visibility':
+                e.stopPropagation();
+                this.toggleVisibilitySelected(el.dataset.objId || null);
+                break;
+            case 'toggle-master-object':
+                this.toggleMasterSelected(el.dataset.objId || null);
+                break;
+            case 'group-selected':
+                this.groupSelectedObjects();
+                break;
+            case 'ungroup-selected':
+                this.ungroupSelectedObjects();
+                break;
+            case 'copy-selected':
+                this.copySelectedObjects();
+                break;
+            case 'paste-selected':
+            case 'paste-clipboard':
+                this.pasteClipboardObjects();
+                break;
+            case 'copy-style':
+                this.copySelectedStyle();
+                break;
+            case 'paste-style':
+                this.pasteSelectedStyle();
+                break;
             case 'align-selected':
                 this.alignSelected(el.dataset.mode);
+                break;
+            case 'distribute-selected':
+                this.distributeSelected(el.dataset.axis);
                 break;
             case 'duplicate-selected':
                 this.duplicateSelected();
@@ -406,11 +445,49 @@ class InMenuStudioApp {
             case 'sync-category-title':
                 this.syncSelectedCategoryTitle();
                 break;
+            case 'thread-overset-category':
+                e.stopPropagation();
+                this.threadOversetCategory(el.dataset.objId);
+                break;
             case 'text-transform-case':
                 this.transformSelectedTextCase(el.dataset.case);
                 break;
             case 'select-export-format':
                 this.selectExportFormat(el.dataset.format);
+                break;
+            case 'toggle-grid-overlay':
+                this.toggleGridOverlay();
+                break;
+            case 'set-grid-columns':
+                this.setGridColumns(parseInt(el.dataset.cols, 10));
+                break;
+            case 'apply-photo-filter-preset':
+                this.applyPhotoFilterPreset(el.dataset.preset);
+                break;
+            case 'set-photo-mask-shape':
+                this.setPhotoMaskShape(el.dataset.shape);
+                break;
+            case 'set-culinary-icon':
+                this.setCulinaryIcon(el.dataset.iconId);
+                break;
+            case 'toggle-dish-active': {
+                const tr = el.closest('tr');
+                this.toggleDishActiveStatus((tr && tr.dataset.dishId) || el.dataset.dishId);
+                break;
+            }
+            case 'create-dish-story': {
+                const tr = el.closest('tr');
+                this.createStoryFromDish((tr && tr.dataset.dishId) || el.dataset.dishId);
+                break;
+            }
+            case 'export-db-csv':
+                this.exportDatabaseCSV();
+                break;
+            case 'trigger-import-db-csv':
+                this.triggerImportDatabaseCSV();
+                break;
+            case 'magic-resize-current':
+                this.magicResizeDocument(el.dataset.format);
                 break;
         }
     }
@@ -447,6 +524,9 @@ class InMenuStudioApp {
                 break;
             case 'mobile-selected-prop':
                 this.updateSelectedProp(el.dataset.prop, el.value, true);
+                break;
+            case 'grid-gutter':
+                this.updateGridGutter(parseFloat(el.value), true);
                 break;
         }
     }
@@ -512,6 +592,24 @@ class InMenuStudioApp {
             }
             case 'exp-format-change':
                 this.updateExportModalUI();
+                break;
+            case 'header-format-select':
+                this.onHeaderFormatChange(el.value);
+                break;
+            case 'font-pairing-select':
+                this.onFontPairingChange(el.value);
+                break;
+            case 'global-leader-style':
+                this.updateGlobalTypography('leaderStyle', el.value);
+                break;
+            case 'global-show-currency':
+                this.updateGlobalTypography('showCurrency', el.checked);
+                break;
+            case 'grid-gutter':
+                this.updateGridGutter(parseFloat(el.value), false);
+                break;
+            case 'import-db-csv':
+                this.importDatabaseCSV(e);
                 break;
         }
     }
@@ -607,8 +705,20 @@ class InMenuStudioApp {
     }
 
     get selectedObject() {
-        if (!this.selectedObjectId) return null;
+        if (!this.selectedObjectId || !this.currentFace) return null;
         return this.currentFace.objects.find(o => o.id === this.selectedObjectId) || null;
+    }
+
+    get selectedObjects() {
+        if (!this.currentFace) return [];
+        if (Array.isArray(this.selectedObjectIds) && this.selectedObjectIds.length > 0) {
+            return this.currentFace.objects.filter(o => this.selectedObjectIds.includes(o.id));
+        }
+        if (this.selectedObjectId) {
+            const single = this.currentFace.objects.find(o => o.id === this.selectedObjectId);
+            return single ? [single] : [];
+        }
+        return [];
     }
 
     undo() {
@@ -619,7 +729,9 @@ class InMenuStudioApp {
                 this.currentFaceIndex = restoredIdx;
             }
             this.selectedObjectId = null;
+            this.selectedObjectIds = [];
             this.populateQuickDishSelect();
+            this.updateFormatHeaderUI();
             this.renderCurrentFace();
             this.renderInspector();
             this.updateUndoRedoButtons();
@@ -636,7 +748,9 @@ class InMenuStudioApp {
                 this.currentFaceIndex = restoredIdx;
             }
             this.selectedObjectId = null;
+            this.selectedObjectIds = [];
             this.populateQuickDishSelect();
+            this.updateFormatHeaderUI();
             this.renderCurrentFace();
             this.renderInspector();
             this.updateUndoRedoButtons();
@@ -722,11 +836,17 @@ class InMenuStudioApp {
             }
 
             if (e.key === 'Escape') {
+                const ctxMenu = document.getElementById('canvas-context-menu');
+                if (ctxMenu && !ctxMenu.classList.contains('hidden')) {
+                    ctxMenu.classList.add('hidden');
+                    e.preventDefault();
+                    return;
+                }
                 if (this.closeTopModal()) {
                     e.preventDefault();
                     return;
                 }
-                if (this.selectedObjectId) {
+                if (this.selectedObjectId || (this.selectedObjectIds && this.selectedObjectIds.length > 0)) {
                     e.preventDefault();
                     this.selectObject(null);
                     return;
@@ -748,8 +868,30 @@ class InMenuStudioApp {
             } else if ((e.ctrlKey || e.metaKey) && keyLower === 'y') {
                 e.preventDefault();
                 this.redo();
+            } else if ((e.ctrlKey || e.metaKey) && keyLower === 'g') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    this.ungroupSelectedObjects();
+                } else {
+                    this.groupSelectedObjects();
+                }
+            } else if ((e.ctrlKey || e.metaKey) && keyLower === 'c') {
+                if (this.selectedObjects.length > 0) {
+                    e.preventDefault();
+                    this.copySelectedObjects();
+                }
+            } else if ((e.ctrlKey || e.metaKey) && keyLower === 'v') {
+                if (this.clipboardObjects && this.clipboardObjects.length > 0) {
+                    e.preventDefault();
+                    this.pasteClipboardObjects();
+                }
+            } else if ((e.ctrlKey || e.metaKey) && keyLower === 'd') {
+                if (this.selectedObjects.length > 0) {
+                    e.preventDefault();
+                    this.duplicateSelected();
+                }
             } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (this.selectedObjectId && !this.previewMode) {
+                if ((this.selectedObjectId || this.selectedObjectIds.length > 0) && !this.previewMode) {
                     e.preventDefault();
                     this.deleteSelected();
                 }
@@ -757,14 +899,16 @@ class InMenuStudioApp {
                 e.preventDefault();
                 this.togglePreviewMode();
             } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-                const obj = this.selectedObject;
-                if (obj && !obj.locked && !this.previewMode) {
+                const selected = this.selectedObjects.filter(o => !o.locked);
+                if (selected.length > 0 && !this.previewMode) {
                     e.preventDefault();
                     const step = e.shiftKey ? 2.0 : 0.5;
-                    if (e.key === 'ArrowLeft') obj.x = +(obj.x - step).toFixed(1);
-                    else if (e.key === 'ArrowRight') obj.x = +(obj.x + step).toFixed(1);
-                    else if (e.key === 'ArrowUp') obj.y = +(obj.y - step).toFixed(1);
-                    else if (e.key === 'ArrowDown') obj.y = +(obj.y + step).toFixed(1);
+                    selected.forEach(obj => {
+                        if (e.key === 'ArrowLeft') obj.x = +(obj.x - step).toFixed(1);
+                        else if (e.key === 'ArrowRight') obj.x = +(obj.x + step).toFixed(1);
+                        else if (e.key === 'ArrowUp') obj.y = +(obj.y - step).toFixed(1);
+                        else if (e.key === 'ArrowDown') obj.y = +(obj.y + step).toFixed(1);
+                    });
                     this.commitState(false);
                     this.renderInspector();
                 }
