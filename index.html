@@ -30,11 +30,11 @@
 </head>
 <body class="bg-idBg text-gray-200 font-sans h-screen w-screen overflow-hidden flex flex-col text-xs">
 
-    <!-- ==================== TOP APPLICATION MENU & CONTROL BAR ==================== -->
-    <header class="bg-idHeader border-b border-idBorder h-11 md:h-10 flex items-center justify-between px-2 md:px-3 shrink-0 z-40">
-        <!-- Left: Brand & File Menu -->
-        <div class="flex items-center space-x-2 md:space-x-3">
-            <div class="flex items-center space-x-1.5 md:space-x-2 bg-pink-600/20 border border-pink-500/40 px-2 py-0.5 md:py-1 rounded">
+    <!-- ==================== 1. TOP APPLICATION MENU & ACTIONS BAR ==================== -->
+    <header class="bg-idHeader border-b border-idBorder h-10 flex items-center justify-between px-2 md:px-3 shrink-0 z-40 select-none">
+        <!-- Left: Brand & Main Modals -->
+        <div class="flex items-center space-x-2 md:space-x-2.5">
+            <div class="flex items-center space-x-1.5 bg-pink-600/20 border border-pink-500/40 px-2 py-1 rounded shrink-0">
                 <span class="font-bold text-pink-400 tracking-tighter text-sm font-mono">Id</span>
                 <span class="font-semibold text-gray-100 tracking-tight hidden sm:inline">InMenu Studio Pro</span>
                 <span class="font-semibold text-gray-100 tracking-tight sm:hidden text-xs">InMenu</span>
@@ -42,7 +42,7 @@
             </div>
 
             <!-- Action Buttons: Undo / Redo -->
-            <div class="flex items-center space-x-1 border-l border-idBorder pl-2">
+            <div class="flex items-center space-x-0.5 border-l border-idBorder pl-2 shrink-0">
                 <button type="button" data-action="undo" id="btn-undo" title="Annuler (Ctrl+Z)" class="p-1 md:px-2 md:py-1 rounded hover:bg-white/10 text-gray-300 disabled:opacity-30">
                     <i class="fa-solid fa-rotate-left"></i>
                 </button>
@@ -51,106 +51,52 @@
                 </button>
             </div>
 
-            <!-- Desktop Tools: Importer Word, BDD, Moteur, Formats, Numérotation -->
-            <div class="hidden lg:flex items-center space-x-1 border-l border-idBorder pl-2">
-                <button type="button" data-action="open-word-import" class="flex items-center space-x-1.5 bg-gradient-to-r from-indigo-600 to-amber-600 hover:from-indigo-500 hover:to-amber-500 text-white border border-amber-400/50 px-2.5 py-1 rounded font-semibold shadow-md transition">
+            <!-- Desktop Tools: Importer Word, BDD, Modèles, Moteur -->
+            <div class="hidden lg:flex items-center space-x-1.5 border-l border-idBorder pl-2 shrink-0">
+                <button type="button" data-action="open-word-import" class="flex items-center space-x-1.5 bg-gradient-to-r from-indigo-600 to-amber-600 hover:from-indigo-500 hover:to-amber-500 text-white border border-amber-400/50 px-2.5 py-1 rounded font-semibold shadow-sm transition">
                     <i class="fa-solid fa-file-word"></i>
-                    <span>📄 Importer Word</span>
+                    <span>Word</span>
                 </button>
-                <button type="button" data-action="open-database" class="flex items-center space-x-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2 py-1 rounded font-medium transition">
+                <button type="button" data-action="open-database" class="flex items-center space-x-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded font-medium transition">
                     <i class="fa-solid fa-database"></i>
                     <span>Base Plats (<span id="db-count-badge">0</span>)</span>
                 </button>
-                <button type="button" data-action="open-engine-inspector" class="flex items-center space-x-1.5 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 px-2 py-1 rounded font-medium transition" title="Inspecter l'architecture Engine.js & JSON">
-                    <i class="fa-solid fa-code"></i>
-                    <span>Moteur</span>
-                </button>
-                <button type="button" data-action="open-templates-modal" class="flex items-center space-x-1.5 bg-gradient-to-r from-purple-600/30 to-pink-600/30 hover:from-purple-600/40 hover:to-pink-600/40 text-purple-200 border border-purple-500/50 px-2 py-1 rounded font-semibold transition" title="Banque de Modèles & Gabarits InDesign (Menus 34×30, Flyers A4, Dépliants, Projets Vierges)">
+                <button type="button" data-action="open-templates-modal" class="flex items-center space-x-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 border border-purple-500/40 px-2.5 py-1 rounded font-semibold transition" title="Banque de Modèles & Gabarits InDesign">
                     <i class="fa-solid fa-shapes text-pink-400"></i>
-                    <span>Modèles InDesign</span>
+                    <span>Modèles</span>
                 </button>
-                <!-- Pilier 0.1 : Sélecteur de Formats & Magic Resize -->
-                <div class="hidden md:flex items-center space-x-1">
-                    <select id="header-format-select" data-change="header-format-select" class="bg-idInput border border-cyan-500/40 text-cyan-300 rounded px-2 py-1 text-xs font-semibold focus:outline-none">
-                        <option value="BOOKLET_34x30">Livret 340×300 mm (10 faces)</option>
-                        <option value="A4_PORTRAIT">Menu A4 Portrait (210×297)</option>
-                        <option value="A3_LANDSCAPE">Set de Table A3 (420×297)</option>
-                        <option value="A6_TENT">Chevalet A6 (105×148)</option>
-                        <option value="INSTA_STORY">Story Instagram (1080×1920)</option>
-                        <option value="INSTA_POST">Post Instagram (1080×1350)</option>
-                        <option value="flyer_a4_portrait">Flyer A4 Portrait</option>
-                        <option value="flyer_a4_landscape">Set de Table A4 Paysage</option>
-                        <option value="flyer_a5_portrait">Chevalet A5 Portrait</option>
-                        <option value="depliant_a4_3volets">Dépliant A4 3 Volets</option>
-                    </select>
-                    <button type="button" data-action="magic-resize-current" class="px-2 py-1 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 rounded text-xs font-bold transition" title="Adapter proportionnellement les éléments au format actif (Magic Resize)">
-                        <i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-400"></i>Resize
-                    </button>
-                </div>
-                <!-- Pilier 0.2 : Duo Typographique -->
-                <div class="hidden lg:flex items-center space-x-1">
-                    <select id="header-font-pairing-select" data-change="font-pairing-select" class="bg-idInput border border-amber-500/40 text-amber-300 rounded px-2 py-1 text-xs font-semibold focus:outline-none" title="Duo typographique global">
-                        <option value="bistrot_chic">Bistrot Chic (Playfair + Inter)</option>
-                        <option value="palace_prestige">Palace & Prestige (Cinzel + Cormorant)</option>
-                        <option value="moderne_minimal">Moderne Minimal (Montserrat + JetBrains)</option>
-                    </select>
-                </div>
-                <!-- Axe 2.4 : Grille de Colonnes -->
-                <button type="button" data-action="toggle-grid-overlay" class="hidden md:flex items-center space-x-1.5 bg-idInput hover:bg-white/10 text-cyan-300 border border-idBorder px-2 py-1 rounded text-xs font-medium transition" title="Afficher/masquer la grille de colonnes (PAO)">
-                    <i class="fa-solid fa-table-columns text-cyan-400"></i>
-                    <span>Grille</span>
-                </button>
-                <button type="button" data-action="open-format-modal" class="flex items-center space-x-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 px-2 py-1 rounded font-medium transition" title="Changer le format du document (Menu 34×30, Flyer A4, A5...)">
-                    <i class="fa-solid fa-expand text-cyan-400"></i>
-                    <span id="header-format-label">34×30 cm</span>
-                </button>
-                <button type="button" data-action="open-page-numbering" class="flex items-center space-x-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 px-2 py-1 rounded font-medium transition" title="Configurer la numérotation automatique des pages">
-                    <i class="fa-solid fa-hashtag text-purple-400"></i>
-                    <span id="header-page-num-label">Numérotation</span>
+                <button type="button" data-action="open-engine-inspector" class="flex items-center space-x-1 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 px-2 py-1 rounded font-medium transition" title="Inspecter l'architecture Engine.js & JSON">
+                    <i class="fa-solid fa-code"></i>
+                    <span>JSON</span>
                 </button>
             </div>
         </div>
 
-        <!-- Center: InDesign Live Coordinate Bar (X, Y, L, H in mm) -->
-        <div id="top-transform-bar" class="hidden xl:flex items-center space-x-2 bg-idInput px-3 py-1 rounded border border-idBorder font-mono text-[11px]">
-            <span class="text-gray-400">X:</span>
-            <input type="number" step="0.5" id="bar-x" data-change="top-bar-transform" class="w-12 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
-            <span class="text-gray-500">mm</span>
-
-            <span class="text-gray-400 pl-1">Y:</span>
-            <input type="number" step="0.5" id="bar-y" data-change="top-bar-transform" class="w-12 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
-            <span class="text-gray-500">mm</span>
-
-            <span class="text-gray-600">|</span>
-
-            <span class="text-gray-400">L:</span>
-            <input type="number" step="0.5" id="bar-w" data-change="top-bar-transform" class="w-12 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
-            <span class="text-gray-500">mm</span>
-
-            <span class="text-gray-400 pl-1">H:</span>
-            <input type="number" step="0.5" id="bar-h" data-change="top-bar-transform" class="w-12 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
-            <span class="text-gray-500">mm</span>
-        </div>
-
-        <!-- Right: View Modes, 3D Fold, Save JSON, Export PDF/PNG -->
-        <div class="flex items-center space-x-1.5 md:space-x-2">
+        <!-- Right: View Modes, 3D Fold, Fullscreen, Save JSON, Export PDF/PNG -->
+        <div class="flex items-center space-x-1.5 md:space-x-2 shrink-0">
             <!-- Toggle Guides / Preview Mode [W] -->
             <button type="button" data-action="toggle-preview-mode" id="btn-preview-mode" class="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded bg-idInput border border-idBorder hover:border-gray-500 text-gray-200 transition" title="Basculer Mode Normal / Aperçu sans repères (Touche W)">
                 <i class="fa-solid fa-eye text-cyan-400"></i>
-                <span id="preview-mode-label">Repères [W]</span>
+                <span id="preview-mode-label" class="hidden xl:inline">Repères [W]</span>
             </button>
 
             <!-- 3D Fold Simulator -->
             <button type="button" data-action="open-3d-fold" class="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/25 text-cyan-300 transition" title="Simuler le pliage 17×30 cm en 3D">
                 <i class="fa-solid fa-book-open"></i>
-                <span>Pliage 3D</span>
+                <span class="hidden xl:inline">Pliage 3D</span>
+            </button>
+
+            <!-- Toggle Fullscreen PC (F11) -->
+            <button type="button" data-action="toggle-fullscreen" id="btn-fullscreen" class="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded bg-idInput border border-idBorder hover:border-gray-500 text-gray-200 transition" title="Basculer Plein Écran PC (F11)">
+                <i id="fullscreen-icon" class="fa-solid fa-expand text-blue-400"></i>
+                <span id="fullscreen-label" class="hidden xl:inline">Plein Écran</span>
             </button>
 
             <!-- Google Drive / Local Disk Sync (Option A) -->
             <div id="drive-sync-wrapper" class="flex items-center bg-idInput border border-idBorder rounded shadow-sm">
                 <button type="button" data-action="save-disk" data-save-as="false" id="btn-save-disk" class="flex items-center space-x-1 md:space-x-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white px-2 md:px-2.5 py-1 font-semibold text-xs transition" title="Enregistrer directement dans votre dossier Google Drive (Ctrl+S)">
                     <i class="fa-brands fa-google-drive text-amber-300"></i>
-                    <span id="label-save-disk" class="hidden sm:inline">Enregistrer (Ctrl+S)</span>
+                    <span id="label-save-disk" class="hidden sm:inline">Enregistrer</span>
                     <span class="sm:hidden font-mono text-[10px]">Drive</span>
                     <span id="drive-sync-dot" class="hidden w-2 h-2 rounded-full bg-emerald-300 ml-1 animate-pulse"></span>
                 </button>
@@ -190,13 +136,13 @@
             </div>
 
             <!-- Export Print Modal Button -->
-            <button type="button" data-action="open-export-modal" class="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded font-semibold text-xs shadow transition">
+            <button type="button" data-action="open-export-modal" class="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded font-semibold text-xs shadow transition shrink-0">
                 <i class="fa-solid fa-file-pdf"></i>
                 <span class="hidden sm:inline">Exporter PDF / PNG</span>
             </button>
 
             <!-- PWA Install Button -->
-            <button type="button" data-action="install-pwa" id="btn-install-pwa" class="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500/20 to-pink-500/20 hover:from-amber-500/30 hover:to-pink-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded font-semibold text-xs shadow transition" title="Installer InMenu Studio Pro sur votre appareil (PWA Hors-Ligne)">
+            <button type="button" data-action="install-pwa" id="btn-install-pwa" class="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500/20 to-pink-500/20 hover:from-amber-500/30 hover:to-pink-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded font-semibold text-xs shadow transition shrink-0" title="Installer InMenu Studio Pro sur votre appareil (PWA Hors-Ligne)">
                 <i class="fa-solid fa-download text-amber-400"></i>
                 <span class="hidden sm:inline">Installer l'App</span>
             </button>
@@ -207,6 +153,84 @@
             </button>
         </div>
     </header>
+
+    <!-- ==================== 2. INDESIGN PAO CONTROL & SPECS BAR (OPTIONS DU DOCUMENT) ==================== -->
+    <div id="pao-control-bar" class="hidden md:flex items-center justify-between px-2.5 h-9 bg-[#18181b] border-b border-idBorder text-xs shrink-0 z-30 select-none">
+        <!-- Left: Formats, Magic Resize, Typo Duo, Grille, Folios -->
+        <div class="flex items-center space-x-1.5 lg:space-x-2 min-w-0">
+            <!-- Format Preset Selector & Resize -->
+            <div class="flex items-center space-x-1 shrink-0">
+                <span class="text-gray-400 font-medium text-[11px] hidden sm:inline"><i class="fa-solid fa-ruler-combined text-cyan-400 mr-1"></i>Format :</span>
+                <select id="header-format-select" data-change="header-format-select" class="max-w-[155px] lg:max-w-[190px] truncate bg-idInput border border-cyan-500/40 text-cyan-300 rounded px-1.5 py-0.5 text-[11px] font-semibold focus:outline-none">
+                    <option value="BOOKLET_34x30">Livret 340×300 mm (10 faces)</option>
+                    <option value="A4_PORTRAIT">Menu A4 Portrait (210×297)</option>
+                    <option value="A3_LANDSCAPE">Set de Table A3 (420×297)</option>
+                    <option value="A6_TENT">Chevalet A6 (105×148)</option>
+                    <option value="INSTA_STORY">Story Instagram (1080×1920)</option>
+                    <option value="INSTA_POST">Post Instagram (1080×1350)</option>
+                    <option value="flyer_a4_portrait">Flyer A4 Portrait</option>
+                    <option value="flyer_a4_landscape">Set de Table A4 Paysage</option>
+                    <option value="flyer_a5_portrait">Chevalet A5 Portrait</option>
+                    <option value="depliant_a4_3volets">Dépliant A4 3 Volets</option>
+                </select>
+                <button type="button" data-action="magic-resize-current" class="px-1.5 py-0.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 rounded text-[11px] font-bold transition" title="Adapter proportionnellement les éléments au format actif (Magic Resize)">
+                    <i class="fa-solid fa-wand-magic-sparkles text-purple-400 sm:mr-1"></i><span class="hidden sm:inline">Resize</span>
+                </button>
+                <button type="button" data-action="open-format-modal" class="hidden xl:flex items-center space-x-1 px-1.5 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded text-[10px] font-medium transition max-w-[110px]" title="Changer le format ou voir les gabarits">
+                    <span id="header-format-label" class="truncate">34×30 cm</span>
+                </button>
+            </div>
+
+            <span class="text-gray-600">|</span>
+
+            <!-- Duo Typographique -->
+            <div class="flex items-center space-x-1 shrink-0">
+                <span class="text-gray-400 font-medium text-[11px] hidden sm:inline"><i class="fa-solid fa-font text-amber-400 mr-1"></i>Typo :</span>
+                <select id="header-font-pairing-select" data-change="font-pairing-select" class="max-w-[140px] lg:max-w-[180px] truncate bg-idInput border border-amber-500/40 text-amber-300 rounded px-1.5 py-0.5 text-[11px] font-semibold focus:outline-none" title="Duo typographique global">
+                    <option value="bistrot_chic">Bistrot Chic (Playfair + Inter)</option>
+                    <option value="palace_prestige">Palace & Prestige (Cinzel + Cormorant)</option>
+                    <option value="moderne_minimal">Moderne Minimal (Montserrat + JetBrains)</option>
+                </select>
+            </div>
+
+            <span class="text-gray-600">|</span>
+
+            <!-- Grille de Colonnes -->
+            <button type="button" data-action="toggle-grid-overlay" class="flex items-center space-x-1 bg-idInput hover:bg-white/10 text-cyan-300 border border-idBorder px-2 py-0.5 rounded text-[11px] font-medium transition shrink-0" title="Afficher/masquer la grille de colonnes (PAO)">
+                <i class="fa-solid fa-table-columns text-cyan-400"></i>
+                <span class="hidden lg:inline">Grille</span>
+            </button>
+
+            <!-- Numérotation Automatique -->
+            <button type="button" data-action="open-page-numbering" class="flex items-center space-x-1 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded text-[11px] font-medium transition shrink-0" title="Configurer la numérotation automatique des pages">
+                <i class="fa-solid fa-hashtag text-purple-400"></i>
+                <span id="header-page-num-label" class="hidden lg:inline">Folios</span>
+            </button>
+        </div>
+
+        <!-- Right: InDesign Live Coordinates (X, Y, L, H in mm) -->
+        <div class="flex items-center space-x-2 shrink-0">
+            <div id="top-transform-bar" class="flex items-center space-x-1.5 bg-idInput px-2 py-0.5 rounded border border-idBorder font-mono text-[10px] md:text-[11px]">
+                <span class="text-gray-400">X:</span>
+                <input type="number" step="0.5" id="bar-x" data-change="top-bar-transform" class="w-10 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
+                <span class="text-gray-500 text-[10px]">mm</span>
+
+                <span class="text-gray-400 pl-0.5">Y:</span>
+                <input type="number" step="0.5" id="bar-y" data-change="top-bar-transform" class="w-10 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
+                <span class="text-gray-500 text-[10px]">mm</span>
+
+                <span class="text-gray-600">|</span>
+
+                <span class="text-gray-400">L:</span>
+                <input type="number" step="0.5" id="bar-w" data-change="top-bar-transform" class="w-10 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
+                <span class="text-gray-500 text-[10px]">mm</span>
+
+                <span class="text-gray-400 pl-0.5">H:</span>
+                <input type="number" step="0.5" id="bar-h" data-change="top-bar-transform" class="w-10 bg-transparent text-white focus:outline-none border-b border-gray-600 focus:border-blue-400 text-right" value="0">
+                <span class="text-gray-500 text-[10px]">mm</span>
+            </div>
+        </div>
+    </div>
 
     <!-- ==================== MAIN WORKSPACE AREA ==================== -->
     <div class="flex-1 flex overflow-hidden relative">

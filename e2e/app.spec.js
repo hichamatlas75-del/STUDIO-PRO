@@ -61,3 +61,20 @@ test('ouverture de la fenêtre d\'export', async ({ page }) => {
     await page.locator('[data-action="open-export-modal"]').first().click();
     await expect(page.locator('#modal-export')).toBeVisible();
 });
+
+test('affichage plein écran PC : header, barre de contrôle PAO et boutons visibles sans débordement', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('index.html');
+    await expect(page.locator('#pao-control-bar')).toBeVisible();
+    await expect(page.locator('#btn-fullscreen')).toBeVisible();
+    await expect(page.locator('[data-action="open-export-modal"]').first()).toBeVisible();
+    await expect(page.locator('#btn-save-disk')).toBeVisible();
+    await expect(page.locator('#top-transform-bar')).toBeVisible();
+
+    const isOverflowing = await page.evaluate(() => {
+        const header = document.querySelector('header');
+        const pao = document.getElementById('pao-control-bar');
+        return (header.scrollWidth > header.clientWidth) || (pao.scrollWidth > pao.clientWidth);
+    });
+    expect(isOverflowing).toBe(false);
+});

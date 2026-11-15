@@ -111,6 +111,14 @@ class InMenuStudioApp {
         window.addEventListener('resize', () => {
             requestAnimationFrame(() => this.renderRulers());
         });
+        document.addEventListener('fullscreenchange', () => {
+            const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+            this.updateFullscreenUI(isFS);
+            requestAnimationFrame(() => {
+                this.renderRulers();
+                if (this.fitToScreen) this.fitToScreen();
+            });
+        });
         // Ne pas perdre une saisie en attente de debounce lors de la fermeture / mise en arrière-plan
         window.addEventListener('beforeunload', () => this.flushPendingSave());
         document.addEventListener('visibilitychange', () => {
@@ -239,6 +247,9 @@ class InMenuStudioApp {
                 break;
             case 'install-pwa':
                 this.installPWA();
+                break;
+            case 'toggle-fullscreen':
+                this.toggleFullscreen();
                 break;
             case 'export-separate-png':
                 this.exportSeparatePanelsPNG();
@@ -834,6 +845,13 @@ class InMenuStudioApp {
         window.addEventListener('keydown', (e) => {
             const keyLower = e.key.toLowerCase();
 
+            // F11: Basculer Plein Écran PC
+            if (e.key === 'F11') {
+                e.preventDefault();
+                this.toggleFullscreen();
+                return;
+            }
+
             // Ctrl + S or Cmd + S: Save directly to Google Drive / Disk file
             if ((e.ctrlKey || e.metaKey) && keyLower === 's') {
                 e.preventDefault();
@@ -1001,6 +1019,46 @@ class InMenuStudioApp {
             } else {
                 this.showToast('Pour installer : ouvrez le menu de votre navigateur et sélectionnez "Installer l\'application" ou "Ajouter à l\'écran d\'accueil".');
             }
+        }
+    }
+
+    toggleFullscreen() {
+        if (typeof document === 'undefined') return;
+        const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        if (!isFS) {
+            const docEl = document.documentElement;
+            const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+            if (req) {
+                req.call(docEl).then(() => {
+                    this.updateFullscreenUI(true);
+                    if (this.fitToScreen) setTimeout(() => this.fitToScreen(), 200);
+                }).catch(() => {
+                    this.showToast('Plein écran non supporté ou bloqué par le navigateur');
+                });
+            }
+        } else {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+            if (exit) {
+                exit.call(document).then(() => {
+                    this.updateFullscreenUI(false);
+                    if (this.fitToScreen) setTimeout(() => this.fitToScreen(), 200);
+                }).catch(() => {});
+            }
+        }
+    }
+
+    updateFullscreenUI(isFullscreen) {
+        const icon = document.getElementById('fullscreen-icon');
+        const label = document.getElementById('fullscreen-label');
+        const btn = document.getElementById('btn-fullscreen');
+        if (icon) {
+            icon.className = isFullscreen ? 'fa-solid fa-compress text-amber-400' : 'fa-solid fa-expand text-blue-400';
+        }
+        if (label) {
+            label.textContent = isFullscreen ? 'Quitter' : 'Plein Écran';
+        }
+        if (btn) {
+            btn.title = isFullscreen ? 'Quitter le plein écran (Échap / F11)' : 'Basculer Plein Écran PC (F11)';
         }
     }
 }

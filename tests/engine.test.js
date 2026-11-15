@@ -122,13 +122,13 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         'openPageNumberingModal', 'closePageNumberingModal', 'updatePageNumberingPreview', 'savePageNumberingFromModal',
         'openMobileSheet', 'closeMobileSheets', 'toggleMobileToolsMenu', 'closeMobileToolsMenu',
         'renderMobilePagesList', 'renderMobileCanvaSheet', 'renderMobileInspector',
-        // app-io.js & PWA
+        // app-io.js & PWA & Fullscreen
         'openExportModal', 'closeExportModal', 'selectExportFormat',
         'getSelectedExportFormatSpecs', 'updateExportModalUI',
         'getSelectedExportScale', 'getReadingPageNumber',
         'exportCurrentFacePNG', 'exportSeparatePanelsPNG', 'exportPDF',
         'saveProjectToDisk', 'openProjectFromDisk', 'updateDiskSyncUI',
-        'exportProjectJSON', 'importProjectJSON', 'installPWA'
+        'exportProjectJSON', 'importProjectJSON', 'installPWA', 'toggleFullscreen'
     ];
 
     for (const method of expectedMethods) {
