@@ -4,7 +4,17 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1c1c1f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="InMenu Pro">
     <title>InMenu Studio Pro — Grey Corner Café (PAO Menu 34×30 cm)</title>
+    <!-- Web App Manifest (PWA Hors-Ligne) -->
+    <link rel="manifest" href="manifest.json">
+    <!-- Favicon & PWA Icons Spéciales -->
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="alternate icon" type="image/png" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <!-- Google Fonts embarquées localement (100% Hors-Ligne) -->
     <link rel="stylesheet" href="vendor/fonts/google-fonts.css">
     <!-- Font Awesome 6.5.1 embarqué localement -->
@@ -183,6 +193,12 @@
             <button type="button" data-action="open-export-modal" class="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded font-semibold text-xs shadow transition">
                 <i class="fa-solid fa-file-pdf"></i>
                 <span class="hidden sm:inline">Exporter PDF / PNG</span>
+            </button>
+
+            <!-- PWA Install Button -->
+            <button type="button" data-action="install-pwa" id="btn-install-pwa" class="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500/20 to-pink-500/20 hover:from-amber-500/30 hover:to-pink-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded font-semibold text-xs shadow transition" title="Installer InMenu Studio Pro sur votre appareil (PWA Hors-Ligne)">
+                <i class="fa-solid fa-download text-amber-400"></i>
+                <span class="hidden sm:inline">Installer l'App</span>
             </button>
 
             <!-- Mobile Tools Quick Button (Burger) -->
@@ -1414,6 +1430,10 @@
                     </button>
                 </div>
                 <div class="border-t border-idBorder pt-2 space-y-1.5">
+                    <button type="button" data-action="install-pwa" data-close-tools="true" id="btn-install-pwa-mobile" class="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500/20 to-pink-500/20 hover:from-amber-500/30 hover:to-pink-500/30 text-amber-300 border border-amber-500/40 rounded-lg font-bold text-xs flex items-center justify-center space-x-2 shadow">
+                        <i class="fa-solid fa-download text-amber-400"></i>
+                        <span>Installer l'Application (PWA Hors-Ligne)</span>
+                    </button>
                     <button type="button" data-action="save-disk" data-save-as="false" data-close-tools="true" class="w-full py-2.5 px-3 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-2 shadow">
                         <i class="fa-brands fa-google-drive"></i>
                         <span>Enregistrer sur Google Drive (Ctrl+S)</span>

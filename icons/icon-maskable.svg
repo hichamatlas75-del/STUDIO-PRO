@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="mBgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#242834" />
+      <stop offset="55%" stop-color="#14161d" />
+      <stop offset="100%" stop-color="#0a0b0f" />
+    </radialGradient>
+
+    <!-- Metallic Luxury Gold Gradient -->
+    <linearGradient id="mGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff6cc" />
+      <stop offset="25%" stop-color="#e5c158" />
+      <stop offset="50%" stop-color="#c59828" />
+      <stop offset="75%" stop-color="#f3d878" />
+      <stop offset="100%" stop-color="#8c6414" />
+    </linearGradient>
+
+    <linearGradient id="mGoldDark" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d8aa38" />
+      <stop offset="100%" stop-color="#704e0b" />
+    </linearGradient>
+
+    <linearGradient id="mRubyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb7185" />
+      <stop offset="40%" stop-color="#e11d48" />
+      <stop offset="100%" stop-color="#881337" />
+    </linearGradient>
+
+    <linearGradient id="mPageLeft" x1="100%" y1="0%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#e3ded4" />
+      <stop offset="12%" stop-color="#f5f2eb" />
+      <stop offset="100%" stop-color="#fdfcf8" />
+    </linearGradient>
+    <linearGradient id="mPageRight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e3ded4" />
+      <stop offset="12%" stop-color="#f7f4ee" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+  </defs>
+
+  <!-- Full Bleed Background for Maskable Icon -->
+  <rect x="0" y="0" width="512" height="512" fill="url(#mBgGrad)" />
+
+  <!-- Center Content scaled inside Safe Zone (80% circle) -->
+  <g transform="translate(256, 256) scale(0.82) translate(-256, -256)">
+    <!-- Base Gold Border Frame -->
+    <rect x="28" y="28" width="456" height="456" rx="96" ry="96" fill="#14161d" stroke="url(#mGoldGrad)" stroke-width="6" />
+    <rect x="42" y="42" width="428" height="428" rx="84" ry="84" fill="none" stroke="url(#mGoldDark)" stroke-width="2" stroke-dasharray="8 6" opacity="0.6" />
+
+    <!-- Crown of the Chef (Top Emblem) -->
+    <g transform="translate(0, -2)">
+      <path d="M 216 114 L 230 138 L 256 100 L 282 138 L 296 114 L 302 152 L 210 152 Z" fill="url(#mGoldGrad)" />
+      <circle cx="216" cy="110" r="4" fill="#ffffff" />
+      <circle cx="256" cy="94" r="5" fill="#ffffff" />
+      <circle cx="296" cy="110" r="4" fill="#ffffff" />
+      <polygon points="256,128 261,136 256,144 251,136" fill="url(#mRubyGrad)" />
+    </g>
+
+    <!-- Menu Book -->
+    <g>
+      <path d="M 88 174 C 110 170 190 166 256 176 C 322 166 402 170 424 174 L 428 382 C 404 376 322 372 256 384 C 190 372 108 376 84 382 Z" fill="#1e1814" stroke="url(#mGoldGrad)" stroke-width="3.5" />
+      <path d="M 96 182 C 120 178 190 174 254 182 L 254 374 C 190 366 120 370 96 376 Z" fill="url(#mPageLeft)" />
+      <path d="M 258 182 C 322 174 392 178 416 182 L 416 376 C 392 370 322 366 258 374 Z" fill="url(#mPageRight)" />
+      <path d="M 252 180 L 260 180 L 260 376 L 252 376 Z" fill="#000000" opacity="0.25" />
+      <line x1="256" y1="178" x2="256" y2="378" stroke="url(#mGoldDark)" stroke-width="2" />
+    </g>
+
+    <!-- Menu Page Details -->
+    <g opacity="0.92">
+      <rect x="122" y="206" width="76" height="8" rx="2" fill="url(#mGoldDark)" />
+      <rect x="110" y="226" width="68" height="5" rx="1.5" fill="#2d3748" />
+      <line x1="182" y1="230" x2="224" y2="230" stroke="#a0aec0" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.7" />
+      <rect x="228" y="226" width="18" height="5" rx="1.5" fill="url(#mGoldDark)" />
+      <rect x="110" y="248" width="60" height="5" rx="1.5" fill="#2d3748" />
+      <line x1="174" y1="252" x2="224" y2="252" stroke="#a0aec0" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.7" />
+      <rect x="228" y="248" width="18" height="5" rx="1.5" fill="url(#mGoldDark)" />
+      <rect x="110" y="270" width="65" height="5" rx="1.5" fill="#2d3748" />
+      <line x1="179" y1="274" x2="224" y2="274" stroke="#a0aec0" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.7" />
+      <rect x="228" y="270" width="18" height="5" rx="1.5" fill="url(#mGoldDark)" />
+
+      <!-- Right Page Gourmet Frame -->
+      <rect x="278" y="206" width="124" height="74" rx="6" fill="#1a1c23" stroke="url(#mGoldGrad)" stroke-width="2" />
+      <circle cx="340" cy="243" r="24" fill="#2a1f18" stroke="url(#mGoldDark)" stroke-width="1.5" />
+      <path d="M 326 248 C 326 235 354 235 354 248 Z" fill="url(#mGoldGrad)" opacity="0.85" />
+      <rect x="296" y="274" width="88" height="12" rx="3" fill="url(#mRubyGrad)" />
+      <text x="340" y="283" font-family="'Montserrat', sans-serif" font-size="6.5" font-weight="800" fill="#ffffff" text-anchor="middle">★ SIGNATURE</text>
+      <rect x="278" y="298" width="70" height="5" rx="1.5" fill="#2d3748" />
+      <line x1="352" y1="302" x2="384" y2="302" stroke="#a0aec0" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.7" />
+      <rect x="388" y="298" width="18" height="5" rx="1.5" fill="url(#mGoldDark)" />
+    </g>
+
+    <!-- Bottom Ribbon: "INMENU STUDIO PRO" -->
+    <g transform="translate(0, 10)">
+      <rect x="108" y="394" width="296" height="42" rx="21" fill="#0c0d12" stroke="url(#mGoldGrad)" stroke-width="3" />
+      <text x="220" y="422" font-family="'Montserrat', sans-serif" font-size="19" font-weight="900" fill="#ffffff" letter-spacing="2">INMENU</text>
+      <rect x="306" y="404" width="76" height="22" rx="11" fill="url(#mGoldGrad)" />
+      <text x="344" y="420" font-family="'Montserrat', sans-serif" font-size="12" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="1">PRO</text>
+    </g>
+  </g>
+</svg>

@@ -122,13 +122,13 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         'openPageNumberingModal', 'closePageNumberingModal', 'updatePageNumberingPreview', 'savePageNumberingFromModal',
         'openMobileSheet', 'closeMobileSheets', 'toggleMobileToolsMenu', 'closeMobileToolsMenu',
         'renderMobilePagesList', 'renderMobileCanvaSheet', 'renderMobileInspector',
-        // app-io.js
+        // app-io.js & PWA
         'openExportModal', 'closeExportModal', 'selectExportFormat',
         'getSelectedExportFormatSpecs', 'updateExportModalUI',
         'getSelectedExportScale', 'getReadingPageNumber',
         'exportCurrentFacePNG', 'exportSeparatePanelsPNG', 'exportPDF',
         'saveProjectToDisk', 'openProjectFromDisk', 'updateDiskSyncUI',
-        'exportProjectJSON', 'importProjectJSON'
+        'exportProjectJSON', 'importProjectJSON', 'installPWA'
     ];
 
     for (const method of expectedMethods) {
@@ -459,4 +459,41 @@ test('v4.0 - Statut Actif / Rupture & Import/Export CSV', () => {
     assert.strictEqual(imported.name, 'Tarte Tatin');
     assert.strictEqual(imported.price, '45 DH');
     assert.strictEqual(imported.active, true);
+});
+
+test('PWA : manifest.json, service worker et icônes haute fidélité valides', () => {
+    const rootDir = path.join(__dirname, '..');
+
+    // 1. Manifest
+    const manifestPath = path.join(rootDir, 'manifest.json');
+    assert.ok(fs.existsSync(manifestPath), 'manifest.json doit exister à la racine');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    assert.ok(manifest.name && manifest.short_name);
+    assert.strictEqual(manifest.display, 'standalone');
+    assert.ok(Array.isArray(manifest.icons) && manifest.icons.length >= 3);
+
+    // 2. Icônes référencées
+    for (const icon of manifest.icons) {
+        const iconPath = path.join(rootDir, icon.src);
+        assert.ok(fs.existsSync(iconPath), `L'icône PWA ${icon.src} doit exister sur le disque`);
+        assert.ok(fs.statSync(iconPath).size > 100, `L'icône PWA ${icon.src} ne doit pas être vide`);
+    }
+
+    // 3. Apple Touch Icon & Maskable Icon
+    assert.ok(fs.existsSync(path.join(rootDir, 'icons', 'apple-touch-icon.png')));
+    assert.ok(fs.existsSync(path.join(rootDir, 'icons', 'icon-maskable.png')));
+
+    // 4. Service Worker
+    const swPath = path.join(rootDir, 'sw.js');
+    assert.ok(fs.existsSync(swPath), 'sw.js doit exister à la racine');
+    const swContent = fs.readFileSync(swPath, 'utf8');
+    assert.ok(swContent.includes('CACHE_NAME'));
+    assert.ok(swContent.includes('addEventListener(\'install\''));
+    assert.ok(swContent.includes('addEventListener(\'fetch\''));
+
+    // 5. Index HTML liens PWA
+    const html = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
+    assert.ok(html.includes('rel="manifest"'));
+    assert.ok(html.includes('name="theme-color"'));
+    assert.ok(html.includes('data-action="install-pwa"'));
 });

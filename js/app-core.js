@@ -34,6 +34,8 @@ class InMenuStudioApp {
         this.activeFileHandle = null;
         this.activeFileName = (typeof localStorage !== 'undefined' && localStorage.getItem('inmenu_last_synced_filename')) || null;
         this.isSavingDisk = false;
+        this.deferredPrompt = null;
+        this.isPWAInstalled = false;
 
         this.init();
     }
@@ -54,6 +56,7 @@ class InMenuStudioApp {
         this.renderIllustrationsTab();
         this.updateFormatHeaderUI();
         this.updateDiskSyncUI(true);
+        this.initPWA();
 
         // Asynchronously verify if larger project exists in IndexedDB
         if (this.engine.loadFromAsyncStorage) {
@@ -233,6 +236,9 @@ class InMenuStudioApp {
                 break;
             case 'close-export-modal':
                 this.closeExportModal();
+                break;
+            case 'install-pwa':
+                this.installPWA();
                 break;
             case 'export-separate-png':
                 this.exportSeparatePanelsPNG();
@@ -926,6 +932,75 @@ class InMenuStudioApp {
             this.toastTimer = setTimeout(() => {
                 toast.classList.add('translate-y-20', 'opacity-0');
             }, 2600);
+        }
+    }
+
+    initPWA() {
+        if (typeof window === 'undefined') return;
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => {
+                    console.warn('SW registration failed:', err);
+                });
+            });
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredPrompt = e;
+            this.showPWAInstallButtons(true);
+        });
+
+        window.addEventListener('appinstalled', () => {
+            this.isPWAInstalled = true;
+            this.deferredPrompt = null;
+            this.showPWAInstallButtons(false);
+            this.showToast('InMenu Studio Pro a été installé avec succès !');
+        });
+
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+            this.isPWAInstalled = true;
+            this.showPWAInstallButtons(false);
+        }
+    }
+
+    showPWAInstallButtons(show) {
+        const btnHeader = document.getElementById('btn-install-pwa');
+        const btnMobile = document.getElementById('btn-install-pwa-mobile');
+        if (btnHeader) {
+            if (show) {
+                btnHeader.classList.remove('hidden');
+                btnHeader.classList.add('flex');
+            } else {
+                btnHeader.classList.add('hidden');
+                btnHeader.classList.remove('flex');
+            }
+        }
+        if (btnMobile) {
+            if (show) {
+                btnMobile.classList.remove('hidden');
+            } else {
+                btnMobile.classList.add('hidden');
+            }
+        }
+    }
+
+    installPWA() {
+        if (this.deferredPrompt) {
+            this.deferredPrompt.prompt();
+            this.deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult && choiceResult.outcome === 'accepted') {
+                    this.showToast('Installation d\'InMenu Studio Pro en cours...');
+                }
+                this.deferredPrompt = null;
+            }).catch(() => {});
+        } else {
+            if (typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone)) {
+                this.showToast('InMenu Studio Pro est déjà installé sur cet appareil.');
+            } else {
+                this.showToast('Pour installer : ouvrez le menu de votre navigateur et sélectionnez "Installer l\'application" ou "Ajouter à l\'écran d\'accueil".');
+            }
         }
     }
 }

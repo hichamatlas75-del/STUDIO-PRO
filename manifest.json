@@ -1,0 +1,38 @@
+{
+  "name": "InMenu Studio Pro - PAO & Menus",
+  "short_name": "InMenu Pro",
+  "description": "Studio PAO & PAO Social Media 100% hors-ligne pour la création de cartes et menus de restaurant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#141416",
+  "theme_color": "#1c1c1f",
+  "categories": ["productivity", "design", "utilities", "food"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
