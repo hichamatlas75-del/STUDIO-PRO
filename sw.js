@@ -1,9 +1,9 @@
 /* ==========================================================================
    InMenu Studio Pro — Service Worker PWA (100% Hors-Ligne & Cache-First)
-   Version: 4.2.0
+   Version: 4.3.0
    ========================================================================== */
 
-const CACHE_NAME = 'inmenu-studio-pro-v4.2.0';
+const CACHE_NAME = 'inmenu-studio-pro-v4.3.0';
 
 const ASSETS_TO_CACHE = [
     './',

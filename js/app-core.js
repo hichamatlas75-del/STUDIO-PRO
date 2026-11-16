@@ -657,6 +657,9 @@ class InMenuStudioApp {
             case 'extractor-font-pairing':
                 this.updateExtractorFontPairing(el.value);
                 break;
+            case 'extractor-format-change':
+                this.updateExtractorFormat(el.value);
+                break;
             case 'extractor-target-mode':
                 this.updateExtractorTargetMode(el.value);
                 break;

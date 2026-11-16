@@ -11,9 +11,9 @@ for (const f of ['utils.js', 'engine.js', 'template-extractor.js']) {
     // const/class de premier niveau ne sont pas exposés : on les rattache au contexte
     const code = fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8');
     vm.runInContext(code + '\n;this.__exp = Object.assign(this.__exp||{}, {' +
-        (f === 'utils.js' ? 'generateUniqueId, sanitizeFileName, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES' : (f === 'engine.js' ? 'DocumentEngine, FORMAT_PRESETS' : 'TemplateExtractorEngine, EXTRACTOR_SPECS')) + '});', ctx);
+        (f === 'utils.js' ? 'generateUniqueId, sanitizeFileName, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES' : (f === 'engine.js' ? 'DocumentEngine, FORMAT_PRESETS' : 'TemplateExtractorEngine, EXTRACTOR_SPECS, EXTRACTOR_FORMATS')) + '});', ctx);
 }
-const { DocumentEngine, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES, TemplateExtractorEngine, EXTRACTOR_SPECS } = ctx.__exp;
+const { DocumentEngine, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES, TemplateExtractorEngine, EXTRACTOR_SPECS, EXTRACTOR_FORMATS } = ctx.__exp;
 const flyer = () => { const e = new DocumentEngine(); e.setFormat('flyer_a4_portrait', true); e.persistReady = false; return e; };
 
 test('numérotation romaine au-delà de 20', () => {
@@ -126,7 +126,7 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         'openTemplateExtractorModal', 'closeTemplateExtractorModal', 'switchExtractorTab',
         'handleExtractorImageUpload', 'loadExtractorDemoSample', 'processExtractorImageSource',
         'analyzeExtractorWebsite', 'syncExtractorUIControls', 'updateExtractorPaletteColor',
-        'updateExtractorFontPairing', 'updateExtractorTargetMode', 'renderExtractorPreviewWireframe',
+        'updateExtractorFontPairing', 'updateExtractorTargetMode', 'updateExtractorFormat', 'renderExtractorPreviewWireframe',
         'applyExtractedTemplate', 'exportExtractedTemplateJSON',
         // app-io.js & PWA & Fullscreen
         'openExportModal', 'closeExportModal', 'selectExportFormat',
@@ -639,20 +639,33 @@ test('TemplateExtractorEngine : Nettoyage gabarit vierge, thème complet 5 planc
 
     // 2. Thème complet sur 5 planches (10 faces 34×30 cm)
     const full5 = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo);
-    assert.strictEqual(full5.faces.length, 5, 'Doit générer exactement 5 planches');
-    assert.ok(full5.placeholderDishes.length >= 10, 'Doit fournir des plats neutres pour la BDD');
+    assert.strictEqual(full5.faces.length, 10, 'Doit générer exactement les 10 faces des 5 planches (5 feuilles Recto/Verso)');
+    assert.strictEqual(full5.spreadsCount, 5, 'Doit couvrir 5 planches / feuilles');
+    assert.ok(full5.placeholderDishes.length >= 20, 'Doit fournir des plats neutres pour la BDD');
 
     full5.faces.forEach((face, fIdx) => {
         assert.ok(Array.isArray(face.objects));
         face.objects.forEach(obj => {
             if (obj.type !== 'shape' || (!obj.isBackground && obj.w < 300)) {
                 const overlaps = (obj.x < 180 && (obj.x + obj.w) > 160);
-                assert.strictEqual(overlaps, false, `Planche ${fIdx + 1} objet "${obj.name}" ne doit pas toucher 160–180 mm`);
+                assert.strictEqual(overlaps, false, `Face ${fIdx + 1} (${face.name}) objet "${obj.name}" ne doit pas toucher 160–180 mm`);
             }
         });
     });
 
-    // 3. Export et Ré-import JSON
+    // 3. Support Format A4 (Portrait et Paysage)
+    const a4Clean = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, pal, typo, { format: 'flyer_a4_portrait' });
+    assert.strictEqual(a4Clean.format, 'flyer_a4_portrait');
+    assert.strictEqual(a4Clean.objects[0].w, 216);
+    assert.strictEqual(a4Clean.objects[0].h, 303);
+
+    const a4Theme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo, { format: 'flyer_a4_portrait' });
+    assert.strictEqual(a4Theme.faces.length, 2, 'Doit générer 2 pages A4 (Recto/Verso)');
+
+    const a4LandTheme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo, { format: 'flyer_a4_landscape' });
+    assert.strictEqual(a4LandTheme.faces.length, 1, 'Doit générer 1 page A4 paysage');
+
+    // 4. Export et Ré-import JSON
     const jsonStr = TemplateExtractorEngine.exportTemplateJSON(full5);
     assert.ok(jsonStr.includes('InMenuStudioPro_TemplateExtractor_v1'));
     assert.ok(jsonStr.includes('menu_34x30'));
@@ -660,6 +673,6 @@ test('TemplateExtractorEngine : Nettoyage gabarit vierge, thème complet 5 planc
     const eng = new DocumentEngine();
     eng.persistReady = false;
     const imported = TemplateExtractorEngine.importTemplateJSON(jsonStr, eng, 'all_spreads');
-    assert.strictEqual(eng.faces.length, 5);
+    assert.strictEqual(eng.faces.length, 10);
     assert.strictEqual(eng.faces[0].bgColor, pal.background);
 });

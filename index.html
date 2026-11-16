@@ -1211,6 +1211,40 @@
                         </button>
                     </div>
 
+                    <!-- Format Cible PAO (Livret 34×30, A4 Portrait, A4 Paysage) -->
+                    <div class="p-3 bg-idInput/70 border border-idBorder rounded-lg space-y-2">
+                        <span class="text-xs font-bold text-gray-200 flex items-center justify-between">
+                            <span class="flex items-center space-x-1.5">
+                                <i class="fa-solid fa-ruler-combined text-teal-400"></i>
+                                <span>Format Cible PAO</span>
+                            </span>
+                            <span id="extractor-format-badge" class="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/40 px-1.5 py-0.5 rounded font-mono">340 × 300 mm (Pli 170 mm)</span>
+                        </span>
+                        <div class="grid grid-cols-1 gap-1.5 text-xs">
+                            <label class="flex items-center space-x-2 p-1.5 rounded bg-idBg/50 hover:bg-white/5 border border-idBorder cursor-pointer transition">
+                                <input type="radio" name="extractor-format-choice" value="menu_34x30" checked data-change="extractor-format-change" class="text-teal-500 focus:ring-0">
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-200 text-xs">Menu Livret 34 × 30 cm (2 Volets)</div>
+                                    <div class="text-[10px] text-gray-400">Pli central 170 mm • 5 Planches (10 faces) • Anti-Pli 160–180 mm</div>
+                                </div>
+                            </label>
+                            <label class="flex items-center space-x-2 p-1.5 rounded bg-idBg/50 hover:bg-white/5 border border-idBorder cursor-pointer transition">
+                                <input type="radio" name="extractor-format-choice" value="flyer_a4_portrait" data-change="extractor-format-change" class="text-teal-500 focus:ring-0">
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-200 text-xs">Flyer / Carte A4 Portrait (210 × 297 mm)</div>
+                                    <div class="text-[10px] text-gray-400">Format A4 • Sans pli • Grille 2 colonnes &amp; Cadre InDesign</div>
+                                </div>
+                            </label>
+                            <label class="flex items-center space-x-2 p-1.5 rounded bg-idBg/50 hover:bg-white/5 border border-idBorder cursor-pointer transition">
+                                <input type="radio" name="extractor-format-choice" value="flyer_a4_landscape" data-change="extractor-format-change" class="text-teal-500 focus:ring-0">
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-200 text-xs">Set de Table A4 Paysage (297 × 210 mm)</div>
+                                    <div class="text-[10px] text-gray-400">Format horizontal • Grille panoramique 3 colonnes</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- Options d'application (Active spread vs 5 Spreads) -->
                     <div class="p-3 bg-idInput/70 border border-idBorder rounded-lg space-y-2">
                         <span class="text-xs font-bold text-gray-200 flex items-center space-x-1.5">
@@ -1220,11 +1254,11 @@
                         <div class="space-y-1.5 text-xs">
                             <label class="flex items-center space-x-2 text-gray-300 hover:text-white cursor-pointer">
                                 <input type="radio" name="extractor-target-choice" value="active_spread" checked data-change="extractor-target-mode" class="text-teal-500 focus:ring-0">
-                                <span>Appliquer sur la planche active (Face courante)</span>
+                                <span id="extractor-target-label-single">Appliquer sur la planche active (Face courante)</span>
                             </label>
                             <label class="flex items-center space-x-2 text-gray-300 hover:text-white cursor-pointer">
                                 <input type="radio" name="extractor-target-choice" value="all_spreads" data-change="extractor-target-mode" class="text-teal-500 focus:ring-0">
-                                <span class="font-semibold text-teal-300">Générer un thème complet sur les 5 planches (10 faces)</span>
+                                <span id="extractor-target-label-all" class="font-semibold text-teal-300">Générer un thème complet sur les 5 planches (10 faces)</span>
                             </label>
                         </div>
                     </div>

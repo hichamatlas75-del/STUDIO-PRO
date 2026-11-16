@@ -938,9 +938,14 @@ Object.assign(InMenuStudioApp.prototype, {
         if (!this._extractorActiveTab) this._extractorActiveTab = 'photo';
         if (!this.extractorTargetMode) this.extractorTargetMode = 'active_spread';
 
+        const currentDocFormat = (this.engine && this.engine.currentFormat) || 'menu_34x30';
+        this.extractorTargetFormat = currentDocFormat;
+
         const modal = document.getElementById('modal-template-extractor');
         if (!modal) return;
         modal.classList.remove('hidden');
+
+        this.updateExtractorFormat(this.extractorTargetFormat);
 
         // Initialiser avec le sample "bistrot" si aucun gabarit n'est encore analysé
         if (!this.currentExtractedTemplate) {
@@ -953,6 +958,76 @@ Object.assign(InMenuStudioApp.prototype, {
     closeTemplateExtractorModal() {
         const modal = document.getElementById('modal-template-extractor');
         if (modal) modal.classList.add('hidden');
+    },
+
+    updateExtractorFormat(newFormat) {
+        if (!newFormat) return;
+        this.extractorTargetFormat = newFormat;
+
+        // 1. Badge Format
+        const badge = document.getElementById('extractor-format-badge');
+        if (badge) {
+            if (newFormat === 'menu_34x30') {
+                badge.textContent = '340 × 300 mm (Pli 170 mm)';
+            } else if (newFormat === 'flyer_a4_portrait') {
+                badge.textContent = 'A4 Portrait (210 × 297 mm)';
+            } else if (newFormat === 'flyer_a4_landscape') {
+                badge.textContent = 'A4 Paysage (297 × 210 mm)';
+            }
+        }
+
+        // 2. Radio synchronisé
+        const radio = document.querySelector(`input[name="extractor-format-choice"][value="${newFormat}"]`);
+        if (radio) radio.checked = true;
+
+        // 3. Libellés de portée
+        const labelSingle = document.getElementById('extractor-target-label-single');
+        const labelAll = document.getElementById('extractor-target-label-all');
+        if (labelSingle) {
+            if (newFormat === 'menu_34x30') {
+                labelSingle.textContent = 'Appliquer sur la planche active (Face courante)';
+            } else if (newFormat === 'flyer_a4_portrait') {
+                labelSingle.textContent = 'Appliquer sur la page A4 active (Page courante)';
+            } else if (newFormat === 'flyer_a4_landscape') {
+                labelSingle.textContent = 'Appliquer sur la page A4 paysage (Set de table)';
+            }
+        }
+        if (labelAll) {
+            if (newFormat === 'menu_34x30') {
+                labelAll.textContent = 'Générer un thème complet sur les 5 planches (10 faces)';
+            } else if (newFormat === 'flyer_a4_portrait') {
+                labelAll.textContent = 'Générer les 2 pages du Flyer A4 (Recto / Verso)';
+            } else if (newFormat === 'flyer_a4_landscape') {
+                labelAll.textContent = 'Générer le Set de Table complet (3 colonnes)';
+            }
+        }
+
+        // 4. Aspect-ratio du conteneur Wireframe
+        const container = document.getElementById('extractor-wireframe-container');
+        if (container) {
+            if (newFormat === 'menu_34x30') {
+                container.style.aspectRatio = '340 / 300';
+            } else if (newFormat === 'flyer_a4_portrait') {
+                container.style.aspectRatio = '210 / 297';
+            } else if (newFormat === 'flyer_a4_landscape') {
+                container.style.aspectRatio = '297 / 210';
+            }
+        }
+
+        // 5. Régénérer le gabarit vierge avec la palette & typo existantes
+        const pal = (this.currentExtractedTemplate && this.currentExtractedTemplate.palette) || TemplateExtractorEngine.getDefaultPalette('bistrot');
+        const typo = (this.currentExtractedTemplate && this.currentExtractedTemplate.typography) || TemplateExtractorEngine.detectTypography('bistrot_chic');
+
+        let rawLayout = this._lastExtractedRawLayout;
+        if (!rawLayout) {
+            rawLayout = TemplateExtractorEngine.getDefaultLayout('bistrot', newFormat);
+        }
+        this.currentExtractedTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, pal, typo, {
+            format: newFormat,
+            name: `Gabarit Vierge (${newFormat})`
+        });
+
+        this.renderExtractorPreviewWireframe();
     },
 
     switchExtractorTab(tabId) {
@@ -995,7 +1070,8 @@ Object.assign(InMenuStudioApp.prototype, {
     },
 
     loadExtractorDemoSample(sampleId = 'bistrot') {
-        const sampleUrl = TemplateExtractorEngine.getDemoSampleSVG(sampleId);
+        const formatId = this.extractorTargetFormat || 'menu_34x30';
+        const sampleUrl = TemplateExtractorEngine.getDemoSampleSVG(sampleId, formatId);
         const nameMap = {
             bistrot: 'Menu Bistrot Chic',
             trattoria: 'Carte Trattoria Bella',
@@ -1005,6 +1081,7 @@ Object.assign(InMenuStudioApp.prototype, {
     },
 
     processExtractorImageSource(imageSrc, sourceLabel = 'Image') {
+        const formatId = this.extractorTargetFormat || 'menu_34x30';
         const thumbEl = document.getElementById('extractor-image-preview-thumb');
         if (thumbEl) {
             thumbEl.innerHTML = `<img src="${imageSrc}" alt="Aperçu source" class="w-full h-24 object-contain rounded bg-black/40 border border-idBorder">`;
@@ -1044,13 +1121,15 @@ Object.assign(InMenuStudioApp.prototype, {
                 const palette = TemplateExtractorEngine.extractPaletteFromCanvas(canvas);
 
                 // 2. Détection Structure & Layout
-                const rawLayout = TemplateExtractorEngine.detectLayoutFromCanvas(canvas);
+                const rawLayout = TemplateExtractorEngine.detectLayoutFromCanvas(canvas, { format: formatId });
+                this._lastExtractedRawLayout = rawLayout;
 
                 // 3. Typographie associée
                 const typo = TemplateExtractorEngine.detectTypography(palette.isDark ? 'luxury' : 'classic');
 
                 // 4. Construction du gabarit vierge
                 const blankTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, palette, typo, {
+                    format: formatId,
                     name: `Gabarit Vierge (${sourceLabel})`
                 });
 
@@ -1061,9 +1140,11 @@ Object.assign(InMenuStudioApp.prototype, {
             } catch (err) {
                 console.warn('[TemplateExtractor] Canvas extraction fallback:', err);
                 const palette = TemplateExtractorEngine.getDefaultPalette('bistrot');
-                const rawLayout = TemplateExtractorEngine.getDefaultLayout();
+                const rawLayout = TemplateExtractorEngine.getDefaultLayout('bistrot', formatId);
+                this._lastExtractedRawLayout = rawLayout;
                 const typo = TemplateExtractorEngine.detectTypography('bistrot_chic');
                 this.currentExtractedTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, palette, typo, {
+                    format: formatId,
                     name: `Gabarit Vierge (${sourceLabel})`
                 });
                 this.syncExtractorUIControls();
@@ -1075,9 +1156,11 @@ Object.assign(InMenuStudioApp.prototype, {
         img.onerror = (err) => {
             console.warn('[TemplateExtractor] Image load fallback:', err);
             const palette = TemplateExtractorEngine.getDefaultPalette('bistrot');
-            const rawLayout = TemplateExtractorEngine.getDefaultLayout();
+            const rawLayout = TemplateExtractorEngine.getDefaultLayout('bistrot', formatId);
+            this._lastExtractedRawLayout = rawLayout;
             const typo = TemplateExtractorEngine.detectTypography('bistrot_chic');
             this.currentExtractedTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, palette, typo, {
+                format: formatId,
                 name: `Gabarit Vierge (${sourceLabel})`
             });
             this.syncExtractorUIControls();
@@ -1093,13 +1176,14 @@ Object.assign(InMenuStudioApp.prototype, {
         const presetSelect = document.getElementById('extractor-web-preset');
         const url = (urlInput && urlInput.value) || 'mon-restaurant.fr/carte';
         const preset = (presetSelect && presetSelect.value) || 'moderne';
+        const formatId = this.extractorTargetFormat || 'menu_34x30';
 
         const webExt = TemplateExtractorEngine.simulateWebsiteExtraction(url, preset);
         const blankTemplate = TemplateExtractorEngine.cleanToBlankTemplate(
             { blocks: webExt.blocks },
             webExt.palette,
             webExt.typography,
-            { name: `Gabarit Web : ${webExt.brandName}` }
+            { format: formatId, name: `Gabarit Web : ${webExt.brandName}` }
         );
 
         this.currentExtractedTemplate = blankTemplate;
@@ -1195,72 +1279,8 @@ Object.assign(InMenuStudioApp.prototype, {
         const container = document.getElementById('extractor-wireframe-container');
         if (!container || !this.currentExtractedTemplate) return;
 
-        const pal = this.currentExtractedTemplate.palette;
-        const objs = this.currentExtractedTemplate.objects || [];
-
-        let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 300" class="w-full h-full select-none">`;
-        svg += `<defs>`;
-        svg += `<pattern id="hatch-fold" width="6" height="6" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">`;
-        svg += `<line x1="0" y1="0" x2="0" y2="6" stroke="#f59e0b" stroke-width="1.8" opacity="0.35"/>`;
-        svg += `</pattern>`;
-        svg += `</defs>`;
-
-        svg += `<rect width="340" height="300" fill="${escapeHTML(pal.background)}"/>`;
-        svg += `<line x1="170" y1="0" x2="170" y2="300" stroke="#06b6d4" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.8"/>`;
-        svg += `<rect x="160" y="0" width="20" height="300" fill="url(#hatch-fold)"/>`;
-        svg += `<rect x="160" y="0" width="20" height="300" fill="#f59e0b" fill-opacity="0.08"/>`;
-
-        svg += `<rect x="12" y="12" width="146" height="276" fill="none" stroke="${escapeHTML(pal.accent)}" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.4"/>`;
-        svg += `<rect x="182" y="12" width="146" height="276" fill="none" stroke="${escapeHTML(pal.accent)}" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.4"/>`;
-
-        objs.forEach(o => {
-            if (o.type === 'shape' && o.isBackground) return;
-            const x = Math.max(0, o.x);
-            const y = Math.max(0, o.y);
-            const w = Math.min(340, o.w);
-            const h = Math.min(300, o.h);
-
-            if (o.type === 'logo') {
-                svg += `<g>`;
-                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${escapeHTML(pal.primary)}" fill-opacity="0.12" stroke="${escapeHTML(pal.primary)}" stroke-width="1"/>`;
-                svg += `<text x="${x + w / 2}" y="${y + h / 2 - 2}" fill="${escapeHTML(pal.primary)}" font-size="7" font-weight="bold" text-anchor="middle" font-family="sans-serif">[LOGO / EN-TÊTE]</text>`;
-                svg += `<text x="${x + w / 2}" y="${y + h / 2 + 7}" fill="${escapeHTML(pal.primary)}" opacity="0.75" font-size="5" text-anchor="middle" font-family="monospace">${Math.round(w)} × ${Math.round(h)} mm</text>`;
-                svg += `</g>`;
-            } else if (o.type === 'vertical_banner') {
-                svg += `<g>`;
-                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${escapeHTML(pal.accent)}" stroke="${escapeHTML(pal.accent)}" stroke-width="0.8"/>`;
-                svg += `<text x="${x + w / 2}" y="${y + h / 2}" fill="${escapeHTML(pal.bannerText || '#ffffff')}" font-size="6" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${x + w / 2} ${y + h / 2})" font-family="sans-serif">BANDEAU</text>`;
-                svg += `</g>`;
-            } else if (o.type === 'category_list') {
-                svg += `<g>`;
-                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${escapeHTML(pal.primary)}" fill-opacity="0.05" stroke="${escapeHTML(pal.primary)}" stroke-width="0.8" stroke-dasharray="3,1.5"/>`;
-                svg += `<line x1="${x + 4}" y1="${y + 12}" x2="${x + w - 4}" y2="${y + 12}" stroke="${escapeHTML(pal.primary)}" stroke-width="0.8"/>`;
-                svg += `<text x="${x + 6}" y="${y + 9}" fill="${escapeHTML(pal.primary)}" font-size="6" font-weight="bold" font-family="sans-serif">${escapeHTML(o.title || '[CATÉGORIE]')}</text>`;
-                const numLines = Math.min(5, Math.max(2, Math.floor((h - 18) / 16)));
-                for (let li = 0; li < numLines; li++) {
-                    const rowY = y + 18 + li * 15;
-                    svg += `<rect x="${x + 6}" y="${rowY}" width="${Math.max(10, w * 0.45)}" height="2" fill="${escapeHTML(pal.text)}" opacity="0.6"/>`;
-                    svg += `<rect x="${x + w - 24}" y="${rowY}" width="18" height="2" fill="${escapeHTML(pal.accent)}" opacity="0.9"/>`;
-                    svg += `<rect x="${x + 6}" y="${rowY + 4}" width="${Math.max(8, w * 0.65)}" height="1.2" fill="${escapeHTML(pal.descText || pal.text)}" opacity="0.35"/>`;
-                }
-                svg += `</g>`;
-            } else if (o.type === 'photo') {
-                svg += `<g>`;
-                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#3b82f6" fill-opacity="0.1" stroke="${escapeHTML(pal.accent)}" stroke-width="1.2" stroke-dasharray="4,2"/>`;
-                svg += `<circle cx="${x + w / 2}" cy="${y + h / 2 - 5}" r="8" fill="none" stroke="${escapeHTML(pal.accent)}" stroke-width="1"/>`;
-                svg += `<text x="${x + w / 2}" y="${y + h / 2 + 9}" fill="${escapeHTML(pal.accent)}" font-size="6" font-weight="bold" text-anchor="middle" font-family="sans-serif">[PHOTO VIERGE]</text>`;
-                svg += `</g>`;
-            } else if (o.type === 'shape') {
-                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.radius || 2}" fill="none" stroke="${escapeHTML(o.borderColor || pal.accent)}" stroke-width="0.6" opacity="0.5"/>`;
-            }
-        });
-
-        svg += `<text x="85" y="295" fill="${escapeHTML(pal.text)}" opacity="0.6" font-size="5" text-anchor="middle" font-family="monospace">Volet Gauche (170 mm)</text>`;
-        svg += `<text x="255" y="295" fill="${escapeHTML(pal.text)}" opacity="0.6" font-size="5" text-anchor="middle" font-family="monospace">Volet Droit (170 mm)</text>`;
-        svg += `<text x="170" y="8" fill="#f59e0b" font-size="4.5" font-weight="bold" text-anchor="middle" font-family="monospace">Pli 170 mm (Zone interdite 160–180 mm)</text>`;
-
-        svg += `</svg>`;
-        container.innerHTML = svg;
+        const formatId = this.extractorTargetFormat || (this.currentExtractedTemplate && this.currentExtractedTemplate.format) || 'menu_34x30';
+        container.innerHTML = TemplateExtractorEngine.renderWireframeSVG(this.currentExtractedTemplate, { format: formatId });
     },
 
     applyExtractedTemplate() {
@@ -1269,14 +1289,22 @@ Object.assign(InMenuStudioApp.prototype, {
             return;
         }
 
+        const formatId = this.extractorTargetFormat || (this.currentExtractedTemplate && this.currentExtractedTemplate.format) || 'menu_34x30';
         const mode = this.extractorTargetMode || 'active_spread';
         const pal = this.currentExtractedTemplate.palette;
         const typo = this.currentExtractedTemplate.typography;
 
+        // Si le format cible est différent du format actuel du document, basculer le document
+        if (this.engine && this.engine.currentFormat !== formatId) {
+            this.engine.setFormat(formatId, false);
+        }
+
         const placeholderDishes = TemplateExtractorEngine.getNeutralPlaceholderDishes([
             '[CATÉGORIE 1]', '[CATÉGORIE 2]', '[CATÉGORIE 3]', '[CATÉGORIE 4]',
             '[ENTRÉES FROIDES]', '[SALADES & ENTRÉES CHAUDES]', '[VIANDES & GRILLADES]',
-            '[POISSONS & FRUITS DE MER]', '[DESSERTS DU CHEF]', '[BOISSONS & COCKTAILS]'
+            '[POISSONS & FRUITS DE MER]', '[DESSERTS DU CHEF]', '[BOISSONS & COCKTAILS]',
+            '[ANTIPASTI]', '[PIZZE ARTIGIANALI]', '[PRIMI PIATTI]', '[SECONDI PIATTI]',
+            '[DOLCI DELLA CASA]', '[VINS & BOISSONS]', '[FORMULES DU JOUR]', '[MENU ENFANT]'
         ]);
 
         const existingIds = new Set(this.engine.dishesDB.map(d => d.id));
@@ -1288,13 +1316,18 @@ Object.assign(InMenuStudioApp.prototype, {
         });
 
         if (mode === 'all_spreads') {
-            const theme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo);
+            const theme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo, { format: formatId });
             this.engine.faces = theme.faces;
             this.currentFace = this.engine.faces[0];
             this.engine.currentFace = this.currentFace;
             this.currentFaceIndex = 0;
             this.engine.fontPairing = typo.id || 'bistrot_chic';
-            this.showToast('Thème complet vierge appliqué sur les 5 planches (10 faces) !');
+            const msg = formatId === 'menu_34x30'
+                ? 'Thème complet vierge appliqué sur les 5 planches (10 faces) !'
+                : (formatId === 'flyer_a4_portrait'
+                    ? 'Gabarit Flyer A4 Recto / Verso (2 pages) appliqué !'
+                    : 'Gabarit Set de Table A4 Paysage (3 colonnes) appliqué !');
+            this.showToast(msg);
         } else {
             const targetFace = this.currentFace || (this.engine && this.engine.faces && this.engine.faces[this.currentFaceIndex || 0]);
             if (targetFace) {
@@ -1303,7 +1336,8 @@ Object.assign(InMenuStudioApp.prototype, {
                 this.currentFace = targetFace;
                 if (this.engine) this.engine.currentFace = targetFace;
             }
-            this.showToast('Gabarit vierge 34×30 cm appliqué sur la planche active !');
+            const formatLabel = formatId === 'menu_34x30' ? '34×30 cm' : (formatId === 'flyer_a4_portrait' ? 'A4 Portrait' : 'A4 Paysage');
+            this.showToast(`Gabarit vierge ${formatLabel} appliqué sur la face active !`);
         }
 
         this.selectedObjectId = null;
@@ -1321,14 +1355,16 @@ Object.assign(InMenuStudioApp.prototype, {
             return;
         }
 
+        const formatId = this.extractorTargetFormat || (this.currentExtractedTemplate && this.currentExtractedTemplate.format) || 'menu_34x30';
         const mode = this.extractorTargetMode || 'active_spread';
         let exportData = this.currentExtractedTemplate;
 
         if (mode === 'all_spreads') {
             const pal = this.currentExtractedTemplate.palette;
             const typo = this.currentExtractedTemplate.typography;
-            const fullTheme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo);
+            const fullTheme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo, { format: formatId });
             exportData = Object.assign({}, this.currentExtractedTemplate, {
+                format: formatId,
                 faces: fullTheme.faces
             });
         }
@@ -1338,7 +1374,7 @@ Object.assign(InMenuStudioApp.prototype, {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `inmenu-gabarit-vierge-34x30-${Date.now()}.json`;
+        a.download = `inmenu-gabarit-vierge-${formatId}-${Date.now()}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
