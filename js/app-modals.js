@@ -931,5 +931,386 @@ Object.assign(InMenuStudioApp.prototype, {
         `;
 
         container.innerHTML = html;
+    },
+
+    // ==================== TEMPLATE EXTRACTOR MODAL (PHOTO & WEB) ====================
+    openTemplateExtractorModal() {
+        if (!this._extractorActiveTab) this._extractorActiveTab = 'photo';
+        if (!this.extractorTargetMode) this.extractorTargetMode = 'active_spread';
+
+        const modal = document.getElementById('modal-template-extractor');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+
+        // Initialiser avec le sample "bistrot" si aucun gabarit n'est encore analysé
+        if (!this.currentExtractedTemplate) {
+            this.loadExtractorDemoSample('bistrot');
+        } else {
+            this.renderExtractorPreviewWireframe();
+        }
+    },
+
+    closeTemplateExtractorModal() {
+        const modal = document.getElementById('modal-template-extractor');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    switchExtractorTab(tabId) {
+        this._extractorActiveTab = tabId;
+        const btnPhoto = document.getElementById('extractor-btn-tab-photo');
+        const btnWeb = document.getElementById('extractor-btn-tab-web');
+        const tabPhoto = document.getElementById('extractor-tab-content-photo');
+        const tabWeb = document.getElementById('extractor-tab-content-web');
+
+        if (tabId === 'web') {
+            btnPhoto?.classList.remove('bg-emerald-600', 'text-white', 'shadow');
+            btnPhoto?.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-white/5');
+            btnWeb?.classList.add('bg-emerald-600', 'text-white', 'shadow');
+            btnWeb?.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-white/5');
+            tabPhoto?.classList.add('hidden');
+            tabWeb?.classList.remove('hidden');
+        } else {
+            btnWeb?.classList.remove('bg-emerald-600', 'text-white', 'shadow');
+            btnWeb?.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-white/5');
+            btnPhoto?.classList.add('bg-emerald-600', 'text-white', 'shadow');
+            btnPhoto?.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-white/5');
+            tabWeb?.classList.add('hidden');
+            tabPhoto?.classList.remove('hidden');
+        }
+    },
+
+    handleExtractorImageUpload(file) {
+        if (!file) return;
+        if (!file.type || !file.type.startsWith('image/')) {
+            this.showToast('Veuillez sélectionner un fichier image valide (JPG, PNG, WebP)');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            this.processExtractorImageSource(dataUrl, file.name);
+        };
+        reader.readAsDataURL(file);
+    },
+
+    loadExtractorDemoSample(sampleId = 'bistrot') {
+        const sampleUrl = TemplateExtractorEngine.getDemoSampleSVG(sampleId);
+        const nameMap = {
+            bistrot: 'Menu Bistrot Chic',
+            trattoria: 'Carte Trattoria Bella',
+            lounge: 'Menu Gastro Lounge'
+        };
+        this.processExtractorImageSource(sampleUrl, nameMap[sampleId] || 'Exemple Démo');
+    },
+
+    processExtractorImageSource(imageSrc, sourceLabel = 'Image') {
+        const thumbEl = document.getElementById('extractor-image-preview-thumb');
+        if (thumbEl) {
+            thumbEl.innerHTML = `<img src="${imageSrc}" alt="Aperçu source" class="w-full h-24 object-contain rounded bg-black/40 border border-idBorder">`;
+        }
+        const statusEl = document.getElementById('extractor-source-label');
+        if (statusEl) {
+            statusEl.textContent = sourceLabel;
+        }
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxDim = 400;
+            let w = img.naturalWidth || img.width || 400;
+            let h = img.naturalHeight || img.height || 400;
+            if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                } else {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                }
+            }
+            canvas.width = Math.max(10, w);
+            canvas.height = Math.max(10, h);
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(img, 0, 0, w, h);
+
+            // 1. Extraction Palette
+            const palette = TemplateExtractorEngine.extractPaletteFromCanvas(canvas);
+
+            // 2. Détection Structure & Layout
+            const rawLayout = TemplateExtractorEngine.detectLayoutFromCanvas(canvas);
+
+            // 3. Typographie associée
+            const typo = TemplateExtractorEngine.detectTypography(palette.isDark ? 'luxury' : 'classic');
+
+            // 4. Construction du gabarit vierge
+            const blankTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, palette, typo, {
+                name: `Gabarit Vierge (${sourceLabel})`
+            });
+
+            this.currentExtractedTemplate = blankTemplate;
+            this.syncExtractorUIControls();
+            this.renderExtractorPreviewWireframe();
+            this.showToast(`Gabarit extrait depuis ${sourceLabel} !`);
+        };
+        img.onerror = () => {
+            this.showToast('Erreur lors du chargement de l\'image');
+        };
+        img.src = imageSrc;
+    },
+
+    analyzeExtractorWebsite() {
+        const urlInput = document.getElementById('extractor-web-url');
+        const presetSelect = document.getElementById('extractor-web-preset');
+        const url = (urlInput && urlInput.value) || 'mon-restaurant.fr/carte';
+        const preset = (presetSelect && presetSelect.value) || 'moderne';
+
+        const webExt = TemplateExtractorEngine.simulateWebsiteExtraction(url, preset);
+        const blankTemplate = TemplateExtractorEngine.cleanToBlankTemplate(
+            { blocks: webExt.blocks },
+            webExt.palette,
+            webExt.typography,
+            { name: `Gabarit Web : ${webExt.brandName}` }
+        );
+
+        this.currentExtractedTemplate = blankTemplate;
+        const statusEl = document.getElementById('extractor-source-label');
+        if (statusEl) statusEl.textContent = `Site Web : ${webExt.brandName}`;
+
+        this.syncExtractorUIControls();
+        this.renderExtractorPreviewWireframe();
+        this.showToast(`Mise en page web extraite pour ${webExt.brandName} !`);
+    },
+
+    syncExtractorUIControls() {
+        if (!this.currentExtractedTemplate) return;
+        const pal = this.currentExtractedTemplate.palette;
+        const typo = this.currentExtractedTemplate.typography;
+
+        const colorKeys = ['background', 'primary', 'accent', 'text'];
+        colorKeys.forEach(k => {
+            const input = document.getElementById(`extractor-color-${k}`);
+            const textEl = document.getElementById(`extractor-color-val-${k}`);
+            if (input && pal[k]) input.value = pal[k];
+            if (textEl && pal[k]) textEl.textContent = pal[k].toUpperCase();
+        });
+
+        const fontSelect = document.getElementById('extractor-font-pairing-select');
+        if (fontSelect && typo && typo.id) {
+            fontSelect.value = typo.id;
+        }
+        const typoLabel = document.getElementById('extractor-typo-label');
+        if (typoLabel && typo) {
+            typoLabel.textContent = `${typo.headingFont} + ${typo.bodyFont} + ${typo.priceFont}`;
+        }
+    },
+
+    updateExtractorPaletteColor(colorKey, hex) {
+        if (!this.currentExtractedTemplate || !colorKey || !hex) return;
+        this.currentExtractedTemplate.palette[colorKey] = hex;
+
+        const textEl = document.getElementById(`extractor-color-val-${colorKey}`);
+        if (textEl) textEl.textContent = hex.toUpperCase();
+
+        const pal = this.currentExtractedTemplate.palette;
+        const objs = this.currentExtractedTemplate.objects || [];
+        objs.forEach(o => {
+            if (o.type === 'shape' && o.isBackground) {
+                o.bgColor = pal.background;
+            } else if (o.type === 'logo') {
+                o.color = pal.primary;
+            } else if (o.type === 'vertical_banner') {
+                o.bgColor = pal.accent;
+            } else if (o.type === 'category_list') {
+                o.titleColor = pal.primary;
+                o.textColor = pal.text;
+                o.priceColor = pal.accent;
+            } else if (o.type === 'photo') {
+                o.borderColor = pal.accent;
+                o.imageUrl = TemplateExtractorEngine.createBlankPhotoPlaceholderSVG(o.w, o.h, pal);
+            }
+        });
+
+        this.renderExtractorPreviewWireframe();
+    },
+
+    updateExtractorFontPairing(pairingId) {
+        if (!this.currentExtractedTemplate || !pairingId) return;
+        const typo = TemplateExtractorEngine.getTypographyForPairing(pairingId);
+        this.currentExtractedTemplate.typography = typo;
+
+        const typoLabel = document.getElementById('extractor-typo-label');
+        if (typoLabel && typo) {
+            typoLabel.textContent = `${typo.headingFont} + ${typo.bodyFont} + ${typo.priceFont}`;
+        }
+
+        const objs = this.currentExtractedTemplate.objects || [];
+        objs.forEach(o => {
+            if (o.type === 'category_list') {
+                o.titleFont = typo.headingFont;
+                o.fontFamily = typo.bodyFont;
+                o.priceFont = typo.priceFont;
+            } else if (o.type === 'logo') {
+                o.titleFont = typo.headingFont;
+            }
+        });
+
+        this.renderExtractorPreviewWireframe();
+    },
+
+    updateExtractorTargetMode(mode) {
+        this.extractorTargetMode = mode;
+    },
+
+    renderExtractorPreviewWireframe() {
+        const container = document.getElementById('extractor-wireframe-container');
+        if (!container || !this.currentExtractedTemplate) return;
+
+        const pal = this.currentExtractedTemplate.palette;
+        const objs = this.currentExtractedTemplate.objects || [];
+
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 300" class="w-full h-full select-none">`;
+        svg += `<defs>`;
+        svg += `<pattern id="hatch-fold" width="6" height="6" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">`;
+        svg += `<line x1="0" y1="0" x2="0" y2="6" stroke="#f59e0b" stroke-width="1.8" opacity="0.35"/>`;
+        svg += `</pattern>`;
+        svg += `</defs>`;
+
+        svg += `<rect width="340" height="300" fill="${escapeHTML(pal.background)}"/>`;
+        svg += `<line x1="170" y1="0" x2="170" y2="300" stroke="#06b6d4" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.8"/>`;
+        svg += `<rect x="160" y="0" width="20" height="300" fill="url(#hatch-fold)"/>`;
+        svg += `<rect x="160" y="0" width="20" height="300" fill="#f59e0b" fill-opacity="0.08"/>`;
+
+        svg += `<rect x="12" y="12" width="146" height="276" fill="none" stroke="${escapeHTML(pal.accent)}" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.4"/>`;
+        svg += `<rect x="182" y="12" width="146" height="276" fill="none" stroke="${escapeHTML(pal.accent)}" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.4"/>`;
+
+        objs.forEach(o => {
+            if (o.type === 'shape' && o.isBackground) return;
+            const x = Math.max(0, o.x);
+            const y = Math.max(0, o.y);
+            const w = Math.min(340, o.w);
+            const h = Math.min(300, o.h);
+
+            if (o.type === 'logo') {
+                svg += `<g>`;
+                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${escapeHTML(pal.primary)}" fill-opacity="0.12" stroke="${escapeHTML(pal.primary)}" stroke-width="1"/>`;
+                svg += `<text x="${x + w / 2}" y="${y + h / 2 - 2}" fill="${escapeHTML(pal.primary)}" font-size="7" font-weight="bold" text-anchor="middle" font-family="sans-serif">[LOGO / EN-TÊTE]</text>`;
+                svg += `<text x="${x + w / 2}" y="${y + h / 2 + 7}" fill="${escapeHTML(pal.primary)}" opacity="0.75" font-size="5" text-anchor="middle" font-family="monospace">${Math.round(w)} × ${Math.round(h)} mm</text>`;
+                svg += `</g>`;
+            } else if (o.type === 'vertical_banner') {
+                svg += `<g>`;
+                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${escapeHTML(pal.accent)}" stroke="${escapeHTML(pal.accent)}" stroke-width="0.8"/>`;
+                svg += `<text x="${x + w / 2}" y="${y + h / 2}" fill="${escapeHTML(pal.bannerText || '#ffffff')}" font-size="6" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${x + w / 2} ${y + h / 2})" font-family="sans-serif">BANDEAU</text>`;
+                svg += `</g>`;
+            } else if (o.type === 'category_list') {
+                svg += `<g>`;
+                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${escapeHTML(pal.primary)}" fill-opacity="0.05" stroke="${escapeHTML(pal.primary)}" stroke-width="0.8" stroke-dasharray="3,1.5"/>`;
+                svg += `<line x1="${x + 4}" y1="${y + 12}" x2="${x + w - 4}" y2="${y + 12}" stroke="${escapeHTML(pal.primary)}" stroke-width="0.8"/>`;
+                svg += `<text x="${x + 6}" y="${y + 9}" fill="${escapeHTML(pal.primary)}" font-size="6" font-weight="bold" font-family="sans-serif">${escapeHTML(o.title || '[CATÉGORIE]')}</text>`;
+                const numLines = Math.min(5, Math.max(2, Math.floor((h - 18) / 16)));
+                for (let li = 0; li < numLines; li++) {
+                    const rowY = y + 18 + li * 15;
+                    svg += `<rect x="${x + 6}" y="${rowY}" width="${Math.max(10, w * 0.45)}" height="2" fill="${escapeHTML(pal.text)}" opacity="0.6"/>`;
+                    svg += `<rect x="${x + w - 24}" y="${rowY}" width="18" height="2" fill="${escapeHTML(pal.accent)}" opacity="0.9"/>`;
+                    svg += `<rect x="${x + 6}" y="${rowY + 4}" width="${Math.max(8, w * 0.65)}" height="1.2" fill="${escapeHTML(pal.descText || pal.text)}" opacity="0.35"/>`;
+                }
+                svg += `</g>`;
+            } else if (o.type === 'photo') {
+                svg += `<g>`;
+                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#3b82f6" fill-opacity="0.1" stroke="${escapeHTML(pal.accent)}" stroke-width="1.2" stroke-dasharray="4,2"/>`;
+                svg += `<circle cx="${x + w / 2}" cy="${y + h / 2 - 5}" r="8" fill="none" stroke="${escapeHTML(pal.accent)}" stroke-width="1"/>`;
+                svg += `<text x="${x + w / 2}" y="${y + h / 2 + 9}" fill="${escapeHTML(pal.accent)}" font-size="6" font-weight="bold" text-anchor="middle" font-family="sans-serif">[PHOTO VIERGE]</text>`;
+                svg += `</g>`;
+            } else if (o.type === 'shape') {
+                svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.radius || 2}" fill="none" stroke="${escapeHTML(o.borderColor || pal.accent)}" stroke-width="0.6" opacity="0.5"/>`;
+            }
+        });
+
+        svg += `<text x="85" y="295" fill="${escapeHTML(pal.text)}" opacity="0.6" font-size="5" text-anchor="middle" font-family="monospace">Volet Gauche (170 mm)</text>`;
+        svg += `<text x="255" y="295" fill="${escapeHTML(pal.text)}" opacity="0.6" font-size="5" text-anchor="middle" font-family="monospace">Volet Droit (170 mm)</text>`;
+        svg += `<text x="170" y="8" fill="#f59e0b" font-size="4.5" font-weight="bold" text-anchor="middle" font-family="monospace">Pli 170 mm (Zone interdite 160–180 mm)</text>`;
+
+        svg += `</svg>`;
+        container.innerHTML = svg;
+    },
+
+    applyExtractedTemplate() {
+        if (!this.currentExtractedTemplate) {
+            this.showToast('Veuillez d\'abord charger ou extraire un gabarit');
+            return;
+        }
+
+        const mode = this.extractorTargetMode || 'active_spread';
+        const pal = this.currentExtractedTemplate.palette;
+        const typo = this.currentExtractedTemplate.typography;
+
+        const placeholderDishes = TemplateExtractorEngine.getNeutralPlaceholderDishes([
+            '[CATÉGORIE 1]', '[CATÉGORIE 2]', '[CATÉGORIE 3]', '[CATÉGORIE 4]',
+            '[ENTRÉES FROIDES]', '[SALADES & ENTRÉES CHAUDES]', '[VIANDES & GRILLADES]',
+            '[POISSONS & FRUITS DE MER]', '[DESSERTS DU CHEF]', '[BOISSONS & COCKTAILS]'
+        ]);
+
+        const existingIds = new Set(this.engine.dishesDB.map(d => d.id));
+        placeholderDishes.forEach(pd => {
+            if (!existingIds.has(pd.id)) {
+                this.engine.dishesDB.push(pd);
+                existingIds.add(pd.id);
+            }
+        });
+
+        if (mode === 'all_spreads') {
+            const theme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo);
+            this.engine.faces = theme.faces;
+            this.engine.currentFace = this.engine.faces[0];
+            this.currentFaceIndex = 0;
+            this.engine.fontPairing = typo.id || 'bistrot_chic';
+            this.showToast('Thème complet vierge appliqué sur les 5 planches (10 faces) !');
+        } else {
+            if (this.engine.currentFace) {
+                this.engine.currentFace.bgColor = pal.background;
+                this.engine.currentFace.objects = JSON.parse(JSON.stringify(this.currentExtractedTemplate.objects || []));
+            }
+            this.showToast('Gabarit vierge 34×30 cm appliqué sur la planche active !');
+        }
+
+        this.commitState(true);
+        this.renderSpreadsNavigator();
+        this.populateQuickDishSelect();
+        this.renderCurrentFace();
+        this.renderInspector();
+        this.closeTemplateExtractorModal();
+    },
+
+    exportExtractedTemplateJSON() {
+        if (!this.currentExtractedTemplate) {
+            this.showToast('Aucun gabarit à exporter');
+            return;
+        }
+
+        const mode = this.extractorTargetMode || 'active_spread';
+        let exportData = this.currentExtractedTemplate;
+
+        if (mode === 'all_spreads') {
+            const pal = this.currentExtractedTemplate.palette;
+            const typo = this.currentExtractedTemplate.typography;
+            const fullTheme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo);
+            exportData = Object.assign({}, this.currentExtractedTemplate, {
+                faces: fullTheme.faces
+            });
+        }
+
+        const jsonStr = TemplateExtractorEngine.exportTemplateJSON(exportData);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `inmenu-gabarit-vierge-34x30-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.showToast('Gabarit réutilisable exporté en JSON !');
     }
 });

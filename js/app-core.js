@@ -84,7 +84,7 @@ class InMenuStudioApp {
         const modalIds = [
             'modal-database', 'modal-export', 'modal-3d', 'modal-engine',
             'modal-word-import', 'modal-format', 'modal-page-numbering',
-            'modal-templates', 'modal-mobile-tools'
+            'modal-templates', 'modal-mobile-tools', 'modal-template-extractor'
         ];
         modalIds.forEach(id => {
             const el = document.getElementById(id);
@@ -184,6 +184,35 @@ class InMenuStudioApp {
                 break;
             case 'close-word-import':
                 this.closeWordImportModal();
+                break;
+            case 'open-template-extractor':
+                this.openTemplateExtractorModal();
+                break;
+            case 'close-template-extractor':
+                this.closeTemplateExtractorModal();
+                break;
+            case 'extractor-tab-photo':
+                this.switchExtractorTab('photo');
+                break;
+            case 'extractor-tab-web':
+                this.switchExtractorTab('web');
+                break;
+            case 'load-extractor-sample':
+                this.loadExtractorDemoSample(el.dataset.sample || 'bistrot');
+                break;
+            case 'trigger-extractor-file': {
+                const finput = document.getElementById('extractor-file-input');
+                if (finput) finput.click();
+                break;
+            }
+            case 'analyze-extractor-web':
+                this.analyzeExtractorWebsite();
+                break;
+            case 'apply-extracted-template':
+                this.applyExtractedTemplate();
+                break;
+            case 'export-extracted-template-json':
+                this.exportExtractedTemplateJSON();
                 break;
             case 'open-database':
                 this.openDatabaseModal();
@@ -545,6 +574,9 @@ class InMenuStudioApp {
             case 'grid-gutter':
                 this.updateGridGutter(parseFloat(el.value), true);
                 break;
+            case 'extractor-palette-color-input':
+                this.updateExtractorPaletteColor(el.dataset.colorKey, el.value);
+                break;
         }
     }
 
@@ -615,6 +647,21 @@ class InMenuStudioApp {
                 break;
             case 'font-pairing-select':
                 this.onFontPairingChange(el.value);
+                break;
+            case 'extractor-file-upload':
+                this.handleExtractorImageUpload(el.files && el.files[0]);
+                break;
+            case 'extractor-palette-color':
+                this.updateExtractorPaletteColor(el.dataset.colorKey, el.value);
+                break;
+            case 'extractor-font-pairing':
+                this.updateExtractorFontPairing(el.value);
+                break;
+            case 'extractor-target-mode':
+                this.updateExtractorTargetMode(el.value);
+                break;
+            case 'extractor-web-preset-change':
+                this.analyzeExtractorWebsite();
                 break;
             case 'global-leader-style':
                 this.updateGlobalTypography('leaderStyle', el.value);
@@ -786,7 +833,8 @@ class InMenuStudioApp {
     isAnyModalOpen() {
         const modalIds = [
             'modal-database', 'modal-export', 'modal-3d', 'modal-engine',
-            'modal-word-import', 'modal-format', 'modal-page-numbering', 'modal-templates'
+            'modal-word-import', 'modal-format', 'modal-page-numbering', 'modal-templates',
+            'modal-template-extractor'
         ];
         return modalIds.some(id => {
             const el = document.getElementById(id);
@@ -796,6 +844,11 @@ class InMenuStudioApp {
 
     closeTopModal() {
         if (this.closeMobileSheets()) {
+            return true;
+        }
+        const modalExtractor = document.getElementById('modal-template-extractor');
+        if (modalExtractor && !modalExtractor.classList.contains('hidden')) {
+            this.closeTemplateExtractorModal();
             return true;
         }
         const modalTemplates = document.getElementById('modal-templates');

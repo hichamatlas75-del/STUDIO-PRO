@@ -51,8 +51,12 @@
                 </button>
             </div>
 
-            <!-- Desktop Tools: Importer Word, BDD, Modèles, Moteur -->
+            <!-- Desktop Tools: Importer Word, Extraire Gabarit, BDD, Modèles, Moteur -->
             <div class="hidden lg:flex items-center space-x-1.5 border-l border-idBorder pl-2 shrink-0">
+                <button type="button" data-action="open-template-extractor" class="flex items-center space-x-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white border border-emerald-400/50 px-2.5 py-1 rounded font-semibold shadow-sm transition" title="Créer un gabarit vierge 100% éditable depuis une photo ou un site web">
+                    <i class="fa-solid fa-wand-magic-sparkles text-emerald-200"></i>
+                    <span>Extraire Gabarit</span>
+                </button>
                 <button type="button" data-action="open-word-import" class="flex items-center space-x-1.5 bg-gradient-to-r from-indigo-600 to-amber-600 hover:from-indigo-500 hover:to-amber-500 text-white border border-amber-400/50 px-2.5 py-1 rounded font-semibold shadow-sm transition">
                     <i class="fa-solid fa-file-word"></i>
                     <span>Word</span>
@@ -1111,6 +1115,243 @@
         </div>
     </div>
 
+    <!-- ==================== MODAL 3B: CRÉER UN GABARIT DEPUIS PHOTO / SITE WEB ==================== -->
+    <div id="modal-template-extractor" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-idPanel border border-idBorder rounded-xl shadow-2xl w-full max-w-6xl h-[92vh] flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-idHeader px-5 py-3 border-b border-idBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center text-sm shadow">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white flex items-center space-x-2">
+                            <span>Créer un Gabarit Vierge depuis Photo ou Site Web</span>
+                            <span class="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/40 px-2 py-0.5 rounded font-mono">TemplateExtractorEngine (34×30 cm)</span>
+                        </h2>
+                        <p class="text-[11px] text-gray-400">Convertit n'importe quel menu ou page web en gabarit PAO vierge 100% éditable (pli central 170 mm, zone sécurisée 160–180 mm).</p>
+                    </div>
+                </div>
+                <button type="button" data-action="close-template-extractor" class="text-gray-400 hover:text-white p-1 text-base">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (2 Columns) -->
+            <div class="flex-1 grid grid-cols-12 overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-idBorder">
+                <!-- Left Panel : Source & Controls (5 cols) -->
+                <div class="col-span-12 lg:col-span-5 flex flex-col p-4 bg-idBg/60 overflow-y-auto space-y-4">
+                    <!-- Onglets Source (Photo vs Site Web) -->
+                    <div class="flex items-center p-1 bg-idInput rounded-lg border border-idBorder shrink-0">
+                        <button type="button" id="extractor-btn-tab-photo" data-action="extractor-tab-photo" class="flex-1 py-1.5 px-3 rounded-md font-semibold text-xs transition bg-emerald-600 text-white shadow flex items-center justify-center space-x-2">
+                            <i class="fa-regular fa-image"></i>
+                            <span>Photo / Image</span>
+                        </button>
+                        <button type="button" id="extractor-btn-tab-web" data-action="extractor-tab-web" class="flex-1 py-1.5 px-3 rounded-md font-semibold text-xs transition text-gray-400 hover:text-white hover:bg-white/5 flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-globe"></i>
+                            <span>Site Web</span>
+                        </button>
+                    </div>
+
+                    <!-- Onglet 1 : Photo / Image -->
+                    <div id="extractor-tab-content-photo" class="space-y-3">
+                        <div class="border-2 border-dashed border-teal-500/40 hover:border-teal-400 bg-teal-500/5 hover:bg-teal-500/10 rounded-lg p-4 text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-teal-400"></i>
+                            <div class="font-semibold text-gray-200 text-xs">Glissez votre photo de menu ici</div>
+                            <div class="text-[10px] text-gray-400">Formats supportés : JPG, PNG, WebP</div>
+                            <button type="button" data-action="trigger-extractor-file" class="mt-1 px-3 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded font-medium text-xs shadow">
+                                <i class="fa-regular fa-folder-open mr-1"></i>Parcourir les fichiers
+                            </button>
+                            <input type="file" id="extractor-file-input" accept="image/jpeg,image/png,image/webp" data-change="extractor-file-upload" class="hidden">
+                        </div>
+
+                        <!-- Échantillons de démo 1-clic -->
+                        <div>
+                            <span class="text-[11px] font-semibold text-gray-300 block mb-1.5">Ou testez instantanément avec un exemple :</span>
+                            <div class="grid grid-cols-3 gap-1.5">
+                                <button type="button" data-action="load-extractor-sample" data-sample="bistrot" class="px-2 py-1.5 bg-idInput hover:bg-white/10 border border-idBorder rounded text-left flex flex-col transition">
+                                    <span class="font-semibold text-gray-200 text-[11px]">Bistrot Chic</span>
+                                    <span class="text-[9px] text-amber-400">Crème & Bordeaux</span>
+                                </button>
+                                <button type="button" data-action="load-extractor-sample" data-sample="trattoria" class="px-2 py-1.5 bg-idInput hover:bg-white/10 border border-idBorder rounded text-left flex flex-col transition">
+                                    <span class="font-semibold text-gray-200 text-[11px]">Trattoria</span>
+                                    <span class="text-[9px] text-emerald-400">Terracotta & Olive</span>
+                                </button>
+                                <button type="button" data-action="load-extractor-sample" data-sample="lounge" class="px-2 py-1.5 bg-idInput hover:bg-white/10 border border-idBorder rounded text-left flex flex-col transition">
+                                    <span class="font-semibold text-gray-200 text-[11px]">Gastro Lounge</span>
+                                    <span class="text-[9px] text-cyan-400">Sombre & Ambre</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Vignette source chargée -->
+                        <div id="extractor-image-preview-thumb" class="rounded overflow-hidden"></div>
+                    </div>
+
+                    <!-- Onglet 2 : Site Web -->
+                    <div id="extractor-tab-content-web" class="hidden space-y-3">
+                        <div>
+                            <label for="extractor-web-url" class="text-xs font-semibold text-gray-300 block mb-1">URL du site du restaurant :</label>
+                            <div class="flex items-center space-x-1.5">
+                                <input type="text" id="extractor-web-url" value="bistrot-parisien.fr/carte" placeholder="restaurant-exemple.com/menu" class="flex-1 bg-idInput border border-idBorder rounded px-3 py-1.5 text-xs text-white font-mono focus:border-teal-400 focus:outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="extractor-web-preset" class="text-xs font-semibold text-gray-300 block mb-1">Style de mise en page web à extraire :</label>
+                            <select id="extractor-web-preset" data-change="extractor-web-preset-change" class="w-full bg-idInput border border-idBorder rounded px-2.5 py-1.5 text-xs text-gray-200">
+                                <option value="moderne">Site Moderne 2 Colonnes (Entrées / Plats)</option>
+                                <option value="bistro">Menu Digital Bistrot Traditionnel</option>
+                                <option value="gastro">Landing Page Gastro & Lounge Sombre</option>
+                                <option value="trattoria">Carte Restaurant Italien Rustique</option>
+                            </select>
+                        </div>
+                        <button type="button" data-action="analyze-extractor-web" class="w-full py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded font-bold text-xs shadow flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-bolt"></i>
+                            <span>Analyser la mise en page web</span>
+                        </button>
+                    </div>
+
+                    <!-- Options d'application (Active spread vs 5 Spreads) -->
+                    <div class="p-3 bg-idInput/70 border border-idBorder rounded-lg space-y-2">
+                        <span class="text-xs font-bold text-gray-200 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-layer-group text-teal-400"></i>
+                            <span>Portée de l'application</span>
+                        </span>
+                        <div class="space-y-1.5 text-xs">
+                            <label class="flex items-center space-x-2 text-gray-300 hover:text-white cursor-pointer">
+                                <input type="radio" name="extractor-target-choice" value="active_spread" checked data-change="extractor-target-mode" class="text-teal-500 focus:ring-0">
+                                <span>Appliquer sur la planche active (Face courante)</span>
+                            </label>
+                            <label class="flex items-center space-x-2 text-gray-300 hover:text-white cursor-pointer">
+                                <input type="radio" name="extractor-target-choice" value="all_spreads" data-change="extractor-target-mode" class="text-teal-500 focus:ring-0">
+                                <span class="font-semibold text-teal-300">Générer un thème complet sur les 5 planches (10 faces)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Palette Extraite (Modifiables) -->
+                    <div class="space-y-2">
+                        <span class="text-xs font-bold text-gray-200 flex items-center justify-between">
+                            <span class="flex items-center space-x-1.5">
+                                <i class="fa-solid fa-palette text-amber-400"></i>
+                                <span>Palette de Couleurs Extraite (Modifiables)</span>
+                            </span>
+                            <span class="text-[10px] text-gray-400 font-mono">Canvas Quantization</span>
+                        </span>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <!-- Background -->
+                            <div class="p-2 bg-idInput border border-idBorder rounded flex items-center justify-between">
+                                <div>
+                                    <div class="text-[10px] text-gray-400">Fond (Background)</div>
+                                    <div id="extractor-color-val-background" class="font-mono text-[11px] font-bold text-white">#FDFBF7</div>
+                                </div>
+                                <input type="color" id="extractor-color-background" value="#fdfbf7" data-color-key="background" data-change="extractor-palette-color" data-input="extractor-palette-color-input" class="w-7 h-7 rounded border border-idBorder cursor-pointer bg-transparent">
+                            </div>
+                            <!-- Primary -->
+                            <div class="p-2 bg-idInput border border-idBorder rounded flex items-center justify-between">
+                                <div>
+                                    <div class="text-[10px] text-gray-400">Principal (Titres)</div>
+                                    <div id="extractor-color-val-primary" class="font-mono text-[11px] font-bold text-white">#881337</div>
+                                </div>
+                                <input type="color" id="extractor-color-primary" value="#881337" data-color-key="primary" data-change="extractor-palette-color" data-input="extractor-palette-color-input" class="w-7 h-7 rounded border border-idBorder cursor-pointer bg-transparent">
+                            </div>
+                            <!-- Accent -->
+                            <div class="p-2 bg-idInput border border-idBorder rounded flex items-center justify-between">
+                                <div>
+                                    <div class="text-[10px] text-gray-400">Accent (Bandeaux/Prix)</div>
+                                    <div id="extractor-color-val-accent" class="font-mono text-[11px] font-bold text-white">#C5A059</div>
+                                </div>
+                                <input type="color" id="extractor-color-accent" value="#c5a059" data-color-key="accent" data-change="extractor-palette-color" data-input="extractor-palette-color-input" class="w-7 h-7 rounded border border-idBorder cursor-pointer bg-transparent">
+                            </div>
+                            <!-- Text -->
+                            <div class="p-2 bg-idInput border border-idBorder rounded flex items-center justify-between">
+                                <div>
+                                    <div class="text-[10px] text-gray-400">Texte (Plats)</div>
+                                    <div id="extractor-color-val-text" class="font-mono text-[11px] font-bold text-white">#1E293B</div>
+                                </div>
+                                <input type="color" id="extractor-color-text" value="#1e293b" data-color-key="text" data-change="extractor-palette-color" data-input="extractor-palette-color-input" class="w-7 h-7 rounded border border-idBorder cursor-pointer bg-transparent">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Polices Détectées (Google Fonts) -->
+                    <div class="space-y-1.5">
+                        <span class="text-xs font-bold text-gray-200 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-font text-purple-400"></i>
+                            <span>Typographie Détectée (Google Fonts)</span>
+                        </span>
+                        <select id="extractor-font-pairing-select" data-change="extractor-font-pairing" class="w-full bg-idInput border border-idBorder rounded px-2.5 py-1.5 text-xs text-gray-200">
+                            <option value="bistrot_chic">Bistrot Chic (Playfair Display + Inter + Montserrat)</option>
+                            <option value="palace_prestige">Palace Prestige (Cinzel + Cormorant Garamond + Montserrat)</option>
+                            <option value="moderne_minimal">Moderne Minimal (Montserrat + Inter + JetBrains Mono)</option>
+                        </select>
+                        <div id="extractor-typo-label" class="text-[10px] text-gray-400 font-mono">
+                            Playfair Display + Inter + Montserrat
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel : Live Wireframe Preview (7 cols) -->
+                <div class="col-span-12 lg:col-span-7 flex flex-col p-4 bg-idBg overflow-hidden space-y-3">
+                    <div class="flex items-center justify-between shrink-0">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-teal-400 flex items-center space-x-1.5">
+                                <i class="fa-solid fa-bezier-curve"></i>
+                                <span>Fil de Fer (Wireframe) — Recalibrage PAO 340 × 300 mm</span>
+                            </span>
+                            <span class="text-[10px] text-gray-400 block">Pli central 170 mm • Zone de sécurité 160–180 mm respectée (zéro empiètement)</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-[10px]">
+                            <span class="flex items-center space-x-1 text-emerald-400">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>100% Anti-Pli</span>
+                            </span>
+                            <span class="flex items-center space-x-1 text-teal-300">
+                                <i class="fa-solid fa-vector-square"></i>
+                                <span>Gabarit Vierge</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Légende Wireframe -->
+                    <div class="flex items-center space-x-2 text-[10px] shrink-0 text-gray-400 flex-wrap gap-y-1">
+                        <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-900 border border-rose-500"></span><span>Logo / En-Tête</span></span>
+                        <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-500"></span><span>Bandeau</span></span>
+                        <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-sm bg-blue-900 border border-blue-500"></span><span>Photo Vierge</span></span>
+                        <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-sm bg-teal-900 border border-teal-500"></span><span>Liste Plats</span></span>
+                        <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 bg-amber-500/30 border border-amber-500 border-dashed"></span><span>Zone Pli (160–180mm)</span></span>
+                    </div>
+
+                    <!-- SVG Wireframe Container -->
+                    <div class="flex-1 flex items-center justify-center min-h-[300px] p-2 bg-idPanel/80 border border-idBorder rounded-lg overflow-hidden">
+                        <div id="extractor-wireframe-container" class="w-full h-full max-h-[58vh] aspect-[340/300] flex items-center justify-center"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-idHeader px-5 py-3 border-t border-idBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-2 text-xs text-gray-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Source active : <strong id="extractor-source-label" class="text-white font-medium">Bistrot Chic (Démo)</strong></span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button type="button" data-action="close-template-extractor" class="bg-idInput hover:bg-white/10 text-gray-200 border border-idBorder px-3 py-1.5 rounded text-xs font-semibold">
+                        Fermer
+                    </button>
+                    <button type="button" data-action="export-extracted-template-json" class="bg-idInput hover:bg-white/10 text-teal-300 border border-teal-500/40 px-3 py-1.5 rounded text-xs font-semibold flex items-center space-x-1.5">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Exporter Gabarit (.json)</span>
+                    </button>
+                    <button type="button" data-action="apply-extracted-template" class="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white px-4 py-1.5 rounded text-xs font-bold shadow flex items-center space-x-1.5">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span>Appliquer le Gabarit Vierge</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== MODAL 4: FORMAT DU DOCUMENT ==================== -->
     <div id="modal-format" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
         <div class="bg-idPanel border border-idBorder rounded-lg shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden">
@@ -1403,6 +1644,13 @@
             </div>
             <div class="p-3.5 space-y-2 overflow-y-auto">
                 <div class="grid grid-cols-2 gap-2 text-xs">
+                    <button type="button" data-action="open-template-extractor" data-close-tools="true" class="p-3 bg-idInput hover:bg-white/10 border border-teal-500/40 rounded-lg text-left flex items-start space-x-2.5 transition">
+                        <i class="fa-solid fa-wand-magic-sparkles text-emerald-400 text-lg mt-0.5"></i>
+                        <div>
+                            <div class="font-bold text-white">Extraire Gabarit</div>
+                            <div class="text-[10px] text-gray-400">Photo ou Site Web</div>
+                        </div>
+                    </button>
                     <button type="button" data-action="open-templates-modal" data-close-tools="true" class="p-3 bg-idInput hover:bg-white/10 border border-purple-500/40 rounded-lg text-left flex items-start space-x-2.5 transition">
                         <i class="fa-solid fa-shapes text-pink-400 text-lg mt-0.5"></i>
                         <div>
@@ -1560,6 +1808,7 @@
     <script src="js/engine.js"></script>
     <script src="js/indesign-templates.js"></script>
     <script src="js/print-exporter.js"></script>
+    <script src="js/template-extractor.js"></script>
     <!-- Contrôleur InMenuStudioApp découpé par domaines -->
     <script src="js/app-core.js"></script>
     <script src="js/app-canvas.js"></script>

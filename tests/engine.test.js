@@ -7,13 +7,13 @@ const vm = require('node:vm');
 
 const ctx = { console, JSON, Date, Math, Set, Object, Array, Number, String, Boolean, Error, Promise };
 vm.createContext(ctx);
-for (const f of ['utils.js', 'engine.js']) {
+for (const f of ['utils.js', 'engine.js', 'template-extractor.js']) {
     // const/class de premier niveau ne sont pas exposés : on les rattache au contexte
     const code = fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8');
     vm.runInContext(code + '\n;this.__exp = Object.assign(this.__exp||{}, {' +
-        (f === 'utils.js' ? 'generateUniqueId, sanitizeFileName, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES' : 'DocumentEngine, FORMAT_PRESETS') + '});', ctx);
+        (f === 'utils.js' ? 'generateUniqueId, sanitizeFileName, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES' : (f === 'engine.js' ? 'DocumentEngine, FORMAT_PRESETS' : 'TemplateExtractorEngine, EXTRACTOR_SPECS')) + '});', ctx);
 }
-const { DocumentEngine, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES } = ctx.__exp;
+const { DocumentEngine, FONT_PAIRINGS, PHOTO_FILTER_PRESETS, QRCodeGenerator, buildPhotoFilterCSS, CULINARY_ICON_BADGES, TemplateExtractorEngine, EXTRACTOR_SPECS } = ctx.__exp;
 const flyer = () => { const e = new DocumentEngine(); e.setFormat('flyer_a4_portrait', true); e.persistReady = false; return e; };
 
 test('numérotation romaine au-delà de 20', () => {
@@ -122,6 +122,12 @@ test('découpage modulaire de InMenuStudioApp : les 6 modules assemblent toutes 
         'openPageNumberingModal', 'closePageNumberingModal', 'updatePageNumberingPreview', 'savePageNumberingFromModal',
         'openMobileSheet', 'closeMobileSheets', 'toggleMobileToolsMenu', 'closeMobileToolsMenu',
         'renderMobilePagesList', 'renderMobileCanvaSheet', 'renderMobileInspector',
+        // app-modals.js : TemplateExtractorEngine
+        'openTemplateExtractorModal', 'closeTemplateExtractorModal', 'switchExtractorTab',
+        'handleExtractorImageUpload', 'loadExtractorDemoSample', 'processExtractorImageSource',
+        'analyzeExtractorWebsite', 'syncExtractorUIControls', 'updateExtractorPaletteColor',
+        'updateExtractorFontPairing', 'updateExtractorTargetMode', 'renderExtractorPreviewWireframe',
+        'applyExtractedTemplate', 'exportExtractedTemplateJSON',
         // app-io.js & PWA & Fullscreen
         'openExportModal', 'closeExportModal', 'selectExportFormat',
         'getSelectedExportFormatSpecs', 'updateExportModalUI',
@@ -496,4 +502,164 @@ test('PWA : manifest.json, service worker et icônes haute fidélité valides', 
     assert.ok(html.includes('rel="manifest"'));
     assert.ok(html.includes('name="theme-color"'));
     assert.ok(html.includes('data-action="install-pwa"'));
+});
+
+test('TemplateExtractorEngine : Extraction de la palette de couleurs (background, primary, accent, text) et calculs WCAG', () => {
+    assert.ok(TemplateExtractorEngine, 'TemplateExtractorEngine doit être défini');
+
+    // 1. Tests utilitaires couleur
+    const hex = TemplateExtractorEngine.rgbToHex(253, 251, 247);
+    assert.strictEqual(hex, '#fdfbf7');
+    const rgb = TemplateExtractorEngine.hexToRgb('#881337');
+    assert.strictEqual(rgb.r, 136);
+    assert.strictEqual(rgb.g, 19);
+    assert.strictEqual(rgb.b, 55);
+
+    // Contraste WCAG
+    const contrastRatio = TemplateExtractorEngine.getContrastRatio('#1e293b', '#fdfbf7');
+    assert.ok(contrastRatio >= 4.5, `Le contraste texte/fond doit être supérieur à 4.5:1 (obtenu: ${contrastRatio})`);
+
+    // 2. Extraction sur ImageData synthétique
+    const w = 40;
+    const h = 40;
+    const data = new Uint8ClampedArray(w * h * 4);
+    // Fond crème
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = 253; data[i + 1] = 251; data[i + 2] = 247; data[i + 3] = 255;
+    }
+    // Zone texte sombre
+    for (let i = 200; i < 600; i += 4) {
+        data[i] = 30; data[i + 1] = 41; data[i + 2] = 59; data[i + 3] = 255;
+    }
+    // Zone primaire bordeaux
+    for (let i = 700; i < 1100; i += 4) {
+        data[i] = 136; data[i + 1] = 19; data[i + 2] = 55; data[i + 3] = 255;
+    }
+
+    const pal = TemplateExtractorEngine.extractPaletteFromImageData({ width: w, height: h, data });
+    assert.ok(pal.background, 'Couleur background requise');
+    assert.ok(pal.primary, 'Couleur primary requise');
+    assert.ok(pal.accent, 'Couleur accent requise');
+    assert.ok(pal.text, 'Couleur text requise');
+    assert.strictEqual(pal.isDark, false);
+});
+
+test('TemplateExtractorEngine : Détection de layout et connecteur Vision API (% relatifs)', () => {
+    // 1. Détection de layout par défaut
+    const defaultLayout = TemplateExtractorEngine.getDefaultLayout();
+    assert.ok(Array.isArray(defaultLayout.blocks));
+    assert.ok(defaultLayout.blocks.length >= 4);
+
+    const types = new Set(defaultLayout.blocks.map(b => b.type));
+    assert.ok(types.has('category_list'));
+    assert.ok(types.has('vertical_banner'));
+    assert.ok(types.has('photo'));
+    assert.ok(types.has('logo'));
+
+    // 2. Connecteur Vision API avec coordonnées relatives en %
+    const visionMock = {
+        blocks: [
+            { type: 'header', xPct: 55, yPct: 5, wPct: 35, hPct: 15 },
+            { type: 'dishes', xPct: 5, yPct: 10, wPct: 40, hPct: 40 },
+            { type: 'photo', xPct: 5, yPct: 55, wPct: 40, hPct: 35 },
+            // Bloc traversant le centre (pli) :
+            { type: 'dishes', xPct: 45, yPct: 55, wPct: 20, hPct: 35 }
+        ]
+    };
+
+    const parsed = TemplateExtractorEngine.parseVisionResponse(visionMock);
+    assert.ok(Array.isArray(parsed.blocks));
+    assert.ok(parsed.blocks.length >= 4);
+
+    parsed.blocks.forEach(b => {
+        assert.ok(b.x >= 0 && b.x <= 340, `Coordonnée x ${b.x} dans les limites du format 340mm`);
+        assert.ok(b.y >= 0 && b.y <= 300, `Coordonnée y ${b.y} dans les limites du format 300mm`);
+        assert.ok(b.w > 0 && b.w <= 340, `Largeur w ${b.w} valide`);
+        assert.ok(b.h > 0 && b.h <= 300, `Hauteur h ${b.h} valide`);
+    });
+});
+
+test('TemplateExtractorEngine : Recalibrage automatique PAO 34×30 cm & règle stricte anti-pli (160–180 mm)', () => {
+    const foldMin = EXTRACTOR_SPECS.safeFoldMinMm; // 160
+    const foldMax = EXTRACTOR_SPECS.safeFoldMaxMm; // 180
+
+    // Test 1 : Bloc chevauchant le pli avec centre sur le panneau gauche
+    const blkLeft = { id: 'test_fold_1', type: 'category_list', x: 145, y: 20, w: 30, h: 60 };
+    const recalLeft = TemplateExtractorEngine.recalibrateBlockAntiFold(blkLeft);
+    assert.strictEqual(recalLeft.length, 1);
+    const b1 = recalLeft[0];
+    const overlaps1 = (b1.x < foldMax && (b1.x + b1.w) > foldMin);
+    assert.strictEqual(overlaps1, false, 'Le bloc recalé à gauche ne doit pas empiéter sur 160–180 mm');
+    assert.ok(b1.x + b1.w <= 158, 'Fin du bloc gauche <= 158 mm');
+
+    // Test 2 : Bloc chevauchant le pli avec centre sur le panneau droit
+    const blkRight = { id: 'test_fold_2', type: 'category_list', x: 165, y: 20, w: 30, h: 60 };
+    const recalRight = TemplateExtractorEngine.recalibrateBlockAntiFold(blkRight);
+    assert.strictEqual(recalRight.length, 1);
+    const b2 = recalRight[0];
+    const overlaps2 = (b2.x < foldMax && (b2.x + b2.w) > foldMin);
+    assert.strictEqual(overlaps2, false, 'Le bloc recalé à droite ne doit pas empiéter sur 160–180 mm');
+    assert.ok(b2.x >= 182, 'Début du bloc droit >= 182 mm');
+
+    // Test 3 : Bloc très large (> 160 mm) couvrant les deux panneaux -> Scission en 2
+    const blkWide = { id: 'test_fold_wide', type: 'category_list', x: 15, y: 20, w: 300, h: 50 };
+    const recalWide = TemplateExtractorEngine.recalibrateBlockAntiFold(blkWide);
+    assert.strictEqual(recalWide.length, 2, 'Un bloc pleine largeur traversant le pli doit être scindé en 2 volets');
+    assert.ok(recalWide[0].x + recalWide[0].w <= 158, 'Volet gauche scindé <= 158 mm');
+    assert.ok(recalWide[1].x >= 182, 'Volet droit scindé >= 182 mm');
+
+    // Test 4 : Fond perdu pleine page (-3..343 mm) autorisé
+    const blkBg = { id: 'test_bg', type: 'shape', isBackground: true, x: 0, y: 0, w: 340, h: 300 };
+    const recalBg = TemplateExtractorEngine.recalibrateBlockAntiFold(blkBg);
+    assert.strictEqual(recalBg.length, 1);
+    assert.strictEqual(recalBg[0].x, -3);
+    assert.strictEqual(recalBg[0].w, 346);
+});
+
+test('TemplateExtractorEngine : Nettoyage gabarit vierge, thème complet 5 planches et export JSON compatible WordImporter', () => {
+    const pal = TemplateExtractorEngine.getDefaultPalette('bistrot');
+    const typo = TemplateExtractorEngine.detectTypography('bistrot_chic');
+
+    // 1. Nettoyage neutre (Gabarit Vierge)
+    const rawLayout = TemplateExtractorEngine.getDefaultLayout();
+    const cleanTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, pal, typo);
+
+    assert.ok(cleanTemplate.objects && cleanTemplate.objects.length > 0);
+    for (const obj of cleanTemplate.objects) {
+        if (obj.type === 'vertical_banner') {
+            assert.ok(obj.text.includes('[CATÉGORIE'), `Placeholder bandeau attendu: ${obj.text}`);
+        } else if (obj.type === 'category_list') {
+            assert.ok(obj.title.includes('[CATÉGORIE'), `Placeholder catégorie attendu: ${obj.title}`);
+        } else if (obj.type === 'photo') {
+            assert.ok(obj.imageUrl.includes('data:image/svg+xml'), 'Cadre photo avec SVG placeholder');
+        } else if (obj.type === 'logo') {
+            assert.strictEqual(obj.title, '[NOM DU RESTAURANT]');
+        }
+    }
+
+    // 2. Thème complet sur 5 planches (10 faces 34×30 cm)
+    const full5 = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo);
+    assert.strictEqual(full5.faces.length, 5, 'Doit générer exactement 5 planches');
+    assert.ok(full5.placeholderDishes.length >= 10, 'Doit fournir des plats neutres pour la BDD');
+
+    full5.faces.forEach((face, fIdx) => {
+        assert.ok(Array.isArray(face.objects));
+        face.objects.forEach(obj => {
+            if (obj.type !== 'shape' || (!obj.isBackground && obj.w < 300)) {
+                const overlaps = (obj.x < 180 && (obj.x + obj.w) > 160);
+                assert.strictEqual(overlaps, false, `Planche ${fIdx + 1} objet "${obj.name}" ne doit pas toucher 160–180 mm`);
+            }
+        });
+    });
+
+    // 3. Export et Ré-import JSON
+    const jsonStr = TemplateExtractorEngine.exportTemplateJSON(full5);
+    assert.ok(jsonStr.includes('InMenuStudioPro_TemplateExtractor_v1'));
+    assert.ok(jsonStr.includes('menu_34x30'));
+
+    const eng = new DocumentEngine();
+    eng.persistReady = false;
+    const imported = TemplateExtractorEngine.importTemplateJSON(jsonStr, eng, 'all_spreads');
+    assert.strictEqual(eng.faces.length, 5);
+    assert.strictEqual(eng.faces[0].bgColor, pal.background);
 });
