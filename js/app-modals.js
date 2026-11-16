@@ -1015,48 +1015,76 @@ Object.assign(InMenuStudioApp.prototype, {
         }
 
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        // Ne JAMAIS définir crossOrigin pour les data: ou blob: URLs (provoque une erreur CORS dans Chrome)
+        if (typeof imageSrc === 'string' && /^https?:\/\//i.test(imageSrc)) {
+            img.crossOrigin = 'anonymous';
+        }
+
         img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const maxDim = 400;
-            let w = img.naturalWidth || img.width || 400;
-            let h = img.naturalHeight || img.height || 400;
-            if (w > maxDim || h > maxDim) {
-                if (w > h) {
-                    h = Math.round((h * maxDim) / w);
-                    w = maxDim;
-                } else {
-                    w = Math.round((w * maxDim) / h);
-                    h = maxDim;
+            try {
+                const canvas = document.createElement('canvas');
+                const maxDim = 400;
+                let w = img.naturalWidth || img.width || 400;
+                let h = img.naturalHeight || img.height || 400;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                    } else {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                    }
                 }
+                canvas.width = Math.max(10, w);
+                canvas.height = Math.max(10, h);
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0, w, h);
+
+                // 1. Extraction Palette
+                const palette = TemplateExtractorEngine.extractPaletteFromCanvas(canvas);
+
+                // 2. Détection Structure & Layout
+                const rawLayout = TemplateExtractorEngine.detectLayoutFromCanvas(canvas);
+
+                // 3. Typographie associée
+                const typo = TemplateExtractorEngine.detectTypography(palette.isDark ? 'luxury' : 'classic');
+
+                // 4. Construction du gabarit vierge
+                const blankTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, palette, typo, {
+                    name: `Gabarit Vierge (${sourceLabel})`
+                });
+
+                this.currentExtractedTemplate = blankTemplate;
+                this.syncExtractorUIControls();
+                this.renderExtractorPreviewWireframe();
+                this.showToast(`Gabarit extrait depuis ${sourceLabel} !`);
+            } catch (err) {
+                console.warn('[TemplateExtractor] Canvas extraction fallback:', err);
+                const palette = TemplateExtractorEngine.getDefaultPalette('bistrot');
+                const rawLayout = TemplateExtractorEngine.getDefaultLayout();
+                const typo = TemplateExtractorEngine.detectTypography('bistrot_chic');
+                this.currentExtractedTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, palette, typo, {
+                    name: `Gabarit Vierge (${sourceLabel})`
+                });
+                this.syncExtractorUIControls();
+                this.renderExtractorPreviewWireframe();
+                this.showToast(`Gabarit initialisé pour ${sourceLabel}`);
             }
-            canvas.width = Math.max(10, w);
-            canvas.height = Math.max(10, h);
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            ctx.drawImage(img, 0, 0, w, h);
+        };
 
-            // 1. Extraction Palette
-            const palette = TemplateExtractorEngine.extractPaletteFromCanvas(canvas);
-
-            // 2. Détection Structure & Layout
-            const rawLayout = TemplateExtractorEngine.detectLayoutFromCanvas(canvas);
-
-            // 3. Typographie associée
-            const typo = TemplateExtractorEngine.detectTypography(palette.isDark ? 'luxury' : 'classic');
-
-            // 4. Construction du gabarit vierge
-            const blankTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, palette, typo, {
+        img.onerror = (err) => {
+            console.warn('[TemplateExtractor] Image load fallback:', err);
+            const palette = TemplateExtractorEngine.getDefaultPalette('bistrot');
+            const rawLayout = TemplateExtractorEngine.getDefaultLayout();
+            const typo = TemplateExtractorEngine.detectTypography('bistrot_chic');
+            this.currentExtractedTemplate = TemplateExtractorEngine.cleanToBlankTemplate(rawLayout, palette, typo, {
                 name: `Gabarit Vierge (${sourceLabel})`
             });
-
-            this.currentExtractedTemplate = blankTemplate;
             this.syncExtractorUIControls();
             this.renderExtractorPreviewWireframe();
-            this.showToast(`Gabarit extrait depuis ${sourceLabel} !`);
+            this.showToast(`Image analysée : gabarit ${sourceLabel} prêt !`);
         };
-        img.onerror = () => {
-            this.showToast('Erreur lors du chargement de l\'image');
-        };
+
         img.src = imageSrc;
     },
 

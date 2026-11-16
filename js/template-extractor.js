@@ -1217,9 +1217,9 @@ class TemplateExtractorEngine {
                 `<text x="44" y="150" fill="#ffffff" font-family="Cinzel,serif" font-size="14" font-weight="bold" transform="rotate(-90 44 150)" text-anchor="middle">ANTIPASTI</text>` +
                 `<text x="75" y="60" fill="#9a3412" font-family="Cinzel,serif" font-size="16" font-weight="bold">ANTIPASTI DELLA CASA</text>` +
                 `<text x="75" y="95" fill="#271e18" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Burrata Pugliese ......... 58 DH</text>` +
-                `<text x="75" y="115" fill="#78716c" font-family="Inter,sans-serif" font-size="10">Tomates d'antan, pesto verde & roquette</text>` +
+                `<text x="75" y="115" fill="#78716c" font-family="Inter,sans-serif" font-size="10">Tomates d'antan, pesto verde &amp; roquette</text>` +
                 `<text x="75" y="145" fill="#271e18" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Carpaccio di Manzo ........ 65 DH</text>` +
-                `<text x="75" y="165" fill="#78716c" font-family="Inter,sans-serif" font-size="10">Parmigiano Reggiano 24 mois, câpres & truffe</text>` +
+                `<text x="75" y="165" fill="#78716c" font-family="Inter,sans-serif" font-size="10">Parmigiano Reggiano 24 mois, câpres &amp; truffe</text>` +
                 `<rect x="40" y="310" width="260" height="240" fill="#15803d" opacity="0.85" rx="6"/>` +
                 `<text x="170" y="435" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="16" font-weight="bold">PHOTO TRATTORIA</text>` +
                 `<text x="510" y="80" text-anchor="middle" fill="#9a3412" font-family="Cinzel,serif" font-size="22" font-weight="bold">TRATTORIA BELLA</text>` +
@@ -1227,7 +1227,7 @@ class TemplateExtractorEngine {
                 `<rect x="375" y="140" width="28" height="380" fill="#15803d" rx="3"/>` +
                 `<text x="389" y="320" fill="#ffffff" font-family="Cinzel,serif" font-size="14" font-weight="bold" transform="rotate(-90 389 320)" text-anchor="middle">PIZZE ARTIGIANALI</text>` +
                 `<text x="420" y="170" fill="#271e18" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Margherita DOP ........... 65 DH</text>` +
-                `<text x="420" y="210" fill="#271e18" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Tartufo & Funghi ......... 85 DH</text>` +
+                `<text x="420" y="210" fill="#271e18" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Tartufo &amp; Funghi ......... 85 DH</text>` +
                 `<text x="420" y="250" fill="#271e18" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Quattro Formaggi ......... 78 DH</text>` +
                 `</svg>`
             );
@@ -1243,7 +1243,7 @@ class TemplateExtractorEngine {
                 `<text x="44" y="150" fill="#111827" font-family="Montserrat,sans-serif" font-size="14" font-weight="bold" transform="rotate(-90 44 150)" text-anchor="middle">SIGNATURES</text>` +
                 `<text x="75" y="65" fill="#f59e0b" font-family="Montserrat,sans-serif" font-size="16" font-weight="bold">COCKTAILS CRÉATION</text>` +
                 `<text x="75" y="100" fill="#f8fafc" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Smoked Old Fashioned ... 75 DH</text>` +
-                `<text x="75" y="120" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Bourbon infusé chêne, bitter orange & zeste</text>` +
+                `<text x="75" y="120" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Bourbon infusé chêne, bitter orange &amp; zeste</text>` +
                 `<text x="75" y="155" fill="#f8fafc" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Velvet Passion Gin ..... 70 DH</text>` +
                 `<text x="75" y="175" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Gin floral, purée de passion, blanc d'oeuf</text>` +
                 `<rect x="40" y="310" width="260" height="240" fill="#1f2937" rx="6"/>` +
@@ -1251,7 +1251,7 @@ class TemplateExtractorEngine {
                 `<text x="510" y="80" text-anchor="middle" fill="#f8fafc" font-family="Montserrat,sans-serif" font-size="22" font-weight="bold">THE NOCTURNE</text>` +
                 `<text x="510" y="105" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="11" letter-spacing="3">GASTRO LOUNGE • CLUB</text>` +
                 `<rect x="375" y="140" width="28" height="380" fill="#374151" rx="3"/>` +
-                `<text x="389" y="320" fill="#f8fafc" font-family="Montserrat,sans-serif" font-size="14" font-weight="bold" transform="rotate(-90 389 320)" text-anchor="middle">TAPAS & GOURMET</text>` +
+                `<text x="389" y="320" fill="#f8fafc" font-family="Montserrat,sans-serif" font-size="14" font-weight="bold" transform="rotate(-90 389 320)" text-anchor="middle">TAPAS &amp; GOURMET</text>` +
                 `<text x="420" y="170" fill="#f8fafc" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Tataki de Thon Rouge ... 85 DH</text>` +
                 `<text x="420" y="210" fill="#f8fafc" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Mini Wagyu Burgers ..... 95 DH</text>` +
                 `<text x="420" y="250" fill="#f8fafc" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Croustillants Gambas ... 80 DH</text>` +
@@ -1269,7 +1269,7 @@ class TemplateExtractorEngine {
             `<text x="44" y="150" fill="#ffffff" font-family="Playfair Display,serif" font-size="14" font-weight="bold" transform="rotate(-90 44 150)" text-anchor="middle">ENTRÉES</text>` +
             `<text x="75" y="60" fill="#881337" font-family="Playfair Display,serif" font-size="16" font-weight="bold">ENTRÉES DE SAISON</text>` +
             `<text x="75" y="95" fill="#1e293b" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Foie Gras Maison ........ 72 DH</text>` +
-            `<text x="75" y="115" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Brioche toastée & chutney de figues</text>` +
+            `<text x="75" y="115" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Brioche toastée &amp; chutney de figues</text>` +
             `<text x="75" y="145" fill="#1e293b" font-family="Inter,sans-serif" font-size="12" font-weight="bold">Velouté de Cèpes ....... 55 DH</text>` +
             `<text x="75" y="165" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Émulsion de noisettes torréfiées</text>` +
             `<rect x="40" y="310" width="260" height="240" fill="#334155" rx="6"/>` +
