@@ -1290,19 +1290,24 @@ Object.assign(InMenuStudioApp.prototype, {
         if (mode === 'all_spreads') {
             const theme = TemplateExtractorEngine.buildFull5SpreadsTheme(pal, typo);
             this.engine.faces = theme.faces;
-            this.engine.currentFace = this.engine.faces[0];
+            this.currentFace = this.engine.faces[0];
+            this.engine.currentFace = this.currentFace;
             this.currentFaceIndex = 0;
             this.engine.fontPairing = typo.id || 'bistrot_chic';
             this.showToast('Thème complet vierge appliqué sur les 5 planches (10 faces) !');
         } else {
-            if (this.engine.currentFace) {
-                this.engine.currentFace.bgColor = pal.background;
-                this.engine.currentFace.objects = JSON.parse(JSON.stringify(this.currentExtractedTemplate.objects || []));
+            const targetFace = this.currentFace || (this.engine && this.engine.faces && this.engine.faces[this.currentFaceIndex || 0]);
+            if (targetFace) {
+                targetFace.bgColor = pal.background;
+                targetFace.objects = JSON.parse(JSON.stringify(this.currentExtractedTemplate.objects || []));
+                this.currentFace = targetFace;
+                if (this.engine) this.engine.currentFace = targetFace;
             }
             this.showToast('Gabarit vierge 34×30 cm appliqué sur la planche active !');
         }
 
-        this.commitState(true);
+        this.selectedObjectId = null;
+        this.commitState();
         this.renderSpreadsNavigator();
         this.populateQuickDishSelect();
         this.renderCurrentFace();

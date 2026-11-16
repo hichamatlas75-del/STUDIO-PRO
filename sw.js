@@ -1,9 +1,9 @@
 /* ==========================================================================
    InMenu Studio Pro — Service Worker PWA (100% Hors-Ligne & Cache-First)
-   Version: 4.0.0
+   Version: 4.2.0
    ========================================================================== */
 
-const CACHE_NAME = 'inmenu-studio-pro-v4.0';
+const CACHE_NAME = 'inmenu-studio-pro-v4.2.0';
 
 const ASSETS_TO_CACHE = [
     './',
@@ -39,6 +39,7 @@ const ASSETS_TO_CACHE = [
     'js/word-importer.js',
     'js/illustrations-pack.js',
     'js/engine.js',
+    'js/template-extractor.js',
     'js/indesign-templates.js',
     'js/print-exporter.js',
     'js/app-core.js',
@@ -57,10 +58,10 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', event => {
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(ASSETS_TO_CACHE))
-            .then(() => self.skipWaiting())
     );
 });
 
@@ -81,14 +82,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET') return;
 
-    event.respondWith(
-        caches.match(event.request).then(cachedResponse => {
-            if (cachedResponse) {
-                return cachedResponse;
-            }
-
-            return fetch(event.request).then(networkResponse => {
-                if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+    // Pour les navigations HTML : Network-First pour obtenir les mises à jour immédiatement en ligne
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request).then(networkResponse => {
+                if (networkResponse && networkResponse.status === 200) {
                     const responseToCache = networkResponse.clone();
                     caches.open(CACHE_NAME).then(cache => {
                         cache.put(event.request, responseToCache);
@@ -96,9 +94,29 @@ self.addEventListener('fetch', event => {
                 }
                 return networkResponse;
             }).catch(() => {
-                if (event.request.mode === 'navigate') {
-                    return caches.match('index.html');
+                return caches.match('index.html') || caches.match('./');
+            })
+        );
+        return;
+    }
+
+    // Pour les assets statiques : Cache-First avec mise en cache réseau et fallback offline
+    event.respondWith(
+        caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            return fetch(event.request).then(networkResponse => {
+                if (networkResponse && networkResponse.status === 200 && (networkResponse.type === 'basic' || networkResponse.type === 'cors')) {
+                    const responseToCache = networkResponse.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
+                    });
                 }
+                return networkResponse;
+            }).catch(() => {
+                return caches.match(event.request, { ignoreSearch: true });
             });
         })
     );

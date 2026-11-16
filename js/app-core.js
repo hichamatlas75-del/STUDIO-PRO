@@ -1011,7 +1011,11 @@ class InMenuStudioApp {
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(err => {
+                navigator.serviceWorker.register('./sw.js').then(reg => {
+                    if (typeof reg.update === 'function') {
+                        reg.update();
+                    }
+                }).catch(err => {
                     console.warn('SW registration failed:', err);
                 });
             });
